@@ -1,0 +1,24 @@
+{
+  "name": "@repo/reliverse-cli",
+  "version": "0.1.0",
+  "private": true,
+  "bin": {
+    "reliverse": "./src/index.ts"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "bun ./src/index.ts",
+    "start": "bun ./src/index.ts",
+    "build": "bun build ./src/index.ts --outdir ./dist --target node",
+    "registry:list": "bun ./src/index.ts registry list",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/sdk": "workspace:*",
+    "gitpick": "^4.12.4"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

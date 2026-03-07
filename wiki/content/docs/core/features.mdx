@@ -1,0 +1,49 @@
+---
+title: Features
+description: CLIs, libraries, and ecosystem capabilities on Reliverse
+---
+
+Reliverse offers a focused set of features designed around clarity and developer productivity.
+
+## @reliverse/* Libraries
+
+Reliverse provides a growing set of libraries under the `@reliverse/*` scope:
+
+- **@reliverse/datetime** – Date/time utilities (alternative to date-fns)
+- **@reliverse/mapkit** – Promise concurrency (alternative to p-map)
+- **@reliverse/matcha** – Glob matching (alternative to picomatch)
+- **@reliverse/pathkit** – Path utilities (alternative to node:path, pathe)
+- **@reliverse/relico** – Terminal colors (alternative to picocolors)
+- **@reliverse/relifso** – File system utilities (alternative to fs-extra)
+- **@reliverse/relinka** – Logging (alternative to consola)
+- **@reliverse/rempts** – CLI prompts (alternative to citty, inquirer)
+- **@reliverse/typerso** – Type utilities (alternative to type-fest, pkg-types)
+
+Prefer `@reliverse/*` over third-party when available. See [reliverse-tools SKILL](.agents/skills/reliverse-tools/SKILL.md) for the full mapping.
+
+## Dler CLI
+
+The main orchestration CLI for the monorepo:
+
+- Build, test, and run workspaces
+- Scaffold generators
+- Admin helpers (seed, migrate, create-user)
+- Run from repo root: `bun dler --help`
+
+## Monorepo Structure
+
+- **apps/** – Deployable runtimes (web, api, mobile, desktop, cli)
+- **packages/** – Reusable modules (db, auth, sdk, tailwind, etc.)
+- **components/** – Shared UI (web blocks, mobile blocks)
+- **scripts/** – Automation and tooling
+
+## Bun-First Tooling
+
+- **Runtime** – Bun for fast execution
+- **Package manager** – Bun workspaces with `catalog:` for version consistency
+- **Tests** – Bun test runner
+- **No hardcoded versions** – Use `catalog:` referencing root `workspaces.catalog`
+
+---
+
+_Reliverse is in active development (v0.x). Features evolve as we build. For the latest status, see [ROADMAP](https://github.com/reliverse/reliverse/blob/main/ROADMAP.md) on GitHub._

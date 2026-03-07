@@ -1,0 +1,39 @@
+{
+  "name": "@repo/db",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./schema": "./src/schema/index.ts",
+    "./schema/*": "./src/schema/*.schema.ts"
+  },
+  "scripts": {
+    "db": "drizzle-kit",
+    "auth:generate": "bunx https://pkg.pr.new/better-auth/better-auth/@better-auth/cli@6913 generate --config ../auth/src/auth.ts --y --output ./src/schema/auth.schema.ts",
+    "db:push": "drizzle-kit push",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio",
+    "db:migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "@neondatabase/serverless": "catalog:",
+    "@repo/env": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "nanoid": "catalog:",
+    "postgres": "catalog:",
+    "ws": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "@types/ws": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "dotenv": "catalog:",
+    "drizzle-kit": "catalog:"
+  },
+  "peerDependencies": {
+    "@tanstack/react-start": "catalog:"
+  }
+}

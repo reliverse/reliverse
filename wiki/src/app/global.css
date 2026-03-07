@@ -1,0 +1,21 @@
+@import "tailwindcss";
+@import "fumadocs-ui/css/neutral.css";
+@import "fumadocs-ui/css/preset.css";
+
+@keyframes hero-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(0.5rem);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.hero-animate {
+  animation: hero-fade-in 0.7s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+.hero-animate-delay-1 { animation-delay: 0.1s; opacity: 0; }
+.hero-animate-delay-2 { animation-delay: 0.2s; opacity: 0; }
+.hero-animate-delay-3 { animation-delay: 0.35s; opacity: 0; }
+.hero-animate-delay-4 { animation-delay: 0.5s; opacity: 0; }

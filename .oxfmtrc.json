@@ -1,0 +1,27 @@
+{
+  "$schema": "./node_modules/oxfmt/configuration_schema.json",
+  "tabWidth": 2,
+  "semi": true,
+  "printWidth": 100,
+  "singleQuote": false,
+  "endOfLine": "lf",
+  "trailingComma": "all",
+  "sortImports": {},
+  "sortPackageJson": true,
+  "ignorePatterns": [
+    "bun.lock",
+    "routeTree.gen.ts",
+    ".tanstack-start/",
+    ".tanstack/",
+    "drizzle/",
+    "migrations/",
+    ".drizzle/",
+    ".turbo",
+    ".cache",
+    "worker-configuration.d.ts",
+    ".vercel",
+    ".output",
+    ".wrangler",
+    "dist"
+  ]
+}

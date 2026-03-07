@@ -1,0 +1,43 @@
+# Dependency directories
+node_modules/
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Declaration files
+next-env.d.ts
+expo-env.d.ts
+
+# Build output
+*.tsbuildinfo
+.tanstack/
+.output/
+.cache/
+.nitro/
+.next/
+.expo/
+build/
+dist/
+out/
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Monorepo
+.vercel/
+.turbo/
+
+# Temporary
+temp
+# Deploy-runtime local guardrails
+DO_NOT_COMMIT_HERE.md
+.githooks/pre-commit
+.githooks/pre-push
+

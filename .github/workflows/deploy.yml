@@ -1,0 +1,120 @@
+name: Deploy Reliverse Monorepo
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deploy target selector (id | key | project:app | repo/path)"
+        required: false
+        default: ""
+        type: string
+      app_id:
+        description: "[deprecated] App ID from deploy registry"
+        required: false
+        default: ""
+        type: string
+      ref:
+        description: "Git ref to deploy (commit SHA / branch / tag)"
+        required: true
+        default: "main"
+        type: string
+
+concurrency:
+  group: reliverse-prod-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    if: >-
+      ${{
+        (
+          github.event_name == 'push' &&
+          contains(fromJson(vars.DEPLOY_AUTO_USERS_JSON || '["blefnk"]'), github.actor) &&
+          !contains(github.event.head_commit.message, '[skip deploy]') &&
+          !contains(github.event.head_commit.message, '[skip ci]')
+        ) ||
+        (
+          github.event_name == 'workflow_dispatch' &&
+          contains(fromJson(vars.DEPLOY_MANUAL_USERS_JSON || '["blefnk"]'), github.actor)
+        )
+      }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    environment: production
+
+    steps:
+      - name: Start ssh-agent (native)
+        shell: bash
+        run: |
+          set -euo pipefail
+          eval "$(ssh-agent -s)"
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-add ~/.ssh/id_deploy
+          echo "SSH_AUTH_SOCK=$SSH_AUTH_SOCK" >> "$GITHUB_ENV"
+          echo "SSH_AGENT_PID=$SSH_AGENT_PID" >> "$GITHUB_ENV"
+
+      - name: Configure known_hosts
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          chmod 600 ~/.ssh/known_hosts
+
+      - name: Deploy over SSH (pinned ref/SHA)
+        shell: bash
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+          DEPLOY_TARGET_VAR: ${{ vars.DEPLOY_TARGET }}
+          DEPLOY_APP_ID_VAR: ${{ vars.DEPLOY_APP_ID }}
+          INPUT_TARGET: ${{ inputs.target }}
+          INPUT_APP_ID: ${{ inputs.app_id }}
+          INPUT_REF: ${{ inputs.ref }}
+          GITHUB_SHA: ${{ github.sha }}
+          GITHUB_EVENT_NAME: ${{ github.event_name }}
+        run: |
+          set -euo pipefail
+
+          DEFAULT_TARGET="${DEPLOY_TARGET_VAR:-${DEPLOY_APP_ID_VAR:-reliverse-web}}"
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TARGET_SELECTOR="${INPUT_TARGET:-${INPUT_APP_ID:-$DEFAULT_TARGET}}"
+            TARGET_REF="${INPUT_REF:-main}"
+          else
+            TARGET_SELECTOR="$DEFAULT_TARGET"
+            TARGET_REF="${GITHUB_SHA}"
+          fi
+
+          REMOTE_CMD='set -euo pipefail; TARGET_SELECTOR="${DEPLOY_TARGET_SELECTOR:-reliverse-web}"; TARGET_REF="${DEPLOY_TARGET_REF:-}"; DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"; REG="${RELIVERSE_REGISTRY_PATH:-$HOME/.config/deploy.json}"; [ -x "$DEPLOY_BIN" ] || { echo "❌ Missing executable deploy script: $DEPLOY_BIN"; exit 1; }; [ -f "$REG" ] || { echo "❌ Missing deploy registry: $REG"; exit 1; }; RESOLVED_JSON="$($DEPLOY_BIN --resolve "$TARGET_SELECTOR")"; APP_ID="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"id\"])" "$RESOLVED_JSON")"; REPO_DIR="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"repoDir\"])" "$RESOLVED_JSON")"; if [ -n "$TARGET_REF" ]; then git -C "$REPO_DIR" fetch --all --prune; RESOLVED_TARGET="$(git -C "$REPO_DIR" rev-parse "$TARGET_REF")"; git -C "$REPO_DIR" checkout --force --detach "$RESOLVED_TARGET"; export BLEVERSE_GIT_PULL_STRATEGY_OVERRIDE=none; fi; "$DEPLOY_BIN" "$APP_ID"; if [ -n "$TARGET_REF" ]; then DEPLOYED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"; [ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ] || { echo "❌ Deployed SHA mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"; exit 1; }; echo "✅ Deployed exact ref: $DEPLOYED_SHA"; fi; echo "✅ Deploy finished successfully"'
+
+          ssh \
+            -p "${SSH_PORT}" \
+            -o BatchMode=yes \
+            -o StrictHostKeyChecking=yes \
+            -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+            -o LogLevel=ERROR \
+            -o ConnectTimeout=20 \
+            -o ServerAliveInterval=15 \
+            -o ServerAliveCountMax=3 \
+            "${SSH_USER}@${SSH_HOST}" \
+            "DEPLOY_TARGET_SELECTOR=$(printf %q "$TARGET_SELECTOR") DEPLOY_TARGET_REF=$(printf %q "$TARGET_REF") bash -lc $(printf %q "$REMOTE_CMD")"
+
+      - name: Stop ssh-agent (best-effort)
+        if: always()
+        shell: bash
+        run: |
+          set +e
+          if [[ -n "${SSH_AGENT_PID:-}" ]]; then
+            ssh-agent -k >/dev/null 2>&1 || true
+          fi

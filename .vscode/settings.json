@@ -1,0 +1,54 @@
+{
+  "editor.codeActionsOnSave": {
+    "source.fixAll.oxc": "explicit"
+  },
+  "editor.defaultFormatter": "oxc.oxc-vscode",
+  "editor.selectionClipboard": false,
+  "editor.formatOnSave": true,
+  "editor.quickSuggestions": {
+    "strings": "on"
+  },
+  "oxc.enable": true,
+  "oxc.typeAware": true,
+  "files.eol": "\n",
+  "files.autoSave": "afterDelay",
+  "json.schemaDownload.enable": true,
+  "typescript.experimental.useTsgo": true,
+  "typescript.preferences.autoImportSpecifierExcludeRegexes": ["^(node:)?os$"],
+  "markdownlint.config": {
+    "MD031": false,
+    "MD032": false,
+    "MD022": false,
+    "MD024": false,
+    "MD033": false,
+    "MD041": false
+  },
+  "files.associations": {
+    "LICENSE": "plaintext",
+    "NOTICE": "plaintext",
+    "*.mdx": "markdown",
+    "*.json": "json",
+    ".env*": "properties"
+  },
+  "files.readonlyInclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "**/.output/**/*": true,
+    "**/worker-configuration.d.ts": true,
+    "bun.lock": true
+  },
+  "files.watcherExclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "**/.output/**/*": true,
+    "**/worker-configuration.d.ts": true,
+    "bun.lock": true
+  },
+  "search.exclude": {
+    "**/routeTree.gen.ts": true,
+    "**/.tanstack/**/*": true,
+    "**/.output/**/*": true,
+    "**/worker-configuration.d.ts": true,
+    "bun.lock": true
+  }
+}

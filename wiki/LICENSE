@@ -1,0 +1,63 @@
+# Wiki License
+
+Copyright (c) 2026-present Nazarii Korniienko
+
+This file applies **only to the `wiki/` directory** of the `reliverse/reliverse` repository.
+
+The root repository itself is licensed under the Apache License 2.0.
+
+This document defines licensing terms specifically for wiki code and content.
+
+## 1) Wiki Source Code
+
+All source code located inside the `wiki/` directory (including UI components, rendering logic, configuration, and tooling specific to the wiki) is licensed under the **MIT License**, unless otherwise specified.
+
+You are free to use, modify, distribute, and sublicense this wiki-specific code under the terms of the MIT License.
+
+The software is provided "as is", without warranty of any kind.
+
+## 2) Documentation & Blog Content
+
+All original content located in:
+
+- `wiki/content/blog`
+- `wiki/content/docs`
+
+is licensed under the **Creative Commons Attribution 4.0 International (CC BY 4.0)** license.
+
+You are free to:
+
+- **Share**: copy and redistribute the material in any medium or format
+- **Adapt**: remix, transform, and build upon the material
+- **Commercial use is allowed**
+
+Under the following condition:
+
+- **Attribution**: You must
+  1. give appropriate credit to "Reliverse" or "Nazarii Korniienko",
+  2. provide a link to the original source and the license,
+  3. and indicate if changes were made.
+
+Full `CC BY 4.0` license text: <https://creativecommons.org/licenses/by/4.0/legalcode>
+
+## Attribution Example (TASL format)
+
+```text
+- "Reliverse Blog" by Nazarii Korniienko.
+- Original source: https://github.com/reliverse/reliverse
+- Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0
+- (Adapted from the original; changes were made)
+```
+
+## Contributions
+
+By contributing to the `wiki/` directory:
+
+- Code contributions are licensed under the MIT License.
+- Documentation and blog contributions are licensed under CC BY 4.0.
+
+## Notices
+
+Unless otherwise specified, all original content is provided "as is", without warranty of any kind.
+
+Third-party assets, dependencies, and materials may be subject to their own licenses.

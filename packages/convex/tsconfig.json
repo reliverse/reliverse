@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "extends": "@repo/tsconfig/ts-files-only.json",
+  "compilerOptions": {
+    /* These compiler options are required by Convex */
+    "target": "ESNext",
+    "lib": ["ES2022", "dom"],
+    "forceConsistentCasingInFileNames": true,
+    "module": "ESNext",
+    "isolatedModules": true,
+    "noEmit": true,
+    "paths": {
+      "#convex/*": ["./src/*"]
+    }
+  },
+  "include": ["./**/*"],
+  "exclude": ["node_modules/"]
+}

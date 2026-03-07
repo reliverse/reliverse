@@ -1,0 +1,20 @@
+{
+  "name": "@repo/env",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./api": "./src/api.ts",
+    "./expo": "./src/expo.ts",
+    "./vite": "./src/vite.ts"
+  },
+  "dependencies": {
+    "arkenv": "catalog:",
+    "arktype": "catalog:"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}
