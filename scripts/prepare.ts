@@ -75,11 +75,11 @@ async function removePathSafe(path: string, opts: { dryRun: boolean }): Promise<
 }
 
 async function prepareDeployRuntime(opts: { dryRun: boolean; force: boolean }): Promise<void> {
-  const marker = `# Deploy checkout (runtime)\n\nThis repo is used as a deploy/runtime checkout.\n\nDo not commit/push from here.\nUse: \`~/B/R/reliverse\` for development work.\n`;
+  const marker = `# Deploy checkout (runtime)\n\nThis repo is used as a deploy/runtime checkout.\n\nDo not commit/push from here.\nUse: \`~/dev/reliverse/reliverse\` for development work.\n`;
 
-  const preCommit = `#!/usr/bin/env bash\necho "❌ Commit blocked: this is a deploy/runtime checkout."\necho "Use dev repo instead: ~/B/R/reliverse"\nexit 1\n`;
+  const preCommit = `#!/usr/bin/env bash\necho "❌ Commit blocked: this is a deploy/runtime checkout."\necho "Use dev repo instead: ~/dev/reliverse/reliverse"\nexit 1\n`;
 
-  const prePush = `#!/usr/bin/env bash\necho "❌ Push blocked from deploy/runtime checkout."\necho "Use dev repo instead: ~/B/R/reliverse"\nexit 1\n`;
+  const prePush = `#!/usr/bin/env bash\necho "❌ Push blocked from deploy/runtime checkout."\necho "Use dev repo instead: ~/dev/reliverse/reliverse"\nexit 1\n`;
 
   if (!opts.dryRun) {
     await mkdir(".githooks", { recursive: true });
