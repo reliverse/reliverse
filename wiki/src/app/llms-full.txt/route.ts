@@ -1,4 +1,4 @@
-import { getLLMText, blogSource, loreSource, source } from "~/lib/source";
+import { getLLMText, blogSource, source } from "~/lib/source";
 
 export const revalidate = false;
 
