@@ -2,10 +2,14 @@
   "name": "@repo/reliverse-cli",
   "version": "0.1.0",
   "private": true,
+  "author": "reliverse",
   "bin": {
     "reliverse": "./src/index.ts"
   },
   "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "dev": "bun ./src/index.ts",
     "start": "bun ./src/index.ts",
@@ -14,6 +18,19 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
+    "@p/linear": "workspace:*",
+    "@reliverse/addons": "workspace:*",
+    "@reliverse/colors": "workspace:*",
+    "@reliverse/escaper": "workspace:*",
+    "@reliverse/helpers": "workspace:*",
+    "@reliverse/launcher": "workspace:*",
+    "@reliverse/logger": "workspace:*",
+    "@reliverse/mapper": "workspace:*",
+    "@reliverse/matcher": "workspace:*",
+    "@reliverse/pkg-tsc": "workspace:*",
+    "@reliverse/prompt": "workspace:*",
+    "@reliverse/rebts": "workspace:*",
+    "@reliverse/rules": "workspace:*",
     "@reliverse/sdk": "workspace:*",
     "gitpick": "^4.12.4"
   },

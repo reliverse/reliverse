@@ -3,6 +3,15 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "dependencies": {
+    "@reliverse/escaper": "workspace:*",
+    "@reliverse/git-utils": "workspace:*",
+    "@reliverse/launcher": "workspace:*",
+    "@reliverse/logger": "workspace:*",
+    "@reliverse/prompt": "workspace:*",
+    "magic-string": "^0.30.21",
+    "ts-morph": "catalog:"
+  },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",

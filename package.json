@@ -13,6 +13,18 @@
       "wiki"
     ],
     "catalog": {
+      "clipboardy": "^5.0.1",
+      "jiti": "^2.6.1",
+      "p-map": "^7.0.4",
+      "tinyglobby": "^0.2.15",
+      "typescript": "^5.9.3",
+      "jsonc-parser": "^3.3.1",
+      "ts-morph": "^27.0.2",
+      "magic-string": "^0.30.21",
+      "execa": "^9.6.1",
+      "yaml": "^2.8.2",
+      "handlebars": "^4.7.8",
+      "gradient-string": "^3.0.0",
       "nanoid": "^5.1.6",
       "@tanstack/react-form-devtools": "^0.2.16",
       "@fontsource-variable/inter": "^5.2.8",
@@ -182,6 +194,17 @@
     "start:web": "bun -F=@repo/reliverse-web start",
     "build:web": "bun -F=@repo/reliverse-web build",
     "smoke:web": "bun -F=@repo/reliverse-web run smoke",
+    "reliverse:rse": "bun cli/src/cli.ts",
+    "reliverse:pub": "bun run build && bun dler publish --skip-tip-2fa",
+    "reliverse:build": "bun clean && bun typecheck && bun dler build",
+    "reliverse:clean": "bun dler clean --presets build --force",
+    "reliverse:typecheck": "bun dler tsc --copy-logs",
+    "reliverse:check": "bun format && bun typecheck",
+    "reliverse:format": "bun biome check --write --unsafe",
+    "reliverse:latest": "bun dler update && bun install && bun check",
+    "reliverse:escaper": "bun rse escape --input 'packages/rules/src/rules' --map 'md:.rules'",
+    "reliverse:scripts": "bun scripts/src/cli.ts",
+    "reliverse:bts": "bun scripts bts && bun check && bun scripts postbts && bun check",
     "build:turbo": "bun check && turbo run build",
     "dev:turbo": "turbo run dev",
     "turbo:build": "turbo run build",
@@ -213,7 +236,6 @@
     "prepare:env": "bun scripts/prepare.ts"
   },
   "devDependencies": {
-    "@reliverse/dler": "^2.3.4",
     "@tanstack/eslint-plugin-query": "^5.91.4",
     "@tanstack/eslint-plugin-router": "^1.161.4",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -231,5 +253,8 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
   },
-  "packageManager": "bun@1.3.9"
+  "engines": {
+    "bun": ">=1.3.10"
+  },
+  "packageManager": "bun@1.3.10"
 }

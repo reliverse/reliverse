@@ -1,9 +1,11 @@
 {
   "recommendations": [
+    "aaron-bond.better-comments",
     "arktypeio.arkdark",
     "bradlc.vscode-tailwindcss",
     "chunsen.bracket-select",
     "davidanson.vscode-markdownlint",
+    "fabiospampinato.vscode-open-multiple-files",
     "oven.bun-vscode",
     "oxc.oxc-vscode",
     "typescriptteam.native-preview",

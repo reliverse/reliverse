@@ -36,8 +36,9 @@ Thumbs.db
 
 # Temporary
 temp
-# Deploy-runtime local guardrails
+*~
+
+# Deploy guardrails
 DO_NOT_COMMIT_HERE.md
 .githooks/pre-commit
 .githooks/pre-push
-
