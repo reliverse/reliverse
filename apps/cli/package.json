@@ -14,25 +14,7 @@
     "dev": "bun ./src/index.ts",
     "start": "bun ./src/index.ts",
     "build": "bun build ./src/index.ts --outdir ./dist --target node",
-    "registry:list": "bun ./src/index.ts registry list",
     "typecheck": "tsgo --noEmit"
-  },
-  "dependencies": {
-    "@p/linear": "workspace:*",
-    "@reliverse/addons": "workspace:*",
-    "@reliverse/colors": "workspace:*",
-    "@reliverse/escaper": "workspace:*",
-    "@reliverse/helpers": "workspace:*",
-    "@reliverse/launcher": "workspace:*",
-    "@reliverse/logger": "workspace:*",
-    "@reliverse/mapper": "workspace:*",
-    "@reliverse/matcher": "workspace:*",
-    "@reliverse/pkg-tsc": "workspace:*",
-    "@reliverse/prompt": "workspace:*",
-    "@reliverse/rebts": "workspace:*",
-    "@reliverse/rules": "workspace:*",
-    "@reliverse/sdk": "workspace:*",
-    "gitpick": "^4.12.4"
   },
   "devDependencies": {
     "@types/bun": "catalog:",

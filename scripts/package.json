@@ -4,11 +4,6 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@reliverse/escaper": "workspace:*",
-    "@reliverse/git-utils": "workspace:*",
-    "@reliverse/launcher": "workspace:*",
-    "@reliverse/logger": "workspace:*",
-    "@reliverse/prompt": "workspace:*",
     "magic-string": "^0.30.21",
     "ts-morph": "catalog:"
   },

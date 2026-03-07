@@ -4,7 +4,7 @@ import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 
-import { defineArgs, defineCommand } from "@reliverse/launcher";
+import { defineArgs, defineCommand } from "@reliverse/rempts";
 import { logger } from "@reliverse/logger";
 
 export interface EscapeArgs {

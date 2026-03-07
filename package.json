@@ -204,7 +204,6 @@
     "reliverse:latest": "bun dler update && bun install && bun check",
     "reliverse:escaper": "bun rse escape --input 'packages/rules/src/rules' --map 'md:.rules'",
     "reliverse:scripts": "bun scripts/src/cli.ts",
-    "reliverse:bts": "bun scripts bts && bun check && bun scripts postbts && bun check",
     "build:turbo": "bun check && turbo run build",
     "dev:turbo": "turbo run dev",
     "turbo:build": "turbo run build",

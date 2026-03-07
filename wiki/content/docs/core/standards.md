@@ -12,7 +12,7 @@ Repeated I/O operations-like reading a configuration file every time a function 
 **❌ Bad Example (Reading config on every prompt):**
 
 ```ts
-import { confirmPrompt } from "@reliverse/prompts";
+import { confirmPrompt } from "@reliverse/rempts";
 import { readConfig } from "./utils/readConfig.js"; // Hypothetical utility
 import { getCurrentWorkingDirectory } from "./utils/fs.js";
 
@@ -31,7 +31,7 @@ async function decide(behaviorKey: string, title: string): Promise<boolean> {
 **✅ Good Example (Read config once and pass it along):**
 
 ```ts
-import { confirmPrompt } from "@reliverse/prompts";
+import { confirmPrompt } from "@reliverse/rempts";
 
 async function decide(config: any, behaviorKey: string, title: string): Promise<boolean> {
   const behavior = config?.[behaviorKey] || "prompt";
