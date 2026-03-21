@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Optional single target (reliverse-web | reliverse-api). Empty = deploy both"
+        description: "Target selector (reliverse | reliverse-web | reliverse-api). Empty = deploy reliverse"
         required: false
         default: ""
         type: string
@@ -95,7 +95,7 @@ jobs:
           fi
 
           case "$REQUESTED_SELECTOR" in
-            "" )
+            ""|"reliverse" )
               DEPLOY_SELECTORS="reliverse-web,reliverse-api"
               ;;
             "reliverse-web"|"reliverse-api" )
@@ -103,7 +103,7 @@ jobs:
               ;;
             * )
               echo "❌ Unsupported target selector: $REQUESTED_SELECTOR"
-              echo "   Allowed: reliverse-web | reliverse-api | empty(default both)"
+              echo "   Allowed: reliverse | reliverse-web | reliverse-api | empty(default reliverse)"
               exit 2
               ;;
           esac
