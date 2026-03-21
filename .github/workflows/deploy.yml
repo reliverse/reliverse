@@ -115,7 +115,7 @@ jobs:
           DEPLOY_SELECTORS_CSV="${DEPLOY_SELECTORS:-reliverse-web,reliverse-api}"
           DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"
           REG="${DEPLOY_REGISTRY_PATH:-/home/deploy/.config/bleverse/deploy.json}"
-          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/blefnk/repos}"
+          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/blefnk/dev}"
           BUILD_TIMEOUT_SECONDS="${BLEVERSE_BUILD_TIMEOUT_SECONDS:-300}"
 
           [ -x "$DEPLOY_BIN" ] || { echo "❌ Missing executable deploy script: $DEPLOY_BIN"; exit 1; }
