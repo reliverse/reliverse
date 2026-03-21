@@ -115,7 +115,11 @@ jobs:
           DEPLOY_SELECTORS_CSV="${DEPLOY_SELECTORS:-reliverse-web,reliverse-api}"
           DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"
           REG="${DEPLOY_REGISTRY_PATH:-/home/deploy/.config/bleverse/deploy.json}"
-          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/blefnk/dev}"
+          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/deploy/prod/sources}"
+          if [[ "$SOURCE_ROOT" == "/home/blefnk/repos" || "$SOURCE_ROOT" == "/home/blefnk/dev" ]]; then
+            echo "ℹ️ overriding legacy SOURCE_ROOT '$SOURCE_ROOT' -> /home/deploy/prod/sources"
+            SOURCE_ROOT="/home/deploy/prod/sources"
+          fi
           BUILD_TIMEOUT_SECONDS="${BLEVERSE_BUILD_TIMEOUT_SECONDS:-300}"
 
           [ -x "$DEPLOY_BIN" ] || { echo "❌ Missing executable deploy script: $DEPLOY_BIN"; exit 1; }
@@ -172,16 +176,9 @@ jobs:
           [[ -n "$REPO_SLUG" ]] || { echo "❌ Missing repo slug in registry"; exit 1; }
           SOURCE_REPO_DIR="${DEPLOY_SOURCE_REPO_DIR:-$SOURCE_ROOT/$REPO_SLUG}"
           if [[ ! -d "$SOURCE_REPO_DIR/.git" ]]; then
-            ALT_SOURCE_ROOT="$HOME/dev"
-            ALT_SOURCE_REPO_DIR="$ALT_SOURCE_ROOT/$REPO_SLUG"
-            if [[ -d "$ALT_SOURCE_REPO_DIR/.git" ]]; then
-              echo "⚠️ Source repo missing at '$SOURCE_REPO_DIR'; falling back to '$ALT_SOURCE_REPO_DIR'"
-              SOURCE_REPO_DIR="$ALT_SOURCE_REPO_DIR"
-            else
-              echo "❌ Source repo is not a git checkout: $SOURCE_REPO_DIR"
-              echo "❌ Fallback source also missing: $ALT_SOURCE_REPO_DIR"
-              exit 1
-            fi
+            echo "❌ Source repo is not a git checkout: $SOURCE_REPO_DIR"
+            echo "❌ Expected prod source checkout under: $SOURCE_ROOT/<org>/<repo>"
+            exit 1
           fi
 
           lock_cleanup() {
