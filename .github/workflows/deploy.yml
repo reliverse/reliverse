@@ -117,7 +117,7 @@ jobs:
           REG="${DEPLOY_REGISTRY_PATH:-/home/deploy/.config/bleverse/deploy.json}"
           SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/deploy/prod/_tmp-source}"
           if [[ "$SOURCE_ROOT" == "/home/blefnk/repos" || "$SOURCE_ROOT" == "/home/blefnk/dev" ]]; then
-            echo "ℹ️ overriding legacy SOURCE_ROOT '$SOURCE_ROOT' -> /home/deploy/prod/_tmp-source"
+            echo "ℹ️ overriding legacy SOURCE_ROOT '$SOURCE_ROOT' -> /home/deploy/prod/.checkouts"
             SOURCE_ROOT="/home/deploy/prod/_tmp-source"
           fi
           BUILD_TIMEOUT_SECONDS="${BLEVERSE_BUILD_TIMEOUT_SECONDS:-300}"
