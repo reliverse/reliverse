@@ -115,10 +115,10 @@ jobs:
           DEPLOY_SELECTORS_CSV="${DEPLOY_SELECTORS:-reliverse-web,reliverse-api}"
           DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"
           REG="${DEPLOY_REGISTRY_PATH:-/home/deploy/.config/bleverse/deploy.json}"
-          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/deploy/prod/sources}"
+          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/deploy/prod/_tmp-source}"
           if [[ "$SOURCE_ROOT" == "/home/blefnk/repos" || "$SOURCE_ROOT" == "/home/blefnk/dev" ]]; then
-            echo "ℹ️ overriding legacy SOURCE_ROOT '$SOURCE_ROOT' -> /home/deploy/prod/sources"
-            SOURCE_ROOT="/home/deploy/prod/sources"
+            echo "ℹ️ overriding legacy SOURCE_ROOT '$SOURCE_ROOT' -> /home/deploy/prod/_tmp-source"
+            SOURCE_ROOT="/home/deploy/prod/_tmp-source"
           fi
           BUILD_TIMEOUT_SECONDS="${BLEVERSE_BUILD_TIMEOUT_SECONDS:-300}"
 
@@ -174,26 +174,22 @@ jobs:
           done
 
           [[ -n "$REPO_SLUG" ]] || { echo "❌ Missing repo slug in registry"; exit 1; }
-          SOURCE_REPO_DIR="${DEPLOY_SOURCE_REPO_DIR:-$SOURCE_ROOT/$REPO_SLUG}"
-          if [[ ! -d "$SOURCE_REPO_DIR/.git" ]]; then
-            echo "❌ Source repo is not a git checkout: $SOURCE_REPO_DIR"
-            echo "❌ Expected prod source checkout under: $SOURCE_ROOT/<org>/<repo>"
-            exit 1
-          fi
 
-          lock_cleanup() {
-            local lock_path="$1"
-            if [[ -f "$lock_path" ]]; then
-              echo "⚠️ Removing stale lock: $lock_path"
-              rm -f "$lock_path"
-            fi
+          SOURCE_ROOT="${SOURCE_ROOT:-/home/deploy/prod/_tmp-source}"
+          mkdir -p "$SOURCE_ROOT"
+          SOURCE_REPO_DIR="$(mktemp -d "$SOURCE_ROOT/${REPO_SLUG//\//-}.XXXXXX")"
+          cleanup_source_repo() {
+            [[ -n "${SOURCE_REPO_DIR:-}" && -d "$SOURCE_REPO_DIR" ]] && rm -rf "$SOURCE_REPO_DIR"
           }
+          trap cleanup_source_repo EXIT
+
+          SOURCE_REPO_URL="git@github.com:${REPO_SLUG}.git"
+          git clone --filter=blob:none "$SOURCE_REPO_URL" "$SOURCE_REPO_DIR"
 
           if [[ -n "$TARGET_REF" ]]; then
             export BLEVERSE_GIT_PULL_STRATEGY_OVERRIDE=none
 
-            lock_cleanup "$SOURCE_REPO_DIR/.git/index.lock"
-            git -C "$SOURCE_REPO_DIR" fetch --all --prune
+            git -C "$SOURCE_REPO_DIR" fetch --all --prune --tags
             RESOLVED_TARGET="$(git -C "$SOURCE_REPO_DIR" rev-parse "$TARGET_REF")"
             git -C "$SOURCE_REPO_DIR" checkout --force --detach "$RESOLVED_TARGET"
 
@@ -242,8 +238,8 @@ jobs:
               CURRENT_REAL="$(readlink -f "$REPO_DIR" || true)"
               PREVIOUS_REAL="$(readlink -f "$BASE_DIR/previous" || true)"
               mapfile -t RELEASES < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
-              if (( ${#RELEASES[@]} > 7 )); then
-                TO_DELETE_COUNT=$((${#RELEASES[@]} - 7))
+              if (( ${#RELEASES[@]} > 3 )); then
+                TO_DELETE_COUNT=$((${#RELEASES[@]} - 3))
                 for ((i=0; i<TO_DELETE_COUNT; i++)); do
                   CANDIDATE="${RELEASES[$i]}"
                   [[ "$CANDIDATE" == "$CURRENT_REAL" ]] && continue
