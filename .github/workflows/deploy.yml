@@ -6,12 +6,12 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: "Deploy target selector (id | key | project:app | repo/path)"
+        description: "Optional single target (reliverse-web | reliverse-api). Empty = deploy both"
         required: false
         default: ""
         type: string
       app_id:
-        description: "[deprecated] App ID from deploy registry"
+        description: "[deprecated] Same as target"
         required: false
         default: ""
         type: string
@@ -44,7 +44,7 @@ jobs:
         )
       }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     environment: production
 
     steps:
@@ -70,14 +70,14 @@ jobs:
           printf '%s\n' "${{ secrets.SSH_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
           chmod 600 ~/.ssh/known_hosts
 
-      - name: Deploy over SSH (pinned ref/SHA)
+      - name: Deploy repo (single sync) and restart apps
         shell: bash
         env:
           SSH_HOST: ${{ secrets.SSH_HOST }}
           SSH_PORT: ${{ secrets.SSH_PORT }}
           SSH_USER: ${{ secrets.SSH_USER }}
-          DEPLOY_TARGET_VAR: ${{ vars.DEPLOY_TARGET }}
-          DEPLOY_APP_ID_VAR: ${{ vars.DEPLOY_APP_ID }}
+          DEPLOY_REGISTRY_PATH_VAR: ${{ vars.DEPLOY_REGISTRY_PATH }}
+          DEPLOY_SOURCE_ROOT_VAR: ${{ vars.DEPLOY_SOURCE_ROOT }}
           INPUT_TARGET: ${{ inputs.target }}
           INPUT_APP_ID: ${{ inputs.app_id }}
           INPUT_REF: ${{ inputs.ref }}
@@ -86,17 +86,249 @@ jobs:
         run: |
           set -euo pipefail
 
-          DEFAULT_TARGET="${DEPLOY_TARGET_VAR:-${DEPLOY_APP_ID_VAR:-reliverse-web}}"
+          REQUESTED_SELECTOR="${INPUT_TARGET:-${INPUT_APP_ID:-}}"
 
           if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
-            TARGET_SELECTOR="${INPUT_TARGET:-${INPUT_APP_ID:-$DEFAULT_TARGET}}"
             TARGET_REF="${INPUT_REF:-main}"
           else
-            TARGET_SELECTOR="$DEFAULT_TARGET"
             TARGET_REF="${GITHUB_SHA}"
           fi
 
-          REMOTE_CMD='set -euo pipefail; TARGET_SELECTOR="${DEPLOY_TARGET_SELECTOR:-reliverse-web}"; TARGET_REF="${DEPLOY_TARGET_REF:-}"; DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"; REG="${RELIVERSE_REGISTRY_PATH:-$HOME/.config/deploy.json}"; [ -x "$DEPLOY_BIN" ] || { echo "❌ Missing executable deploy script: $DEPLOY_BIN"; exit 1; }; [ -f "$REG" ] || { echo "❌ Missing deploy registry: $REG"; exit 1; }; RESOLVED_JSON="$($DEPLOY_BIN --resolve "$TARGET_SELECTOR")"; APP_ID="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"id\"])" "$RESOLVED_JSON")"; REPO_DIR="$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"repoDir\"])" "$RESOLVED_JSON")"; if [ -n "$TARGET_REF" ]; then git -C "$REPO_DIR" fetch --all --prune; RESOLVED_TARGET="$(git -C "$REPO_DIR" rev-parse "$TARGET_REF")"; git -C "$REPO_DIR" checkout --force --detach "$RESOLVED_TARGET"; export BLEVERSE_GIT_PULL_STRATEGY_OVERRIDE=none; fi; "$DEPLOY_BIN" "$APP_ID"; if [ -n "$TARGET_REF" ]; then DEPLOYED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"; [ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ] || { echo "❌ Deployed SHA mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"; exit 1; }; echo "✅ Deployed exact ref: $DEPLOYED_SHA"; fi; echo "✅ Deploy finished successfully"'
+          case "$REQUESTED_SELECTOR" in
+            "" )
+              DEPLOY_SELECTORS="reliverse-web,reliverse-api"
+              ;;
+            "reliverse-web"|"reliverse-api" )
+              DEPLOY_SELECTORS="$REQUESTED_SELECTOR"
+              ;;
+            * )
+              echo "❌ Unsupported target selector: $REQUESTED_SELECTOR"
+              echo "   Allowed: reliverse-web | reliverse-api | empty(default both)"
+              exit 2
+              ;;
+          esac
+
+          REMOTE_CMD="$(cat <<'REMOTE_BASH'
+          set -euo pipefail
+
+          TARGET_REF="${DEPLOY_TARGET_REF:-}"
+          DEPLOY_SELECTORS_CSV="${DEPLOY_SELECTORS:-reliverse-web,reliverse-api}"
+          DEPLOY_BIN="$HOME/.local/bin/bleverse-deploy-app"
+          REG="${DEPLOY_REGISTRY_PATH:-/home/deploy/.config/bleverse/deploy.json}"
+          SOURCE_ROOT="${DEPLOY_SOURCE_ROOT:-/home/blefnk/repos}"
+          BUILD_TIMEOUT_SECONDS="${BLEVERSE_BUILD_TIMEOUT_SECONDS:-300}"
+
+          [ -x "$DEPLOY_BIN" ] || { echo "❌ Missing executable deploy script: $DEPLOY_BIN"; exit 1; }
+          [ -f "$REG" ] || { echo "❌ Missing deploy registry: $REG"; exit 1; }
+
+          mkdir -p "$HOME/.ssh"
+          chmod 700 "$HOME/.ssh"
+          touch "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/known_hosts"
+          ssh-keygen -F github.com >/dev/null || ssh-keyscan -H github.com >> "$HOME/.ssh/known_hosts"
+
+          export BLEVERSE_REGISTRY_PATH="$REG"
+
+          IFS=',' read -r -a SELECTORS <<< "$DEPLOY_SELECTORS_CSV"
+          [[ ${#SELECTORS[@]} -gt 0 ]] || { echo "❌ No deploy selectors provided"; exit 1; }
+
+          declare -a APP_IDS=()
+          declare -a REPO_DIRS=()
+          declare -a REPO_SLUGS=()
+          declare -a WORKSPACES=()
+          declare -a SERVICES=()
+          declare -a SMOKE_URLS=()
+
+          for selector in "${SELECTORS[@]}"; do
+            selector="${selector//[[:space:]]/}"
+            [[ -n "$selector" ]] || continue
+
+            RESOLVED_JSON="$($DEPLOY_BIN --resolve "$selector")"
+
+            APP_IDS+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"id\"])" "$RESOLVED_JSON")")
+            REPO_DIRS+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1])[\"repoDir\"])" "$RESOLVED_JSON")")
+            REPO_SLUGS+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get(\"repo\") or \"\")" "$RESOLVED_JSON")")
+            WORKSPACES+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get(\"workspacePath\") or \"\")" "$RESOLVED_JSON")")
+            SERVICES+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get(\"service\") or \"\")" "$RESOLVED_JSON")")
+            SMOKE_URLS+=("$(python3 -c "import json,sys; print(json.loads(sys.argv[1]).get(\"smokeUrl\") or \"\")" "$RESOLVED_JSON")")
+          done
+
+          [[ ${#APP_IDS[@]} -gt 0 ]] || { echo "❌ No apps resolved from selectors"; exit 1; }
+
+          REPO_DIR="${REPO_DIRS[0]}"
+          REPO_SLUG="${REPO_SLUGS[0]}"
+
+          for i in "${!APP_IDS[@]}"; do
+            [[ "${REPO_DIRS[$i]}" == "$REPO_DIR" ]] || {
+              echo "❌ RepoDir mismatch between targets: ${APP_IDS[$i]} => ${REPO_DIRS[$i]} vs $REPO_DIR"
+              exit 1
+            }
+            [[ "${REPO_SLUGS[$i]}" == "$REPO_SLUG" ]] || {
+              echo "❌ Repo slug mismatch between targets: ${APP_IDS[$i]} => ${REPO_SLUGS[$i]} vs $REPO_SLUG"
+              exit 1
+            }
+          done
+
+          [[ -n "$REPO_SLUG" ]] || { echo "❌ Missing repo slug in registry"; exit 1; }
+          SOURCE_REPO_DIR="${DEPLOY_SOURCE_REPO_DIR:-$SOURCE_ROOT/$REPO_SLUG}"
+          [ -d "$SOURCE_REPO_DIR/.git" ] || { echo "❌ Source repo is not a git checkout: $SOURCE_REPO_DIR"; exit 1; }
+
+          lock_cleanup() {
+            local lock_path="$1"
+            if [[ -f "$lock_path" ]]; then
+              echo "⚠️ Removing stale lock: $lock_path"
+              rm -f "$lock_path"
+            fi
+          }
+
+          if [[ -n "$TARGET_REF" ]]; then
+            export BLEVERSE_GIT_PULL_STRATEGY_OVERRIDE=none
+
+            lock_cleanup "$SOURCE_REPO_DIR/.git/index.lock"
+            git -C "$SOURCE_REPO_DIR" fetch --all --prune
+            RESOLVED_TARGET="$(git -C "$SOURCE_REPO_DIR" rev-parse "$TARGET_REF")"
+            git -C "$SOURCE_REPO_DIR" checkout --force --detach "$RESOLVED_TARGET"
+
+            if [[ "$REPO_DIR" == */current ]]; then
+              BASE_DIR="${REPO_DIR%/current}"
+              RELEASES_DIR="$BASE_DIR/releases"
+              META_DIR="$BASE_DIR/deploy-meta"
+              mkdir -p "$RELEASES_DIR" "$META_DIR" "$BASE_DIR/shared"
+
+              for svc in "${SERVICES[@]}"; do
+                [[ -n "$svc" ]] || continue
+                systemctl --user stop "$svc" || true
+              done
+
+              SHORT_SHA="${RESOLVED_TARGET:0:7}"
+              TS_UTC="$(date -u +%Y-%m-%dT%H-%M-%SZ)"
+              RELEASE_ID="${TS_UTC}_${SHORT_SHA}"
+              NEW_RELEASE_DIR="$RELEASES_DIR/$RELEASE_ID"
+
+              mkdir -p "$NEW_RELEASE_DIR"
+              rsync -a --delete \
+                --exclude '.git/' \
+                --exclude 'node_modules/' \
+                --exclude '.next/' \
+                --exclude '.cache/' \
+                "$SOURCE_REPO_DIR/" "$NEW_RELEASE_DIR/"
+
+              OLD_CURRENT_REAL=""
+              if [[ -L "$REPO_DIR" ]]; then
+                OLD_CURRENT_REAL="$(readlink -f "$REPO_DIR" || true)"
+              elif [[ -d "$REPO_DIR" ]]; then
+                LEGACY_RELEASE_ID="legacy-${TS_UTC}"
+                LEGACY_RELEASE_DIR="$RELEASES_DIR/$LEGACY_RELEASE_ID"
+                mv "$REPO_DIR" "$LEGACY_RELEASE_DIR"
+                OLD_CURRENT_REAL="$LEGACY_RELEASE_DIR"
+              fi
+
+              if [[ -n "$OLD_CURRENT_REAL" ]] && [[ -d "$OLD_CURRENT_REAL" ]]; then
+                ln -sfn "$OLD_CURRENT_REAL" "$BASE_DIR/previous"
+              fi
+
+              ln -sfn "$NEW_RELEASE_DIR" "$REPO_DIR"
+              printf '%s\n' "$RESOLVED_TARGET" > "$NEW_RELEASE_DIR/.deploy-sha"
+              printf '%s\t%s\n' "$TS_UTC" "$RESOLVED_TARGET" >> "$META_DIR/history.jsonl"
+
+              CURRENT_REAL="$(readlink -f "$REPO_DIR" || true)"
+              PREVIOUS_REAL="$(readlink -f "$BASE_DIR/previous" || true)"
+              mapfile -t RELEASES < <(find "$RELEASES_DIR" -mindepth 1 -maxdepth 1 -type d | sort)
+              if (( ${#RELEASES[@]} > 7 )); then
+                TO_DELETE_COUNT=$((${#RELEASES[@]} - 7))
+                for ((i=0; i<TO_DELETE_COUNT; i++)); do
+                  CANDIDATE="${RELEASES[$i]}"
+                  [[ "$CANDIDATE" == "$CURRENT_REAL" ]] && continue
+                  [[ -n "$PREVIOUS_REAL" && "$CANDIDATE" == "$PREVIOUS_REAL" ]] && continue
+                  rm -rf "$CANDIDATE"
+                done
+              fi
+            else
+              mkdir -p "$REPO_DIR"
+              rsync -a --delete \
+                --exclude '.git/' \
+                --exclude 'node_modules/' \
+                --exclude '.next/' \
+                --exclude '.cache/' \
+                "$SOURCE_REPO_DIR/" "$REPO_DIR/"
+              printf '%s\n' "$RESOLVED_TARGET" > "$REPO_DIR/.deploy-sha"
+            fi
+
+            echo "✅ Synced exact ref into runtime tree: $RESOLVED_TARGET"
+          fi
+
+          UIDN="$(id -u)"
+          export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UIDN}"
+          export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+
+          (
+            cd "$REPO_DIR"
+            bun install --frozen-lockfile
+          )
+
+          for i in "${!APP_IDS[@]}"; do
+            APP_ID="${APP_IDS[$i]}"
+            APP_DIR="$REPO_DIR/${WORKSPACES[$i]}"
+
+            [[ -f "$APP_DIR/package.json" ]] || {
+              echo "❌ missing package.json for app '$APP_ID' at $APP_DIR"
+              exit 1
+            }
+
+            if python3 -c 'import json,sys; s=json.load(open(sys.argv[1])).get("scripts",{}); sys.exit(0 if "build" in s else 1)' "$APP_DIR/package.json"; then
+              (
+                cd "$APP_DIR"
+                if ! CI=1 timeout --signal=TERM --kill-after=20s "$BUILD_TIMEOUT_SECONDS" bun run build; then
+                  rc=$?
+                  if [[ "$rc" -eq 124 ]]; then
+                    echo "build timed out after ${BUILD_TIMEOUT_SECONDS}s for $APP_ID"
+                  fi
+                  exit "$rc"
+                fi
+              )
+            fi
+          done
+
+          for svc in "${SERVICES[@]}"; do
+            [[ -n "$svc" ]] || continue
+            systemctl --user restart "$svc"
+            systemctl --user is-active --quiet "$svc"
+          done
+
+          for smoke in "${SMOKE_URLS[@]}"; do
+            [[ -n "$smoke" ]] || continue
+            HEALTH_URL="${smoke%/}/health"
+            ROOT_URL="${smoke%/}/"
+
+            if ! curl -fs --retry 20 --retry-delay 1 --retry-all-errors "$HEALTH_URL" >/dev/null 2>&1; then
+              curl -fs --retry 20 --retry-delay 1 --retry-all-errors "$ROOT_URL" >/dev/null 2>&1
+            fi
+          done
+
+          if [[ -n "${RESOLVED_TARGET:-}" ]]; then
+            if [[ -d "$REPO_DIR/.git" ]]; then
+              DEPLOYED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
+              [[ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ]] || {
+                echo "❌ Deployed SHA mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"
+                exit 1
+              }
+              echo "✅ Deployed exact ref: $DEPLOYED_SHA"
+            elif [[ -f "$REPO_DIR/.deploy-sha" ]]; then
+              DEPLOYED_SHA="$(cat "$REPO_DIR/.deploy-sha")"
+              [[ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ]] || {
+                echo "❌ Runtime marker mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"
+                exit 1
+              }
+              echo "✅ Deployed exact ref marker: $DEPLOYED_SHA"
+            else
+              echo "❌ Missing deploy SHA marker in runtime tree"
+              exit 1
+            fi
+          fi
+
+          echo "✅ Repo deploy finished successfully"
+          REMOTE_BASH
+          )"
 
           ssh \
             -p "${SSH_PORT}" \
@@ -108,7 +340,7 @@ jobs:
             -o ServerAliveInterval=15 \
             -o ServerAliveCountMax=3 \
             "${SSH_USER}@${SSH_HOST}" \
-            "DEPLOY_TARGET_SELECTOR=$(printf %q "$TARGET_SELECTOR") DEPLOY_TARGET_REF=$(printf %q "$TARGET_REF") bash -lc $(printf %q "$REMOTE_CMD")"
+            "DEPLOY_TARGET_REF=$(printf %q "$TARGET_REF") DEPLOY_SELECTORS=$(printf %q "$DEPLOY_SELECTORS") DEPLOY_REGISTRY_PATH=$(printf %q "${DEPLOY_REGISTRY_PATH_VAR:-}") DEPLOY_SOURCE_ROOT=$(printf %q "${DEPLOY_SOURCE_ROOT_VAR:-}") bash -lc $(printf %q "$REMOTE_CMD")"
 
       - name: Stop ssh-agent (best-effort)
         if: always()
