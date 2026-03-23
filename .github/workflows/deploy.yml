@@ -199,7 +199,7 @@ jobs:
             if [[ "$REPO_DIR" == */current ]]; then
               BASE_DIR="${REPO_DIR%/current}"
               RELEASES_DIR="$BASE_DIR/releases"
-              META_DIR="$BASE_DIR/deploy-meta"
+              META_DIR="$BASE_DIR/metadata"
               mkdir -p "$RELEASES_DIR" "$META_DIR" "$BASE_DIR/shared"
 
               for svc in "${SERVICES[@]}"; do
