@@ -313,20 +313,20 @@ jobs:
           done
 
           if [[ -n "${RESOLVED_TARGET:-}" ]]; then
-            if [[ -d "$REPO_DIR/.git" ]]; then
-              DEPLOYED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
-              [[ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ]] || {
-                echo "❌ Deployed SHA mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"
-                exit 1
-              }
-              echo "✅ Deployed exact ref: $DEPLOYED_SHA"
-            elif [[ -f "$REPO_DIR/.deploy-sha" ]]; then
+            if [[ -f "$REPO_DIR/.deploy-sha" ]]; then
               DEPLOYED_SHA="$(cat "$REPO_DIR/.deploy-sha")"
               [[ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ]] || {
                 echo "❌ Runtime marker mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"
                 exit 1
               }
               echo "✅ Deployed exact ref marker: $DEPLOYED_SHA"
+            elif [[ -d "$REPO_DIR/.git" ]]; then
+              DEPLOYED_SHA="$(git -C "$REPO_DIR" rev-parse HEAD)"
+              [[ "$DEPLOYED_SHA" = "$RESOLVED_TARGET" ]] || {
+                echo "❌ Deployed SHA mismatch: expected $RESOLVED_TARGET got $DEPLOYED_SHA"
+                exit 1
+              }
+              echo "✅ Deployed exact ref: $DEPLOYED_SHA"
             else
               echo "❌ Missing deploy SHA marker in runtime tree"
               exit 1
