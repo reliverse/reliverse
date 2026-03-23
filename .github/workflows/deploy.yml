@@ -247,7 +247,9 @@ jobs:
                   CANDIDATE="${RELEASES[$i]}"
                   [[ "$CANDIDATE" == "$CURRENT_REAL" ]] && continue
                   [[ -n "$PREVIOUS_REAL" && "$CANDIDATE" == "$PREVIOUS_REAL" ]] && continue
-                  rm -rf "$CANDIDATE"
+                  if ! rm -rf "$CANDIDATE"; then
+                    echo "⚠️ failed to prune old release (non-fatal): $CANDIDATE"
+                  fi
                 done
               fi
             else
@@ -267,6 +269,15 @@ jobs:
           UIDN="$(id -u)"
           export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$UIDN}"
           export DBUS_SESSION_BUS_ADDRESS="${DBUS_SESSION_BUS_ADDRESS:-unix:path=$XDG_RUNTIME_DIR/bus}"
+
+          if [[ "$REPO_DIR" == */current ]]; then
+            RELEASE_ENV_REHYDRATE_SCRIPT="$REPO_DIR/scripts/rehydrate-release-env.sh"
+            if [[ -x "$RELEASE_ENV_REHYDRATE_SCRIPT" ]]; then
+              "$RELEASE_ENV_REHYDRATE_SCRIPT" "$REPO_DIR" "https://reliverse.org"
+            else
+              echo "ℹ️ skip release env rehydration"
+            fi
+          fi
 
           (
             cd "$REPO_DIR"
