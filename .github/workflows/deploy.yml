@@ -179,7 +179,14 @@ jobs:
           }
           trap cleanup_source_repo EXIT
 
-          SOURCE_REPO_URL="git@github.com:${REPO_SLUG}.git"
+          case "$REPO_SLUG" in
+            reliverse/bleverse|reliverse/reliverse)
+              SOURCE_REPO_URL="https://github.com/${REPO_SLUG}.git"
+              ;;
+            *)
+              SOURCE_REPO_URL="git@github.com:${REPO_SLUG}.git"
+              ;;
+          esac
           git clone --filter=blob:none "$SOURCE_REPO_URL" "$SOURCE_REPO_DIR"
 
           if [[ -n "$TARGET_REF" ]]; then
