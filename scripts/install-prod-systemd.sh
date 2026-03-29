@@ -4,7 +4,7 @@ set -euo pipefail
 TARGET_DIR="${1:-/home/deploy/.config/systemd/user}"
 SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
 REPO_DIR="$(cd -- "$SCRIPT_DIR/.." && pwd)"
-SOURCE_DIR="$REPO_DIR/deploy/systemd"
+SOURCE_DIR="$REPO_DIR/.deploy/systemd"
 
 mkdir -p "$TARGET_DIR"
 cp "$SOURCE_DIR/bun-web-4020-reliverse-prod.service" "$TARGET_DIR/"

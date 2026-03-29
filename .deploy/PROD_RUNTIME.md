@@ -18,8 +18,6 @@ The deploy workflow swaps `current` to a new release and records deploy history 
 Remote deploy staging now uses:
 - `/home/deploy/prod/.checkouts`
 
-Legacy `_tmp-source` is no longer part of the active deploy flow.
-
 ## Deploy registry
 Canonical registry path:
 - `/home/deploy/.config/bleverse/deploy.json`
@@ -41,8 +39,13 @@ Current Reliverse prod services run from:
 - `current/apps/web`
 - `current/apps/api`
 
-Current Reliverse web runtime also reads:
+Current Reliverse prod runtime uses deploy-owned env files:
 - `/home/deploy/.config/reliverse/reliverse-web.env`
+- `/home/deploy/.config/reliverse/reliverse-api.env`
+
+Current DB contract is environment-split:
+- dev -> `reliverse_dev`
+- prod -> `reliverse_prod`
 
 Reliverse does not currently use canonical app env files under `shared/` for web/api startup.
 The `shared/` directory remains reserved for future durable runtime config if needed.

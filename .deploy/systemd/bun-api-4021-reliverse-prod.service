@@ -9,6 +9,7 @@ Type=simple
 WorkingDirectory=/home/deploy/prod/reliverse/reliverse/current/apps/api
 Environment=PORT=4021
 Environment=NODE_ENV=production
+EnvironmentFile=/home/deploy/.config/reliverse/reliverse-api.env
 ExecStart=/usr/local/bin/bun run start
 Restart=on-failure
 RestartSec=3

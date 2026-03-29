@@ -232,7 +232,7 @@
     "pr": "bun run ck:fix && bun run ck",
     "dev:all": "bun run -F='*' dev",
     "build:all": "bun run -F='*' build",
-    "prepare:env": "bun scripts/prepare.ts"
+    "prepare:env": "bun scripts/env-sync.ts"
   },
   "devDependencies": {
     "@tanstack/eslint-plugin-query": "^5.91.4",
