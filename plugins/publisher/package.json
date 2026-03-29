@@ -1,0 +1,26 @@
+{
+  "name": "@reliverse/publisher-rse-plugin",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "bun build ./src/index.ts ./src/cmds/publisher/publish.ts --outdir ./dist --target bun",
+    "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
+    "typecheck": "tsgo --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/builder-rse-plugin": "workspace:*",
+    "@reliverse/rempts": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

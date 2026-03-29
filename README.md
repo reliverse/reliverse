@@ -66,8 +66,4 @@ Reliverse Wiki lives at:
 
 Copyright © 2026-present Nazarii Korniienko
 
-Licensed under the [Apache License 2.0](LICENSE).
-
-Some apps or packages may define additional licenses.
-
-See the `LICENSE` file inside each package for details.
+Licensed under the [MIT License](LICENSE). Some apps or packages may define additional licenses. See the `LICENSE` file inside each package for details.

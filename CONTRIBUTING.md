@@ -104,7 +104,7 @@ Reliverse is organized as a modular monorepo:
 
 ```bash
 apps/          → deployable runtimes
-wiki/          → deployable docs and blog
+apps/wiki/          → deployable docs and blog
 packages/      → reusable platform modules
 scripts/       → automation tools
 components/    → UI libraries
