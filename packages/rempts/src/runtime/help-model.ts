@@ -137,7 +137,7 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
       : options.programName;
 
   return {
-    aliases: options.command.aliases ?? [],
+    aliases: options.command.meta?.aliases ?? [],
     agentNotes: options.command.agent?.notes,
     commandFlags: toCommandFlagItems(options.command.options),
     commandPath: options.commandPath,
@@ -153,10 +153,10 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
           supportsYes: options.command.conventions.supportsYes,
         }
       : undefined,
-    description: options.command.description,
-    examples: options.command.examples ?? [],
+    description: options.command.meta?.description,
+    examples: options.command.help?.examples ?? [],
     globalFlags: options.globalFlagDefinitions.map(toGlobalFlagItem),
-    helpText: options.command.help,
+    helpText: options.command.help?.text,
     programName: options.programName,
     scope: "command",
     scopeLabel: "Subcommands",

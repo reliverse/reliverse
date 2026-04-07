@@ -1,4 +1,5 @@
 import { defineCommand } from "@reliverse/rempts";
+import pMap from "p-map";
 
 import {
   cloneManifest,
@@ -29,7 +30,10 @@ interface AddAction {
 }
 
 export default defineCommand({
-  description: "Add new dependencies to a repo or workspace package using Bun-first package management flows",
+  meta: {
+    name: "add",
+    description: "Add new dependencies to a repo or workspace package using Bun-first package management flows",
+  },
   agent: {
     notes:
       "This command is non-interactive by default. Pass packages as args and choose the target explicitly with --cwd or --target.",
@@ -38,17 +42,17 @@ export default defineCommand({
     idempotent: true,
     supportsDryRun: true,
   },
-  examples: [
-    "rse pm add zod --cwd .",
-    "rse pm add typescript @types/bun --dev --cwd .",
-    "rse pm add react --target apps/web",
-    "rse pm add drizzle-orm --target packages/db --json",
-    "rse pm add valibot --target packages/rempts --dry-run --json",
-    "rse pm add jest --target apps/web --catalog testing --dry-run --json",
-  ],
-  help:
-    "For workspace packages, the command prefers the default Bun catalog when available. Use --catalog <name> to target a named Bun catalog and write catalog:<name> references.",
-  name: "add",
+  help: {
+    examples: [
+      "rse pm add zod --cwd .",
+      "rse pm add typescript @types/bun --dev --cwd .",
+      "rse pm add react --target apps/web",
+      "rse pm add drizzle-orm --target packages/db --json",
+      "rse pm add valibot --target packages/rempts --dry-run --json",
+      "rse pm add jest --target apps/web --catalog testing --dry-run --json",
+    ],
+    text: "For workspace packages, the command prefers the default Bun catalog when available. Use --catalog <name> to target a named Bun catalog and write catalog:<name> references.",
+  },
   options: {
     cwd: {
       type: "string",
@@ -125,6 +129,33 @@ export default defineCommand({
     let nextRootManifest = cloneManifest(context.repoRootManifest);
     const actions: AddAction[] = [];
 
+    const packagesNeedingRegistryLookup = [
+      ...new Set(
+        packageInputs
+          .filter(
+            (input) =>
+              !input.requestedSpecifier &&
+              !(shouldUseCatalog && Boolean(findCatalogEntry(nextRootManifest, input.name, requestedCatalogName))),
+          )
+          .map((input) => input.name),
+      ),
+    ];
+    const latestVersionByName =
+      packagesNeedingRegistryLookup.length === 0
+        ? new Map<string, string>()
+        : new Map(
+            (
+              await pMap(
+                packagesNeedingRegistryLookup,
+                async (packageName) => {
+                  const version = await fetchLatestVersion(packageName);
+                  return [packageName, version] as const;
+                },
+                { concurrency: 8 },
+              )
+            ).map(([name, version]) => [name, version]),
+          );
+
     for (const input of packageInputs) {
       const existing = findDependencyLocation(nextTargetManifest, input.name);
       const catalogEntry = findCatalogEntry(
@@ -138,7 +169,9 @@ export default defineCommand({
           : createDesiredSpecifier({
               exact: ctx.options.exact,
               requestedSpecifier: input.requestedSpecifier,
-              version: await fetchLatestVersion(input.name),
+              version:
+                latestVersionByName.get(input.name) ??
+                (await fetchLatestVersion(input.name)),
             });
       const desiredSpecifier = shouldUseCatalog
         ? getCatalogProtocol(requestedCatalogName)

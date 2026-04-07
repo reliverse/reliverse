@@ -26,6 +26,7 @@
     "@typescript/native-preview": "catalog:"
   },
   "dependencies": {
+    "p-map": "catalog:",
     "valibot": "catalog:"
   }
 }

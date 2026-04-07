@@ -1,8 +1,8 @@
-import { existsSync, statSync, unlinkSync } from "node:fs";
-import { mkdir, readdir, readFile, writeFile } from "node:fs/promises";
+import { access, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { basename, dirname, extname, join, relative, resolve } from "node:path";
 
 import { defineCommand } from "@reliverse/rempts";
+import pMap from "p-map";
 
 interface FileMapping {
   format: string;
@@ -93,7 +93,7 @@ async function findFiles(
   recursive: boolean,
 ): Promise<string[]> {
   const files: string[] = [];
-  const inputStat = statSync(inputPath);
+  const inputStat = await stat(inputPath);
 
   if (inputStat.isFile()) {
     return [inputPath];
@@ -185,7 +185,7 @@ function isDeclarationFile(filename: string): boolean {
 
 async function findEscapedFiles(inputPath: string, recursive: boolean): Promise<string[]> {
   const files: string[] = [];
-  const inputStat = statSync(inputPath);
+  const inputStat = await stat(inputPath);
 
   if (inputStat.isFile()) {
     const ext = extname(inputPath);
@@ -328,9 +328,11 @@ function buildActionSummary(actions: readonly EscapeAction[]) {
 }
 
 export default defineCommand({
-  name: "escape",
-  description:
-    "Convert files (.md, .mdc, .mdx, .json, .jsonc, .toml) to TypeScript with proper escaping",
+  meta: {
+    name: "escape",
+    description:
+      "Convert files (.md, .mdc, .mdx, .json, .jsonc, .toml) to TypeScript with proper escaping",
+  },
   agent: {
     notes:
       "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --force is supplied.",
@@ -340,16 +342,17 @@ export default defineCommand({
     supportsDryRun: true,
     supportsForce: true,
   },
-  examples: [
-    'rse escape --input "path/to/file.md"',
-    'rse escape --input "path/to/dir" --dry-run',
-    'rse escape --input "path/to/dir" --force',
-    'rse escape --input "path/to/dir" --map "md:.rules,path/to/file json:*.markdown"',
-    'rse escape --input "path/to/dir-escaped" --unescape',
-    'rse escape --input "path/to/dir" --json',
-  ],
-  help:
-    "Input resolution is explicit: provide --input, optionally preview with --dry-run, and use --force only when overwriting differing outputs is intentional.",
+  help: {
+    examples: [
+      'rse escape --input "path/to/file.md"',
+      'rse escape --input "path/to/dir" --dry-run',
+      'rse escape --input "path/to/dir" --force',
+      'rse escape --input "path/to/dir" --map "md:.rules,path/to/file json:*.markdown"',
+      'rse escape --input "path/to/dir-escaped" --unescape',
+      'rse escape --input "path/to/dir" --json',
+    ],
+    text: "Input resolution is explicit: provide --input, optionally preview with --dry-run, and use --force only when overwriting differing outputs is intentional.",
+  },
   options: {
     dryRun: {
       type: "boolean",
@@ -391,11 +394,13 @@ export default defineCommand({
     const force = ctx.options.force === true;
     const kind: EscapeAction["kind"] = ctx.options.unescape ? "unescape" : "convert";
 
-    if (!existsSync(inputPath)) {
+    try {
+      await access(inputPath);
+    } catch {
       ctx.exit(1, `Input path does not exist: ${inputPath}`);
     }
 
-    const inputStat = statSync(inputPath);
+    const inputStat = await stat(inputPath);
     const isDirectory = inputStat.isDirectory();
     const recursive = ctx.options.recursive;
     const actions: EscapeAction[] = [];
@@ -417,84 +422,95 @@ export default defineCommand({
       ctx.out(`Processing ${files.length} file(s)...`);
     }
 
-    for (const file of files) {
-      const outputPath = ctx.options.unescape
-        ? getUnescapeOutputPath(inputPath, file, isDirectory)
-        : getOutputPath(inputPath, file, isDirectory);
-      const nextContent = ctx.options.unescape
-        ? await buildUnconvertedFileContent(file)
-        : await buildConvertedFileContent(file);
-      const existingOutput = await readOptionalTextFile(outputPath);
+    const fileResults = await pMap(
+      files,
+      async (file) => {
+        const outputPath = ctx.options.unescape
+          ? getUnescapeOutputPath(inputPath, file, isDirectory)
+          : getOutputPath(inputPath, file, isDirectory);
+        const nextContent = ctx.options.unescape
+          ? await buildUnconvertedFileContent(file)
+          : await buildConvertedFileContent(file);
+        const existingOutput = await readOptionalTextFile(outputPath);
 
-      if (existingOutput === nextContent) {
-        actions.push({
-          action: "noop",
-          inputPath: file,
-          kind,
-          outputPath,
-          reason: "output already up to date",
-        });
-
-        if (!isJsonOutput) {
-          ctx.out(`No-op: ${outputPath} is already up to date`);
+        if (existingOutput === nextContent) {
+          return {
+            action: {
+              action: "noop" as const,
+              inputPath: file,
+              kind,
+              outputPath,
+              reason: "output already up to date",
+            },
+            messages: isJsonOutput ? [] : [`No-op: ${outputPath} is already up to date`],
+          };
         }
 
-        continue;
-      }
-
-      if (existingOutput !== undefined && !force) {
-        actions.push({
-          action: "blocked",
-          inputPath: file,
-          kind,
-          outputPath,
-          reason: "existing output differs; re-run with --force to overwrite",
-        });
-
-        if (!isJsonOutput) {
-          ctx.err(`Blocked: ${outputPath} already exists. Re-run with --force to overwrite.`);
+        if (existingOutput !== undefined && !force) {
+          return {
+            action: {
+              action: "blocked" as const,
+              inputPath: file,
+              kind,
+              outputPath,
+              reason: "existing output differs; re-run with --force to overwrite",
+            },
+            messages: isJsonOutput
+              ? []
+              : [`Blocked: ${outputPath} already exists. Re-run with --force to overwrite.`],
+          };
         }
 
-        continue;
-      }
-
-      if (dryRun) {
-        actions.push({
-          action: "planned",
-          inputPath: file,
-          kind,
-          outputPath,
-          reason:
-            existingOutput === undefined ? "would create output file" : "would overwrite output file",
-        });
-
-        if (!isJsonOutput) {
-          ctx.out(
-            existingOutput === undefined
-              ? `Dry run: would write ${outputPath}`
-              : `Dry run: would overwrite ${outputPath}`,
-          );
+        if (dryRun) {
+          return {
+            action: {
+              action: "planned" as const,
+              inputPath: file,
+              kind,
+              outputPath,
+              reason:
+                existingOutput === undefined
+                  ? "would create output file"
+                  : "would overwrite output file",
+            },
+            messages: isJsonOutput
+              ? []
+              : [
+                  existingOutput === undefined
+                    ? `Dry run: would write ${outputPath}`
+                    : `Dry run: would overwrite ${outputPath}`,
+                ],
+          };
         }
 
-        continue;
-      }
+        await writeOutputFile(outputPath, nextContent);
+        return {
+          action: {
+            action: "written" as const,
+            inputPath: file,
+            kind,
+            outputPath,
+            reason:
+              existingOutput === undefined ? "created output file" : "overwrote existing output file",
+          },
+          messages: isJsonOutput
+            ? []
+            : [
+                kind === "unescape"
+                  ? `Unescaped: ${file} -> ${outputPath}`
+                  : `Converted: ${file} -> ${outputPath}`,
+              ],
+        };
+      },
+      { concurrency: 8 },
+    );
 
-      await writeOutputFile(outputPath, nextContent);
-      actions.push({
-        action: "written",
-        inputPath: file,
-        kind,
-        outputPath,
-        reason:
-          existingOutput === undefined ? "created output file" : "overwrote existing output file",
-      });
-
+    for (const result of fileResults) {
+      actions.push(result.action);
       if (!isJsonOutput) {
-        ctx.out(
-          kind === "unescape"
-            ? `Unescaped: ${file} -> ${outputPath}`
-            : `Converted: ${file} -> ${outputPath}`,
-        );
+        for (const message of result.messages) {
+          ctx.out(message);
+        }
       }
     }
 

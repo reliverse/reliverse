@@ -32,8 +32,11 @@ async function fileExists(path: string): Promise<boolean> {
 }
 
 export default defineCommand({
-  description:
-    "Publish selected workspace packages to npm using a staging directory (merged files + build output). Prebuild uses the builder plugin when it is registered on the CLI.",
+  meta: {
+    name: "publish",
+    description:
+      "Publish selected workspace packages to npm using a staging directory (merged files + build output). Prebuild uses the builder plugin when it is registered on the CLI.",
+  },
   agent: {
     notes:
       "Eligible packages: not private, type module, publishConfig.access public. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
@@ -42,14 +45,14 @@ export default defineCommand({
     idempotent: false,
     supportsDryRun: true,
   },
-  examples: [
-    "rse publisher publish --targets packages/foo --dry-run",
-    "rse publisher publish --targets packages/foo --no-prebuild --publish-from dist --dry-run",
-    "rse publisher publish --targets packages/foo --publish-from dist --tag next --dry-run",
-  ],
-  help:
-    "With default prebuild, the builder-rse-plugin must be loaded by the CLI. Otherwise pass --no-prebuild and --publish-from (relative to each package root). Staging always includes package.json and the publish-from directory; existing package.json `files` entries are merged in.",
-  name: "publish",
+  help: {
+    examples: [
+      "rse publisher publish --targets packages/foo --dry-run",
+      "rse publisher publish --targets packages/foo --no-prebuild --publish-from dist --dry-run",
+      "rse publisher publish --targets packages/foo --publish-from dist --tag next --dry-run",
+    ],
+    text: "With default prebuild, the builder-rse-plugin must be loaded by the CLI. Otherwise pass --no-prebuild and --publish-from (relative to each package root). Staging always includes package.json and the publish-from directory; existing package.json `files` entries are merged in.",
+  },
   options: {
     dryRun: {
       type: "boolean",
@@ -95,7 +98,7 @@ export default defineCommand({
     if (prebuild && !hasBuilder) {
       ctx.exit(
         1,
-        "Prebuild is on by default but builder-rse-plugin is not registered on this CLI. Add it to createCLI({ plugins }) or use --no-prebuild with --publish-from after building manually.",
+        "Prebuild is on by default but builder-rse-plugin is not registered on this CLI. Install it and ensure it matches plugins.allowedPatterns (or pass it via createCLI({ plugins: { explicit: [...] } })). Alternatively use --no-prebuild with --publish-from after building manually.",
       );
     }
 

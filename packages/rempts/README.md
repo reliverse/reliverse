@@ -8,11 +8,15 @@ Bun-first, file-based CLI foundation for TypeScript projects.
 import { createCLI } from "@reliverse/rempts";
 
 await createCLI({
-  description: "My automation-friendly CLI",
   entry: import.meta.url,
-  helpFormat: "auto",
-  examples: ["my-cli sync --dry-run"],
-  name: "my-cli",
+  meta: {
+    description: "My automation-friendly CLI",
+    name: "my-cli",
+  },
+  help: {
+    examples: ["my-cli sync --dry-run"],
+    format: "auto",
+  },
 });
 ```
 
@@ -36,8 +40,8 @@ const builderPlugin = definePlugin({
 
 await createCLI({
   entry: import.meta.url,
-  name: "my-cli",
-  plugins: [builderPlugin],
+  meta: { name: "my-cli" },
+  plugins: { explicit: [builderPlugin] },
 });
 ```
 
@@ -45,7 +49,9 @@ await createCLI({
 import { defineCommand } from "@reliverse/rempts";
 
 export default defineCommand({
-  description: "Example command",
+  meta: {
+    description: "Example command",
+  },
   agent: {
     notes: "Prefer flags first. Use stdin only when the caller opts into it explicitly.",
   },
@@ -54,6 +60,9 @@ export default defineCommand({
     idempotent: true,
     supportsDryRun: true,
     supportsForce: true,
+  },
+  help: {
+    // examples: ["my-cli example --dry-run"]
   },
   options: {
     dryRun: {

@@ -17,7 +17,10 @@ function toBuildTargets(cwd: string, targets: readonly string[]): BuildTarget[] 
 }
 
 export default defineCommand({
-  description: "Build selected Reliverse workspaces through the provider-oriented builder runtime",
+  meta: {
+    name: "build",
+    description: "Build selected Reliverse workspaces through the provider-oriented builder runtime",
+  },
   agent: {
     notes:
       "Use --dry-run first when you need a preview. Targets are explicit and default to the core RSE dogfooding set.",
@@ -26,14 +29,14 @@ export default defineCommand({
     idempotent: true,
     supportsDryRun: true,
   },
-  examples: [
-    "rse builder build --dry-run",
-    "rse builder build --targets plugins/pm,plugins/builder,apps/cli",
-    "rse builder build --targets plugins/builder --provider bun --json",
-  ],
-  help:
-    "The Bun provider runs each target's build script in order and stops on the first failure so the result stays predictable for automation.",
-  name: "build",
+  help: {
+    examples: [
+      "rse builder build --dry-run",
+      "rse builder build --targets plugins/pm,plugins/builder,apps/cli",
+      "rse builder build --targets plugins/builder --provider bun --json",
+    ],
+    text: "The Bun provider runs each target's build script in order and stops on the first failure so the result stays predictable for automation.",
+  },
   options: {
     dryRun: {
       type: "boolean",

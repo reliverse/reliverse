@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/rse-pm-plugin",
+  "name": "@reliverse/pm-rse-plugin",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -15,7 +15,8 @@
     "typecheck": "bunx tsgo --noEmit"
   },
   "dependencies": {
-    "@reliverse/rempts": "workspace:*"
+    "@reliverse/rempts": "workspace:*",
+    "p-map": "catalog:"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

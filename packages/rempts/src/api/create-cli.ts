@@ -26,9 +26,16 @@ import { createRuntimeOutput } from "../runtime/output";
 import { parseArgvTail, type ParseArgvResult } from "../runtime/parse-argv";
 import { createPluginCommandSource } from "../runtime/plugin-source";
 import {
+  getBunGlobalNodeModulesDirectory,
+  isBunGlobalEntryPath,
   loadPluginsFromHostManifest,
   resolveHostPluginsFromDirectory,
 } from "../runtime/host-plugins";
+import {
+  getDefaultRemptsGlobalConfigPath,
+  readGlobalRemptsConfig,
+  readGlobalHostPluginSpecifiers,
+} from "../runtime/global-plugin-config";
 import { resolveEntry } from "../runtime/resolve-entry";
 import type { OutputMode, ParsedGlobalFlags } from "../runtime/types";
 import {
@@ -39,6 +46,21 @@ import {
 } from "../runtime/errors";
 
 type OutputStream = Pick<typeof process.stdout, "write">;
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function globToRegExp(glob: string): RegExp {
+  // Minimal glob: supports "*" only (no "**", no braces). Good enough for allowlists.
+  const pattern = `^${glob.split("*").map(escapeRegExp).join(".*")}$`;
+  return new RegExp(pattern);
+}
+
+function matchesAnyGlob(value: string, patterns: readonly string[]): boolean {
+  if (patterns.length === 0) return true;
+  return patterns.some((pattern) => globToRegExp(pattern).test(value));
+}
 
 export interface CLIExecutionResult {
   readonly commandName?: string | undefined;
@@ -55,29 +77,36 @@ export interface CreateCLIOptions {
   readonly entry: string;
   readonly argv?: readonly string[] | undefined;
   readonly cwd?: string | undefined;
-  readonly description?: string | undefined;
   readonly env?: NodeJS.ProcessEnv | undefined;
-  readonly examples?: readonly string[] | undefined;
   readonly globalFlags?: GlobalFlagConfig | undefined;
-  readonly helpFormat?: "auto" | "json" | "text" | undefined;
-  readonly name?: string | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
   readonly onError?: ((error: unknown) => Promise<void> | void) | undefined;
   readonly onExit?: ((result: CLIExecutionResult) => Promise<void> | void) | undefined;
   readonly outputMode?: OutputMode | undefined;
-  readonly plugins?: readonly RemptsPlugin[] | undefined;
+  readonly meta?: {
+    readonly name?: string | undefined;
+    readonly description?: string | undefined;
+  } | undefined;
+  readonly help?: {
+    readonly examples?: readonly string[] | undefined;
+    readonly format?: "auto" | "json" | "text" | undefined;
+  } | undefined;
   /**
-   * When true, load plugins from host package manifests. Rempts first loads defaults near the CLI entry
-   * by resolving the nearest package.json from `hostPluginsCwd` or `cwd`. Loaded host plugins are
-   * listed before any explicit `plugins`.
+   * Plugin loading configuration.
+   *
+   * - `supportPlugins`: enable auto-discovery from the host package environment.
+   * - `allowedPatterns`: optional allowlist of package name globs applied to auto-discovery candidates.
+   * - `cwd`: directory to start searching upward for the host package.json (defaults to CreateCLIOptions.cwd).
+   *
+   * Note: explicit plugins should be passed via `explicit`.
    */
-  readonly hostPlugins?: boolean | undefined;
-  /**
-   * Directory to start searching upward for the host manifest.
-   * When unset: uses {@link CreateCLIOptions.cwd}.
-   */
-  readonly hostPluginsCwd?: string | undefined;
+  readonly plugins?: {
+    readonly explicit?: readonly RemptsPlugin[] | undefined;
+    readonly supportPlugins?: boolean | undefined;
+    readonly allowedPatterns?: readonly string[] | undefined;
+    readonly cwd?: string | undefined;
+  } | undefined;
   readonly stderr?: typeof process.stderr | undefined;
   readonly stdin?: typeof process.stdin | undefined;
   readonly stdout?: typeof process.stdout | undefined;
@@ -87,13 +116,13 @@ function writeHelp(stream: OutputStream, helpText: string): void {
   stream.write(`${helpText}\n`);
 }
 
-function stripProgramExtension(programName: string): string {
-  const extension = extname(programName);
+function stripCLIExtension(cliName: string): string {
+  const extension = extname(cliName);
 
-  return extension ? basename(programName, extension) : basename(programName);
+  return extension ? basename(cliName, extension) : basename(cliName);
 }
 
-function getProgramName(
+function getCLIName(
   entryFileName: string,
   explicitName: string | undefined,
   processArgv: readonly string[],
@@ -105,7 +134,7 @@ function getProgramName(
   const invokedPath = processArgv[1];
 
   if (invokedPath) {
-    return stripProgramExtension(invokedPath);
+    return stripCLIExtension(invokedPath);
   }
 
   return basename(entryFileName, extname(entryFileName));
@@ -123,7 +152,7 @@ function getOutputMode(
 }
 
 function shouldRenderJsonHelp(
-  helpFormat: CreateCLIOptions["helpFormat"],
+  helpFormat: "auto" | "json" | "text" | undefined,
   outputMode: OutputMode,
 ): boolean {
   if (helpFormat === "json") {
@@ -163,11 +192,9 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
   commandPath: readonly string[],
   definition: {
     readonly agent?: { readonly notes?: string | undefined } | undefined;
-    readonly aliases?: readonly string[] | undefined;
+    readonly meta?: { readonly aliases?: readonly string[] | undefined; readonly description?: string | undefined } | undefined;
     readonly conventions?: CommandConventions | undefined;
-    readonly description?: string | undefined;
-    readonly examples?: readonly string[] | undefined;
-    readonly help?: string | undefined;
+    readonly help?: { readonly examples?: readonly string[] | undefined; readonly text?: string | undefined } | undefined;
     readonly noTTY?: boolean | undefined;
     readonly noTUI?: boolean | undefined;
     readonly options?: TOptions | undefined;
@@ -175,13 +202,13 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
 ): CommandRuntimeInfo<TOptions> {
   return {
     agent: definition.agent,
-    aliases: definition.aliases ?? [],
+    aliases: definition.meta?.aliases ?? [],
     conventions: definition.conventions,
-    description: definition.description,
+    description: definition.meta?.description,
     directoryPath: commandNode.directoryPath,
-    examples: definition.examples ?? [],
+    examples: definition.help?.examples ?? [],
     filePath: commandNode.filePath,
-    help: definition.help,
+    help: definition.help?.text,
     name: commandName,
     noTTY: definition.noTTY ?? false,
     noTUI: definition.noTUI ?? false,
@@ -201,7 +228,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
   const stderr = options.stderr ?? process.stderr;
   const parsedGlobals = parseGlobalFlags(argv, options.globalFlags);
   const outputMode = getOutputMode(options.outputMode, parsedGlobals.flags);
-  const renderJsonHelp = shouldRenderJsonHelp(options.helpFormat, outputMode);
+  const renderJsonHelp = shouldRenderJsonHelp(options.help?.format, outputMode);
   const output = createRuntimeOutput({
     mode: outputMode,
     stderr,
@@ -211,37 +238,111 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
   try {
     const resolvedEntry = resolveEntry(options.entry);
     const globalFlagDefinitions = getGlobalFlagDefinitions(options.globalFlags);
-    const programName = getProgramName(
+    const cliName = getCLIName(
       resolvedEntry.entryFileName,
-      options.name,
+      options.meta?.name,
       process.argv,
     );
 
-    let effectivePlugins: readonly RemptsPlugin[] = options.plugins ?? [];
+    const explicitPlugins = options.plugins?.explicit ?? [];
+    const supportPlugins = options.plugins?.supportPlugins ?? false;
+    const allowedPatterns = options.plugins?.allowedPatterns ?? [];
+    const pluginsCwd = options.plugins?.cwd ?? cwd;
 
-    if (options.hostPlugins) {
-      const staticPlugins = options.plugins ?? [];
-      const hostSearchRoot = options.hostPluginsCwd ?? cwd;
+    let effectivePlugins: readonly RemptsPlugin[] = explicitPlugins;
+
+    if (supportPlugins) {
+      if (allowedPatterns.length === 0) {
+        throw new RemptsUsageError(
+          [
+            "supportPlugins is enabled, but plugins.allowedPatterns is empty.",
+            "",
+            "Rempts runs supportPlugins in strict mode. Scanning all dependencies/devDependencies is not supported",
+            "because most dependencies are not plugins and would fail strict validation.",
+            "",
+            "Fix: provide an allowlist of plugin package globs, e.g.:",
+            '  plugins: { supportPlugins: true, allowedPatterns: ["@reliverse/*-rse-plugin"] }',
+            "",
+            "Alternatively, configure global host plugins:",
+            `  ${getDefaultRemptsGlobalConfigPath()}`,
+          ].join("\n"),
+          1,
+        );
+      }
+
+      const globalConfig = await readGlobalRemptsConfig();
+      const bunInstallRoot = globalConfig?.bunInstallRoot;
+      const bunGlobalNodeModules = getBunGlobalNodeModulesDirectory(bunInstallRoot);
+      const globalEntry = isBunGlobalEntryPath(resolvedEntry.entryFilePath, bunInstallRoot);
+      const hostSearchRoot = globalEntry ? resolvedEntry.entryDirectory : pluginsCwd;
 
       try {
         const { hostRoot, pluginSpecifiers } = await resolveHostPluginsFromDirectory(hostSearchRoot);
+        const hostCandidates = hostRoot
+          ? pluginSpecifiers.filter((name) => matchesAnyGlob(name, allowedPatterns))
+          : [];
+        const loadedHostPlugins =
+          hostRoot && hostCandidates.length > 0
+            ? await loadPluginsFromHostManifest(hostRoot, hostCandidates, {
+                resolvePaths: globalEntry ? [bunGlobalNodeModules] : undefined,
+              })
+            : [];
 
-        if (hostRoot && pluginSpecifiers.length > 0) {
-          const loadedHostPlugins = await loadPluginsFromHostManifest(hostRoot, pluginSpecifiers);
-          effectivePlugins = [...loadedHostPlugins, ...staticPlugins];
-        } else if (staticPlugins.length === 0) {
+        const globalConfigSpecifiers =
+          loadedHostPlugins.length > 0 ? [] : await readGlobalHostPluginSpecifiers(cliName);
+        const globalRejectedByPattern =
+          allowedPatterns.length > 0
+            ? globalConfigSpecifiers.filter((name) => !matchesAnyGlob(name, allowedPatterns))
+            : [];
+        if (globalRejectedByPattern.length > 0) {
           throw new RemptsUsageError(
             [
-              "No Rempts host plugins found. Add a non-empty list to the nearest package.json (search walks upward from cwd):",
+              "Global plugin config contains entries that are not allowed by this CLI's allowedPatterns.",
               "",
-              '  "rempts": { "plugins": ["@acme/my-rempts-plugin"] }',
+              `Config: ${getDefaultRemptsGlobalConfigPath()}`,
+              `CLI: ${cliName}`,
               "",
-              "The legacy `rse.plugins` key is still honored when `rempts.plugins` is absent.",
+              "Not allowed:",
+              ...globalRejectedByPattern.map((name) => `- ${name}`),
+              "",
+              "Fix: remove these entries or adjust plugins.allowedPatterns in the CLI.",
+            ].join("\n"),
+            1,
+          );
+        }
+        const allowedGlobalSpecifiers =
+          allowedPatterns.length > 0
+            ? globalConfigSpecifiers.filter((name) => matchesAnyGlob(name, allowedPatterns))
+            : globalConfigSpecifiers;
+
+        const loadedGlobalPlugins =
+          allowedGlobalSpecifiers.length > 0
+            ? await loadPluginsFromHostManifest(hostRoot ?? hostSearchRoot, allowedGlobalSpecifiers, {
+                // Global config is meant for global installs too, so always allow Bun global resolution.
+                resolvePaths: [bunGlobalNodeModules],
+              })
+            : [];
+
+        if (loadedHostPlugins.length > 0 || loadedGlobalPlugins.length > 0) {
+          effectivePlugins = [...loadedHostPlugins, ...explicitPlugins];
+          if (loadedGlobalPlugins.length > 0) {
+            effectivePlugins = [...loadedGlobalPlugins, ...effectivePlugins];
+          }
+        } else if (explicitPlugins.length === 0) {
+          throw new RemptsUsageError(
+            [
+              "No Rempts host plugins found.",
+              "",
+              "For local development, install plugins as dependencies/devDependencies in the nearest package.json.",
+              "",
+              "For global usage, configure global host plugins:",
+              "",
+              `  ${getDefaultRemptsGlobalConfigPath()}`,
               `Search started from: ${hostSearchRoot}`,
             ].join("\n"),
             1,
             {
-              hint: "Install plugin packages in the same project as that package.json, or pass explicit `plugins` to createCLI.",
+              hint: "Install plugin packages in your project (deps/devDeps), or configure global host plugins, or pass explicit plugins to createCLI({ plugins: { explicit: [...] } }).",
             },
           );
         }
@@ -270,15 +371,15 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
           discovered.matchedPath.length > 0
             ? discovered.commandNode?.description ??
               `Available subcommands for ${discovered.matchedPath.join(" ")}.`
-            : options.description,
+                : options.meta?.description,
         examples:
           discovered.matchedPath.length > 0
             ? discovered.commandNode?.examples
-            : options.examples,
+                : options.help?.examples,
         conventions: discovered.commandNode?.conventions,
         globalFlagDefinitions,
         helpText: discovered.commandNode?.help,
-        programName,
+        programName: cliName,
       });
 
       if (discovered.unknownSegment) {
@@ -331,15 +432,15 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     const command = await discovered.commandNode.loadCommand();
     assertNoGlobalFlagCollisions(command.options, options.globalFlags);
     const commandName =
-      command.name ??
+      command.meta?.name ??
       discovered.matchedPath.at(-1) ??
-      programName;
+      cliName;
     const commandHelp = buildCommandHelpDocument({
       availableSubcommands: discovered.availableSubcommands,
       command,
       commandPath: discovered.matchedPath,
       globalFlagDefinitions,
-      programName,
+      programName: cliName,
     });
 
     if (parsedGlobals.flags.help) {

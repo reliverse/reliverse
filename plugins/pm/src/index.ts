@@ -30,5 +30,5 @@ export const rsePmPlugin = definePlugin({
     },
   ],
   description: "Package-management commands for RSE",
-  id: "rse-pm-plugin",
+  id: "pm-rse-plugin",
 });

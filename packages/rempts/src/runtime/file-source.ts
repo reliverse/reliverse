@@ -102,8 +102,8 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
             const command = await loadCommand(childCommandFilePath);
 
             return {
-              aliases: command.aliases ?? [],
-              description: command.description,
+              aliases: command.meta?.aliases ?? [],
+              description: command.meta?.description,
               name: childName,
             };
           } catch {
@@ -119,15 +119,15 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
       const node = loadCurrentCommand
         ? await loadCurrentCommand().then((command) => ({
             agent: command.agent,
-            aliases: command.aliases ?? [],
+            aliases: command.meta?.aliases ?? [],
             conventions: command.conventions,
-            description: command.description,
+            description: command.meta?.description,
             directoryPath,
-            examples: command.examples ?? [],
+            examples: command.help?.examples ?? [],
             filePath: commandFilePath,
-            help: command.help,
+            help: command.help?.text,
             loadCommand: loadCurrentCommand,
-            name: command.name ?? path.at(-1) ?? resolvedEntry.entryFileName,
+            name: command.meta?.name ?? path.at(-1) ?? resolvedEntry.entryFileName,
             path,
             sourceId: "local",
             sourceKind: "file" as const,

@@ -109,12 +109,16 @@ export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCom
 
 export interface CommandConfig<TOptions extends CommandOptionsRecord = EmptyCommandOptions> {
   readonly agent?: CommandAgentMetadata | undefined;
-  readonly name?: string | undefined;
-  readonly description?: string | undefined;
-  readonly aliases?: ReadonlyArray<string> | undefined;
+  readonly meta?: {
+    readonly name?: string | undefined;
+    readonly description?: string | undefined;
+    readonly aliases?: ReadonlyArray<string> | undefined;
+  } | undefined;
   readonly conventions?: CommandConventions | undefined;
-  readonly examples?: ReadonlyArray<string> | undefined;
-  readonly help?: string | undefined;
+  readonly help?: {
+    readonly text?: string | undefined;
+    readonly examples?: ReadonlyArray<string> | undefined;
+  } | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
   readonly options?: TOptions | undefined;
@@ -132,13 +136,19 @@ export interface CommandDefinition<
 export function defineCommand<TOptions extends CommandOptionsRecord = EmptyCommandOptions>(
   config: CommandConfig<TOptions>,
 ): CommandDefinition<TOptions> {
-  const aliases = config.aliases ? [...config.aliases] : [];
-  const examples = config.examples ? [...config.examples] : [];
+  const aliases = config.meta?.aliases ? [...config.meta.aliases] : [];
+  const examples = config.help?.examples ? [...config.help.examples] : [];
 
   return {
     ...config,
-    aliases,
-    examples,
+    meta: {
+      ...config.meta,
+      aliases,
+    },
+    help: {
+      ...config.help,
+      examples,
+    },
     kind: COMMAND_DEFINITION_KIND,
   };
 }
@@ -166,11 +176,17 @@ export function isCommandDefinition(
     return false;
   }
 
-  if (value.aliases !== undefined && !isStringArray(value.aliases)) {
+  if (
+    value.meta !== undefined &&
+    (!isRecord(value.meta) || (value.meta.aliases !== undefined && !isStringArray(value.meta.aliases)))
+  ) {
     return false;
   }
 
-  if (value.examples !== undefined && !isStringArray(value.examples)) {
+  if (
+    value.help !== undefined &&
+    (!isRecord(value.help) || (value.help.examples !== undefined && !isStringArray(value.help.examples)))
+  ) {
     return false;
   }
 

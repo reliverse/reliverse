@@ -1,10 +1,12 @@
 import { defineCommand } from "@reliverse/rempts";
+import pMap from "p-map";
 
 import {
   canRewriteSpecifier,
   cloneManifest,
   collectSnapshots,
   createUpdatedSpecifier,
+  type DependencySection,
   findCatalogEntry,
   findDependencyLocation,
   isCatalogProtocol,
@@ -35,8 +37,21 @@ interface UpdateAction {
   readonly targetLabel?: string | undefined;
 }
 
+interface PendingUpdate {
+  readonly catalogName?: string | undefined;
+  readonly currentSpecifier: string;
+  readonly packageName: string;
+  readonly section?: DependencySection | undefined;
+  readonly source: "catalog" | "target";
+  readonly targetLabel?: string | undefined;
+  readonly targetManifestPath?: string | undefined;
+}
+
 export default defineCommand({
-  description: "Update dependency versions in a repo or workspace package with Bun-aware package.json changes",
+  meta: {
+    name: "update",
+    description: "Update dependency versions in a repo or workspace package with Bun-aware package.json changes",
+  },
   agent: {
     notes:
       "Pass package names to update a focused subset, or omit args to update all direct dependencies of the target package. By default the command updates to the newest stable version and uses smart behavior for prereleases. With `latest=true` (default), smart picks the newest stable overall. With `latest=false`, smart prefers the current prerelease release line and promotes to matching stable when it appears. Pass `--no-smart` to disable this behavior. When the target is a monorepo root, workspace manifests are swept recursively by default; pass `--no-recursive` to stay on the root manifest only.",
@@ -46,21 +61,21 @@ export default defineCommand({
     supportsDryRun: true,
     supportsForce: true,
   },
-  examples: [
-    "rse pm update --cwd .",
-    "rse pm update typescript @types/bun --target packages/rempts",
-    "rse pm update --target apps/cli --json",
-    "rse pm update zod --target packages/server --dry-run --json",
-    "rse pm update --target . --dry-run --json",
-    "rse pm update --target . --no-recursive --dry-run --json",
-    "rse pm update typescript --dry-run --json",
-    "rse pm update typescript --no-latest --dry-run --json",
-    "rse pm update vite --no-smart --dry-run --json",
-    "rse pm update --cwd /path/to/project --target /path/to/project --force --dry-run --json",
-  ],
-  help:
-    "By default this command updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
-  name: "update",
+  help: {
+    examples: [
+      "rse pm update --cwd .",
+      "rse pm update typescript @types/bun --target packages/rempts",
+      "rse pm update --target apps/cli --json",
+      "rse pm update zod --target packages/server --dry-run --json",
+      "rse pm update --target . --dry-run --json",
+      "rse pm update --target . --no-recursive --dry-run --json",
+      "rse pm update typescript --dry-run --json",
+      "rse pm update typescript --no-latest --dry-run --json",
+      "rse pm update vite --no-smart --dry-run --json",
+      "rse pm update --cwd /path/to/project --target /path/to/project --force --dry-run --json",
+    ],
+    text: "By default this command updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+  },
   options: {
     cwd: {
       type: "string",
@@ -170,6 +185,7 @@ export default defineCommand({
     }
 
     const actions: UpdateAction[] = [];
+    const pendingUpdates: PendingUpdate[] = [];
 
     for (const manifestTarget of manifestTargets) {
       let nextTargetManifest = nextManifests.get(manifestTarget.manifestPath);
@@ -206,46 +222,10 @@ export default defineCommand({
           processedCatalogKeys.add(catalogKey);
           foundRequestedPackages.add(packageName);
 
-          const nextVersion = await resolveUpdateVersion({
-            currentSpecifier: catalogEntry.specifier,
-            force: ctx.options.force,
-            latest: latestByDefault,
-            packageName,
-            smart: smartByDefault,
-          });
-          const nextSpecifier = createUpdatedSpecifier({
-            currentSpecifier: catalogEntry.specifier,
-            version: nextVersion,
-          });
-
-          if (nextSpecifier === catalogEntry.specifier) {
-            actions.push({
-              action: "noop",
-              catalogName: catalogEntry.catalogName,
-              packageName,
-              previousSpecifier: catalogEntry.specifier,
-              reason: canRewriteSpecifier(catalogEntry.specifier)
-                ? "catalog entry is already up to date"
-                : "catalog entry uses a non-rewritable specifier; Bun will refresh it during install/update",
-              source: "catalog",
-              targetLabel: manifestTarget.label,
-            });
-            continue;
-          }
-
-          nextRootManifest = setCatalogEntry(
-            nextRootManifest,
-            packageName,
-            nextSpecifier,
-            catalogEntry.catalogName,
-          );
-          actions.push({
-            action: "updated",
+          pendingUpdates.push({
             catalogName: catalogEntry.catalogName,
-            nextSpecifier,
+            currentSpecifier: catalogEntry.specifier,
             packageName,
-            previousSpecifier: catalogEntry.specifier,
-            reason: "updated repo catalog entry",
             source: "catalog",
             targetLabel: manifestTarget.label,
           });
@@ -296,98 +276,127 @@ export default defineCommand({
           processedCatalogKeys.add(catalogKey);
           foundRequestedPackages.add(packageName);
 
-          const nextVersion = await resolveUpdateVersion({
-            currentSpecifier: catalogEntry.specifier,
-            force: ctx.options.force,
-            latest: latestByDefault,
-            packageName,
-            smart: smartByDefault,
-          });
-          const nextSpecifier = createUpdatedSpecifier({
-            currentSpecifier: catalogEntry.specifier,
-            version: nextVersion,
-          });
-
-          if (nextSpecifier === catalogEntry.specifier) {
-            actions.push({
-              action: "noop",
-              catalogName,
-              packageName,
-              previousSpecifier: catalogEntry.specifier,
-              reason: canRewriteSpecifier(catalogEntry.specifier)
-                ? "catalog entry is already up to date"
-                : "catalog entry uses a non-rewritable specifier; Bun will refresh it during install/update",
-              section: targetLocation.section,
-              source: "catalog",
-              targetLabel: manifestTarget.label,
-            });
-            continue;
-          }
-
-          nextRootManifest = setCatalogEntry(
-            nextRootManifest,
-            packageName,
-            nextSpecifier,
+          pendingUpdates.push({
             catalogName,
-          );
-          actions.push({
-            action: "updated",
-            catalogName,
-            nextSpecifier,
+            currentSpecifier: catalogEntry.specifier,
             packageName,
-            previousSpecifier: catalogEntry.specifier,
-            reason: "updated repo catalog entry",
             section: targetLocation.section,
             source: "catalog",
             targetLabel: manifestTarget.label,
           });
           continue;
         }
-
-        const nextVersion = await resolveUpdateVersion({
+        pendingUpdates.push({
           currentSpecifier: targetLocation.specifier,
+          packageName,
+          section: targetLocation.section,
+          source: "target",
+          targetLabel: manifestTarget.label,
+          targetManifestPath: manifestTarget.manifestPath,
+        });
+      }
+    }
+
+    const resolvedUpdates = await pMap(
+      pendingUpdates,
+      async (update) => {
+        const nextVersion = await resolveUpdateVersion({
+          currentSpecifier: update.currentSpecifier,
           force: ctx.options.force,
           latest: latestByDefault,
-          packageName,
+          packageName: update.packageName,
           smart: smartByDefault,
         });
         const nextSpecifier = createUpdatedSpecifier({
-          currentSpecifier: targetLocation.specifier,
+          currentSpecifier: update.currentSpecifier,
           version: nextVersion,
         });
+        return {
+          ...update,
+          nextSpecifier,
+        };
+      },
+      { concurrency: 8 },
+    );
 
-        if (nextSpecifier === targetLocation.specifier) {
+    for (const update of resolvedUpdates) {
+      if (update.source === "catalog") {
+        if (update.nextSpecifier === update.currentSpecifier) {
           actions.push({
             action: "noop",
-            packageName,
-            previousSpecifier: targetLocation.specifier,
-            reason: canRewriteSpecifier(targetLocation.specifier)
-              ? "already up to date"
-              : "specifier is not rewritten; Bun will refresh it during install/update",
-            section: targetLocation.section,
-            source: "target",
-            targetLabel: manifestTarget.label,
+            catalogName: update.catalogName,
+            packageName: update.packageName,
+            previousSpecifier: update.currentSpecifier,
+            reason: canRewriteSpecifier(update.currentSpecifier)
+              ? "catalog entry is already up to date"
+              : "catalog entry uses a non-rewritable specifier; Bun will refresh it during install/update",
+            section: update.section,
+            source: "catalog",
+            targetLabel: update.targetLabel,
           });
           continue;
         }
 
-        nextTargetManifest = setDependency(
-          nextTargetManifest,
-          targetLocation.section,
-          packageName,
-          nextSpecifier,
+        nextRootManifest = setCatalogEntry(
+          nextRootManifest,
+          update.packageName,
+          update.nextSpecifier,
+          update.catalogName,
         );
-        nextManifests.set(manifestTarget.manifestPath, nextTargetManifest);
         actions.push({
           action: "updated",
-          nextSpecifier,
-          packageName,
-          previousSpecifier: targetLocation.specifier,
-          section: targetLocation.section,
-          source: "target",
-          targetLabel: manifestTarget.label,
+          catalogName: update.catalogName,
+          nextSpecifier: update.nextSpecifier,
+          packageName: update.packageName,
+          previousSpecifier: update.currentSpecifier,
+          reason: "updated repo catalog entry",
+          section: update.section,
+          source: "catalog",
+          targetLabel: update.targetLabel,
         });
+        continue;
       }
+
+      if (!update.targetManifestPath || !update.section) {
+        continue;
+      }
+
+      const nextTargetManifest = nextManifests.get(update.targetManifestPath);
+      if (!nextTargetManifest) {
+        continue;
+      }
+
+      if (update.nextSpecifier === update.currentSpecifier) {
+        actions.push({
+          action: "noop",
+          packageName: update.packageName,
+          previousSpecifier: update.currentSpecifier,
+          reason: canRewriteSpecifier(update.currentSpecifier)
+            ? "already up to date"
+            : "specifier is not rewritten; Bun will refresh it during install/update",
+          section: update.section,
+          source: "target",
+          targetLabel: update.targetLabel,
+        });
+        continue;
+      }
+
+      const updatedManifest = setDependency(
+        nextTargetManifest,
+        update.section,
+        update.packageName,
+        update.nextSpecifier,
+      );
+      nextManifests.set(update.targetManifestPath, updatedManifest);
+      actions.push({
+        action: "updated",
+        nextSpecifier: update.nextSpecifier,
+        packageName: update.packageName,
+        previousSpecifier: update.currentSpecifier,
+        section: update.section,
+        source: "target",
+        targetLabel: update.targetLabel,
+      });
     }
 
     const missingRequestedPackages = requestedPackages.filter(
