@@ -12,6 +12,12 @@ export interface PluginCommandConfig {
   readonly examples?: ReadonlyArray<string> | undefined;
   readonly help?: string | undefined;
   readonly loadCommand?: (() => Promise<unknown>) | undefined;
+  /**
+   * Command path relative to the plugin root.
+   *
+   * - `[]` targets the plugin root command itself
+   * - `["build"]` becomes `<plugin.name> build`
+   */
   readonly path: ReadonlyArray<string>;
 }
 
@@ -19,6 +25,7 @@ export interface RemptsPlugin {
   readonly commands: readonly PluginCommandConfig[];
   readonly description?: string | undefined;
   readonly id: string;
+  readonly name: string;
 }
 
 function assertValidSegment(segment: string, path: readonly string[]): void {
@@ -41,6 +48,22 @@ function getParentKey(path: readonly string[]): string {
 
 function getPathKey(path: readonly string[]): string {
   return path.join("\0");
+}
+
+function getNormalizedPath(pluginName: string, path: readonly string[]): readonly string[] {
+  return [pluginName, ...path];
+}
+
+function normalizePluginCommands(
+  pluginName: string,
+  commands: readonly PluginCommandConfig[],
+): PluginCommandConfig[] {
+  return commands.map((command) => ({
+    ...command,
+    aliases: command.aliases ? [...command.aliases] : [],
+    examples: command.examples ? [...command.examples] : [],
+    path: getNormalizedPath(pluginName, command.path),
+  }));
 }
 
 function validatePluginCommands(
@@ -104,12 +127,9 @@ function validatePluginCommands(
 }
 
 export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
-  const commands = plugin.commands.map((command) => ({
-    ...command,
-    aliases: command.aliases ? [...command.aliases] : [],
-    examples: command.examples ? [...command.examples] : [],
-    path: [...command.path],
-  }));
+  assertValidSegment(plugin.name, [plugin.name]);
+
+  const commands = normalizePluginCommands(plugin.name, plugin.commands);
 
   validatePluginCommands(plugin.id, commands);
 
@@ -117,5 +137,6 @@ export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
     commands,
     description: plugin.description,
     id: plugin.id,
+    name: plugin.name,
   };
 }

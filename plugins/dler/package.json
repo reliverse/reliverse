@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/builder-rse-plugin",
+  "name": "@reliverse/dler-rse-plugin",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,10 +8,10 @@
   "types": "./src/index.ts",
   "exports": {
     ".": "./src/index.ts",
-    "./build-runtime": "./src/build-runtime/index.ts"
+    "./build-runtime": "./src/impl/build/index.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cmds/builder/build.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts ./src/cmds/build/cmd.ts --outdir ./dist --target bun",
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
     "typecheck": "tsgo --noEmit"
   },

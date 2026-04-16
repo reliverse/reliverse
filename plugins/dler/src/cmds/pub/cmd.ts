@@ -3,14 +3,14 @@ import { resolve } from "node:path";
 
 import { defineCommand } from "@reliverse/rempts";
 
-import { getIneligibilityReason } from "../../lib/eligibility";
-import { runNpmPublish } from "../../lib/npm-publish";
-import { isSafeRelativePublishFrom } from "../../lib/paths";
-import { runPrebuildForPackage } from "../../lib/prebuild";
-import { createPublishStaging } from "../../lib/staging";
-import { parseTargetsOption } from "../../targets";
+import { getIneligibilityReason } from "../../impl/pub/eligibility";
+import { runNpmPublish } from "../../impl/pub/npm-publish";
+import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
+import { runPrebuildForPackage } from "../../impl/pub/prebuild";
+import { createPublishStaging } from "../../impl/pub/staging";
+import { parseTargetsOption } from "../../impl/pub/targets";
 
-const BUILDER_PLUGIN_ID = "builder-rse-plugin";
+const BUILDER_PLUGIN_ID = "dler-rse-plugin";
 const DEFAULT_PUBLISH_FROM = "dist";
 
 async function pathIsDirectory(path: string): Promise<boolean> {
@@ -47,11 +47,11 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse publisher publish --targets packages/foo --dry-run",
-      "rse publisher publish --targets packages/foo --no-prebuild --publish-from dist --dry-run",
-      "rse publisher publish --targets packages/foo --publish-from dist --tag next --dry-run",
+      "rse pub publish --targets packages/foo --dry-run",
+      "rse pub publish --targets packages/foo --no-prebuild --publish-from dist --dry-run",
+      "rse pub publish --targets packages/foo --publish-from dist --tag next --dry-run",
     ],
-    text: "With default prebuild, the builder-rse-plugin must be loaded by the CLI. Otherwise pass --no-prebuild and --publish-from (relative to each package root). Staging always includes package.json and the publish-from directory; existing package.json `files` entries are merged in.",
+    text: "With default prebuild, the dler must be loaded by the CLI. Otherwise pass --no-prebuild and --publish-from (relative to each package root). Staging always includes package.json and the publish-from directory; existing package.json `files` entries are merged in.",
   },
   options: {
     dryRun: {
@@ -63,7 +63,7 @@ export default defineCommand({
       type: "boolean",
       defaultValue: true,
       description:
-        "Run bun run build before publish when builder-rse-plugin is registered (use --no-prebuild to skip)",
+        "Run bun run build before publish when dler is registered (use --no-prebuild to skip)",
       inputSources: ["flag", "default"],
     },
     publishFrom: {
@@ -80,7 +80,7 @@ export default defineCommand({
     targets: {
       type: "string",
       description: "Comma-separated workspace paths (relative to --cwd) to publish in order",
-      hint: "Example: packages/rempts,plugins/publisher",
+      hint: "Example: packages/rempts,plugins/pub",
       inputSources: ["flag"],
     },
   },
@@ -98,7 +98,7 @@ export default defineCommand({
     if (prebuild && !hasBuilder) {
       ctx.exit(
         1,
-        "Prebuild is on by default but builder-rse-plugin is not registered on this CLI. Install it and ensure it matches plugins.allowedPatterns (or pass it via createCLI({ plugins: { explicit: [...] } })). Alternatively use --no-prebuild with --publish-from after building manually.",
+        "Prebuild is on by default but dler is not registered on this CLI. Install it and ensure it matches plugins.allowedPatterns (or pass it via createCLI({ plugins: { explicit: [...] } })). Alternatively use --no-prebuild with --publish-from after building manually.",
       );
     }
 
@@ -202,7 +202,7 @@ export default defineCommand({
 
     if (results.length === 0) {
       if (ctx.output.mode === "json") {
-        ctx.output.result({ dryRun, ok: false, published: [], publishFrom, skipped }, "publisher publish");
+        ctx.output.result({ dryRun, ok: false, published: [], publishFrom, skipped }, "pub publish");
         return;
       }
 
@@ -227,7 +227,7 @@ export default defineCommand({
           })),
           skipped,
         },
-        "publisher publish",
+        "pub publish",
       );
       return;
     }

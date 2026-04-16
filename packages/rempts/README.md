@@ -25,15 +25,16 @@ import { createCLI, definePlugin } from "@reliverse/rempts";
 
 const builderPlugin = definePlugin({
   id: "builder",
+  name: "builder",
   commands: [
     {
       description: "Builder command group",
-      path: ["builder"],
+      path: [],
     },
     {
       description: "Build workspaces",
-      loadCommand: () => import("./plugins/builder-build").then((module) => module.default),
-      path: ["builder", "build"],
+      loadCommand: () => import("./plugins/dler-build").then((module) => module.default),
+      path: ["build"],
     },
   ],
 });
@@ -123,7 +124,7 @@ Rempts resolves the runtime tree from `entry`:
 
 ## Plugins
 
-- Use `definePlugin(...)` to register additional command trees.
+- Use `definePlugin(...)` to register additional command trees. `plugin.name` becomes the top-level command namespace, and each `commands[].path` is relative to that root.
 - Plugin commands participate in the same discovery, help, parsing, error, and output pipeline as local file-based commands.
 - Plugin manifests stay lightweight; `loadCommand()` is called only when a leaf command needs full help or execution.
 - Local file-based commands remain the default source, so plugin support extends the architecture instead of replacing it.

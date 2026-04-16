@@ -236,10 +236,9 @@
     "prepare:env": "bun scripts/env-sync.ts"
   },
   "devDependencies": {
-    "@reliverse/builder-rse-plugin": "workspace:*",
-    "@reliverse/escaper-rse-plugin": "workspace:*",
+    "@reliverse/dler-rse-plugin": "workspace:*",
+    "@reliverse/tools-rse-plugin": "workspace:*",
     "@reliverse/pm-rse-plugin": "workspace:*",
-    "@reliverse/publisher-rse-plugin": "workspace:*",
     "@tanstack/eslint-plugin-query": "^5.91.4",
     "@tanstack/eslint-plugin-router": "^1.161.4",
     "eslint-plugin-react-hooks": "^7.0.1",

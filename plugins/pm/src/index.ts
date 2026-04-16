@@ -16,19 +16,20 @@ export const rsePmPlugin = definePlugin({
       ],
       help:
         "Use `rse pm add --help` or `rse pm update --help` for the concrete mutation commands. The top-level pm scope stays lightweight and discovery-friendly, while still advertising Bun catalogs plus update defaults such as latest-by-default, smart prerelease branch handling, `--force`, and recursive-by-default root updates.",
-      path: ["pm"],
+      path: [],
     },
     {
       description: "Add new dependencies to a repo or workspace package",
-      loadCommand: () => import("./cmds/pm/add").then((module) => module.default),
-      path: ["pm", "add"],
+      loadCommand: () => import("./cmds/add/cmd").then((module) => module.default),
+      path: ["add"],
     },
     {
       description: "Update dependency versions in a repo or workspace package",
-      loadCommand: () => import("./cmds/pm/update").then((module) => module.default),
-      path: ["pm", "update"],
+      loadCommand: () => import("./cmds/update/cmd").then((module) => module.default),
+      path: ["update"],
     },
   ],
   description: "Package-management commands for RSE",
   id: "pm-rse-plugin",
+  name: "pm",
 });

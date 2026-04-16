@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/publisher-rse-plugin",
+  "name": "@reliverse/tools-rse-plugin",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,13 +10,13 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cmds/publisher/publish.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts ./src/cmds/escape/cmd.ts --outdir ./dist --target bun",
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@reliverse/builder-rse-plugin": "workspace:*",
-    "@reliverse/rempts": "workspace:*"
+    "@reliverse/rempts": "workspace:*",
+    "p-map": "catalog:"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

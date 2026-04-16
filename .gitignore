@@ -42,3 +42,7 @@ temp
 DO_NOT_COMMIT_HERE.md
 .githooks/pre-commit
 .githooks/pre-push
+
+# Excludes
+!/plugins/dler/src/cmds/build/
+!/plugins/dler/src/impl/build/

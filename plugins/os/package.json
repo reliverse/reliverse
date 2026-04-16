@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/escaper-rse-plugin",
+  "name": "@reliverse/os-rse-plugin",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -10,7 +10,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cmds/escape.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts ./src/cmds/bootstrap/cmd.ts --outdir ./dist --target bun",
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
     "typecheck": "tsgo --noEmit"
   },

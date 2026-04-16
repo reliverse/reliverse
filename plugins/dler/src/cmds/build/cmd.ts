@@ -4,10 +4,10 @@ import {
   createBuilderRuntime,
   createBunBuildProvider,
   type BuildTarget,
-} from "../../build-runtime";
+} from "../../impl/build";
 import { defineCommand } from "@reliverse/rempts";
 
-import { DEFAULT_RSE_BUILD_TARGETS, parseTargetsOption } from "../../targets";
+import { DEFAULT_RSE_BUILD_TARGETS, parseTargetsOption } from "../../impl/build/targets";
 
 function toBuildTargets(cwd: string, targets: readonly string[]): BuildTarget[] {
   return targets.map((target) => ({
@@ -31,9 +31,9 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse builder build --dry-run",
-      "rse builder build --targets plugins/pm,plugins/builder,apps/cli",
-      "rse builder build --targets plugins/builder --provider bun --json",
+      "rse dler build --dry-run",
+      "rse dler build --targets plugins/pm,plugins/dler,apps/cli",
+      "rse dler build --targets plugins/dler --provider bun --json",
     ],
     text: "The Bun provider runs each target's build script in order and stops on the first failure so the result stays predictable for automation.",
   },
@@ -54,7 +54,7 @@ export default defineCommand({
       type: "string",
       defaultValue: DEFAULT_RSE_BUILD_TARGETS.join(","),
       description: "Comma-separated workspace paths to build in order",
-      hint: "Examples: plugins/pm,plugins/builder,apps/cli",
+      hint: "Examples: plugins/pm,plugins/dler,apps/cli",
       inputSources: ["flag", "default"],
     },
   },

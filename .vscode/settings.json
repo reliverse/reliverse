@@ -26,9 +26,9 @@
   "files.associations": {
     "LICENSE": "plaintext",
     "NOTICE": "plaintext",
+    ".env*": "properties",
     "*.mdx": "markdown",
-    "*.json": "json",
-    ".env*": "properties"
+    "*.json": "json"
   },
   "files.readonlyInclude": {
     "**/routeTree.gen.ts": true,

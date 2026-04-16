@@ -7,7 +7,7 @@ const footerLinks = {
     { label: "Reliverse", href: "https://reliverse.org" },
     { label: "Relivator", href: "https://relivator.com" },
     { label: "RSE CLI", href: "https://wiki.reliverse.org/docs/libraries/rse" },
-    { label: "Dler", href: "https://wiki.reliverse.org/docs/libraries/dler" },
+    { label: "Dler", href: "https://wiki.reliverse.org/docs/libraries/dler-rse-plugin" },
   ],
   Community: [{ label: "Discord", href: "#" }],
   Resources: [

@@ -82,7 +82,7 @@ Features include project scaffolding, deployment automation, AI assistance, and 
     body: `Dler is our open-source solution for building TypeScript and JavaScript libraries and CLI tools. It simplifies the development workflow with sensible defaults.
 
 Features include zero-config setup, TypeScript support, bundling, testing, publishing helpers, and documentation generation.`,
-    externalLink: "https://wiki.reliverse.org/docs/libraries/dler",
+    externalLink: "https://wiki.reliverse.org/docs/libraries/dler-rse-plugin",
     category: "developer",
     status: "live",
   },

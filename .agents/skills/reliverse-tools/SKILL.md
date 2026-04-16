@@ -63,7 +63,7 @@ Repo: <https://github.com/reliverse/reliverse>
 
 ## Dler CLI usage
 
-- Main orchestration CLI: `@reliverse/dler`
+- Main orchestration CLI: `@reliverse/dler-rse-plugin`
 - Learn commands: `bun dler --help`
 - If a command fails: **don't bypass tooling**.
   - Inspect usage: `bun dler <command> --help`
