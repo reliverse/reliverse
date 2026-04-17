@@ -10,6 +10,7 @@ import type { InteractionPolicy } from "../runtime/noninteractive";
 import type {
   ConfirmationMode,
   ParsedGlobalFlags,
+  RemptsInteractionMode,
   RuntimeOutput,
   StdinMode,
 } from "../runtime/types";
@@ -74,6 +75,7 @@ export interface CommandRuntimeInfo<
   readonly conventions?: CommandConventions | undefined;
   readonly examples: readonly string[];
   readonly help?: string | undefined;
+  readonly interactive: RemptsInteractionMode;
   readonly noTTY: boolean;
   readonly noTUI: boolean;
   readonly options?: TOptions | undefined;
@@ -119,6 +121,7 @@ export interface CommandConfig<TOptions extends CommandOptionsRecord = EmptyComm
     readonly text?: string | undefined;
     readonly examples?: ReadonlyArray<string> | undefined;
   } | undefined;
+  readonly interactive?: RemptsInteractionMode | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
   readonly options?: TOptions | undefined;

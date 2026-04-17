@@ -24,6 +24,7 @@ function getSyntheticTopLevelNode(plugin: RemptsPlugin, path: readonly string[])
     aliases: [],
     description: plugin.description,
     examples: [],
+    interactive: "never",
     name: path[0] ?? plugin.name,
     path,
     sourceId: plugin.name,

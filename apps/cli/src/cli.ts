@@ -21,6 +21,7 @@ const result = await createCLI({
     ],
     format: "auto",
   },
+  interactionMode: "never",
   plugins: {
     supportPlugins: true,
     allowedPatterns: ["@reliverse/*-rse-plugin"],

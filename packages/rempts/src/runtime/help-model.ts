@@ -29,6 +29,7 @@ export interface HelpDocument {
   readonly examples: readonly string[];
   readonly globalFlags: readonly HelpFlagItem[];
   readonly helpText?: string | undefined;
+  readonly interactive?: "never" | "tty" | "tui" | undefined;
   readonly programName: string;
   readonly scope: "command" | "launcher";
   readonly scopeLabel: string;
@@ -99,6 +100,7 @@ export function buildLauncherHelpDocument(options: {
   readonly examples?: readonly string[] | undefined;
   readonly globalFlagDefinitions: readonly GlobalFlagDefinition[];
   readonly helpText?: string | undefined;
+  readonly interactive?: "never" | "tty" | "tui" | undefined;
   readonly programName: string;
 }): HelpDocument {
   const usage =
@@ -116,6 +118,7 @@ export function buildLauncherHelpDocument(options: {
     examples: options.examples ?? [],
     globalFlags: options.globalFlagDefinitions.map(toGlobalFlagItem),
     helpText: options.helpText,
+    interactive: options.interactive,
     programName: options.programName,
     scope: "launcher",
     scopeLabel: options.commandPath.length > 0 ? "Subcommands" : "Commands",
@@ -157,6 +160,7 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
     examples: options.command.help?.examples ?? [],
     globalFlags: options.globalFlagDefinitions.map(toGlobalFlagItem),
     helpText: options.command.help?.text,
+    interactive: options.command.interactive ?? "never",
     programName: options.programName,
     scope: "command",
     scopeLabel: "Subcommands",

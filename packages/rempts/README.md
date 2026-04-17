@@ -30,6 +30,7 @@ import { createCLI } from "@reliverse/rempts";
 
 await createCLI({
   entry: import.meta.url,
+  interactionMode: "never",
   meta: {
     description: "My automation-friendly CLI",
     name: "my-cli",
@@ -47,6 +48,7 @@ await createCLI({
 import { defineCommand } from "@reliverse/rempts";
 
 export default defineCommand({
+  interactive: "never",
   meta: {
     description: "Example command",
   },
@@ -240,6 +242,10 @@ my-cli dler pack
 
 ## Runtime behavior
 
+- interaction is automation-first by default
+- host CLIs should prefer `interactionMode: "never"` unless they intentionally expose human-guided flows
+- commands should declare `interactive: "never" | "tty" | "tui"` explicitly when interaction policy matters
+- `--interactive` and `--tui` are explicit host opt-ins, not implicit behavior triggered by TTY presence
 - root help and command help are built from structured metadata
 - `--help --json` emits machine-readable help
 - reserved global flags are separate from final-command flags
@@ -255,6 +261,7 @@ my-cli dler pack
 - Add `--dry-run` for side-effecting commands
 - Use `--apply` when a command should switch from preview to real execution
 - Prefer clearer flags such as `--overwrite` when the behavior is specifically about replacing existing outputs
+- Default to `interactive: "never"` and opt into `tty` or `tui` only when a command truly benefits from guided human input
 - Use `--yes` only when a command actually has a confirmation step
 - Include examples in `--help` for meaningful commands
 - Keep stdin support explicit

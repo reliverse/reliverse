@@ -8,6 +8,12 @@ It is the main host CLI for internal developer workflows in this monorepo and is
 
 `rse` aggregates file-based command trees from workspace plugins and exposes them as one CLI.
 
+It is configured as an automation-first host CLI:
+
+- default interaction mode is `never`
+- commands are expected to work well for agents, scripts, and CI
+- humans can opt into guided flows only when commands support them
+
 Current command families include:
 
 - `dler` - build and publish flows
@@ -105,6 +111,13 @@ bun run dev:cli
 bun run rse --help
 ```
 
+If a future command explicitly supports human-guided interaction, the host-side opt-in surface is:
+
+```bash
+bun run rse --interactive ...
+bun run rse --tui ...
+```
+
 ## Command model
 
 `rse` itself is a Rempts host CLI.
@@ -129,7 +142,7 @@ apps/cli/src/cli.ts
 The current CLI metadata is:
 
 - name: `rse`
-- description: `Reliverse developer CLI that aggregates Rempts plugins.`
+- description: `CLI for automating developer and sysadmin routine tasks.`
 
 ## Related docs
 

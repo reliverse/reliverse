@@ -1,0 +1,10 @@
+{
+  "name": "@reliverse/ai-rse-plugin",
+  "version": "0.1.0",
+  "type": "module",
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
+  }
+}

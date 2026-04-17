@@ -7,8 +7,10 @@ export type GlobalFlagKey = keyof ParsedGlobalFlags;
 
 export interface GlobalFlagConfig {
   readonly help?: boolean | undefined;
+  readonly interactive?: boolean | undefined;
   readonly json?: boolean | undefined;
   readonly noInput?: boolean | undefined;
+  readonly tui?: boolean | undefined;
 }
 
 export interface GlobalFlagDefinition {
@@ -26,8 +28,10 @@ export interface ParsedGlobalFlagsResult {
 
 interface MutableGlobalFlags {
   help: boolean;
+  interactive: boolean;
   json: boolean;
   noInput: boolean;
+  tui: boolean;
 }
 
 const DEFAULT_GLOBAL_FLAGS: Readonly<Record<GlobalFlagKey, Omit<GlobalFlagDefinition, "enabled">>> = {
@@ -36,6 +40,12 @@ const DEFAULT_GLOBAL_FLAGS: Readonly<Record<GlobalFlagKey, Omit<GlobalFlagDefini
     key: "help",
     longName: "help",
     shortName: "h",
+  },
+  interactive: {
+    description: "Allow plain interactive prompts when the command supports them",
+    key: "interactive",
+    longName: "interactive",
+    shortName: "i",
   },
   json: {
     description: "Emit machine-readable JSON help, results, and errors",
@@ -46,6 +56,11 @@ const DEFAULT_GLOBAL_FLAGS: Readonly<Record<GlobalFlagKey, Omit<GlobalFlagDefini
     description: "Disable interactive input and fail fast when required values are missing",
     key: "noInput",
     longName: "no-input",
+  },
+  tui: {
+    description: "Allow TUI prompts when the command supports them",
+    key: "tui",
+    longName: "tui",
   },
 };
 
@@ -81,8 +96,10 @@ export function parseGlobalFlags(
 
   const flags: MutableGlobalFlags = {
     help: false,
+    interactive: false,
     json: false,
     noInput: false,
+    tui: false,
   };
 
   for (const definition of enabledDefinitions) {

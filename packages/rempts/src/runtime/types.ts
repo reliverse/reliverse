@@ -6,12 +6,18 @@ export type StdinMode = "pipe" | "tty";
 
 export type ConfirmationMode = "disabled" | "prompt";
 
+export type RemptsInteractionMode = "never" | "tty" | "tui";
+
+export type RemptsHostInteractionMode = RemptsInteractionMode | "auto";
+
 export type RemptsErrorKind = "internal" | "prompt" | "usage" | "validation";
 
 export interface ParsedGlobalFlags {
   readonly help: boolean;
+  readonly interactive: boolean;
   readonly json: boolean;
   readonly noInput: boolean;
+  readonly tui: boolean;
 }
 
 export interface StructuredRemptsError {

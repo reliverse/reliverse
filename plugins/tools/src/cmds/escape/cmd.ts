@@ -337,6 +337,7 @@ export default defineCommand({
     notes:
       "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --overwrite is supplied.",
   },
+  interactive: "never",
   conventions: {
     idempotent: true,
     supportsDryRun: true,

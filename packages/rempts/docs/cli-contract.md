@@ -25,6 +25,7 @@
 ## Automation-First Behavior
 
 - Prefer flags, explicit stdin helpers, and defaults before prompts.
+- Default host CLIs to non-interactive mode and require explicit opt-in for human-guided interaction.
 - In non-TTY mode, prompts must fail fast instead of waiting for interaction.
 - Error messages should tell the caller which flag or input path to use next.
 - Commands must not silently consume stdin just because a value is missing.
@@ -33,8 +34,10 @@
 ## Reserved Global Flags
 
 - `--help`
+- `--interactive`
 - `--json`
 - `--no-input`
+- `--tui`
 
 These are framework-reserved and must stay distinct from final-command flags.
 
@@ -44,6 +47,7 @@ These are framework-reserved and must stay distinct from final-command flags.
 - Support `--dry-run` for commands with side effects.
 - Support `--apply` when a command should switch from preview to real execution.
 - Prefer clear flags such as `--overwrite` when the behavior is specifically about replacing existing outputs rather than applying a previewed plan.
+- Default commands to `interactive: "never"` unless there is a strong reason to guide a human through a flow.
 - Support `--yes` only when a command has a real confirmation path to bypass.
 - Avoid hidden interactive requirements in automation and CI.
 - Make stdin support explicit in help and examples.

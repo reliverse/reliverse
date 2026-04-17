@@ -41,6 +41,7 @@ export default defineCommand({
     notes:
       "Eligible packages: not private, type module, publishConfig.access public. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
   },
+  interactive: "never",
   conventions: {
     idempotent: false,
     supportsDryRun: true,

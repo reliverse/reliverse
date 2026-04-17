@@ -17,6 +17,7 @@ export interface CommandNodeMetadata {
   readonly description?: string | undefined;
   readonly examples: readonly string[];
   readonly help?: string | undefined;
+  readonly interactive?: "never" | "tty" | "tui" | undefined;
   readonly name: string;
   readonly path: readonly string[];
 }

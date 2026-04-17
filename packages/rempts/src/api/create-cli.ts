@@ -37,7 +37,12 @@ import {
   readGlobalHostPluginSpecifiers,
 } from "../runtime/global-plugin-config";
 import { resolveEntry } from "../runtime/resolve-entry";
-import type { OutputMode, ParsedGlobalFlags } from "../runtime/types";
+import type {
+  OutputMode,
+  ParsedGlobalFlags,
+  RemptsHostInteractionMode,
+  RemptsInteractionMode,
+} from "../runtime/types";
 import {
   PromptUnavailableError,
   RemptsUsageError,
@@ -79,6 +84,7 @@ export interface CreateCLIOptions {
   readonly cwd?: string | undefined;
   readonly env?: NodeJS.ProcessEnv | undefined;
   readonly globalFlags?: GlobalFlagConfig | undefined;
+  readonly interactionMode?: RemptsHostInteractionMode | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
   readonly onError?: ((error: unknown) => Promise<void> | void) | undefined;
@@ -215,6 +221,7 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
     readonly meta?: { readonly aliases?: readonly string[] | undefined; readonly description?: string | undefined } | undefined;
     readonly conventions?: CommandConventions | undefined;
     readonly help?: { readonly examples?: readonly string[] | undefined; readonly text?: string | undefined } | undefined;
+    readonly interactive?: RemptsInteractionMode | undefined;
     readonly noTTY?: boolean | undefined;
     readonly noTUI?: boolean | undefined;
     readonly options?: TOptions | undefined;
@@ -229,6 +236,7 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
     examples: definition.help?.examples ?? [],
     filePath: commandNode.filePath,
     help: definition.help?.text,
+    interactive: definition.interactive ?? "never",
     name: commandName,
     noTTY: definition.noTTY ?? false,
     noTUI: definition.noTUI ?? false,
@@ -401,6 +409,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
         conventions: discovered.commandNode?.conventions,
         globalFlagDefinitions,
         helpText: discovered.commandNode?.help,
+        interactive: discovered.commandNode?.interactive ?? "never",
         programName: cliName,
       });
 
@@ -517,13 +526,17 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     }
 
     const promptRuntime = await createPromptRuntime({
+      commandMode: command.interactive,
       env,
+      hostMode: options.interactionMode ?? "never",
+      interactive: parsedGlobals.flags.interactive,
       noInput: parsedGlobals.flags.noInput,
       noTTY: options.noTTY || command.noTTY,
       noTUI: options.noTTY || command.noTTY || options.noTUI || command.noTUI,
       stderr,
       stdin,
       stdout,
+      tui: parsedGlobals.flags.tui,
     });
 
     const context = createCommandContext({

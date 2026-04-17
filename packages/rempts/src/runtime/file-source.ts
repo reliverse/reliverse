@@ -117,7 +117,7 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
       );
 
       const node = loadCurrentCommand
-        ? await loadCurrentCommand().then((command) => ({
+          ? await loadCurrentCommand().then((command) => ({
             agent: command.agent,
             aliases: command.meta?.aliases ?? [],
             conventions: command.conventions,
@@ -126,6 +126,7 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
             examples: command.help?.examples ?? [],
             filePath: commandFilePath,
             help: command.help?.text,
+            interactive: command.interactive ?? "never",
             loadCommand: loadCurrentCommand,
             name: command.meta?.name ?? path.at(-1) ?? resolvedEntry.entryFileName,
             path,

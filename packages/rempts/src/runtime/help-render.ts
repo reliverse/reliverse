@@ -13,6 +13,17 @@ export function renderHelpDocument(document: HelpDocument): string {
     lines.push("", "Aliases", `  ${document.aliases.join(", ")}`);
   }
 
+  if (document.interactive) {
+    const interactiveDescription =
+      document.interactive === "never"
+        ? "Disabled by default, optimized for agents and scripts"
+        : document.interactive === "tty"
+          ? "Plain terminal prompts available only with explicit host opt-in (for example --interactive)"
+          : "TUI available only with explicit host opt-in (for example --tui), with terminal fallback when supported";
+
+    lines.push("", "Interaction", `  ${interactiveDescription}`);
+  }
+
   if (document.globalFlags.length > 0) {
     lines.push("", "Global Flags");
 

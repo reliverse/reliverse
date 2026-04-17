@@ -8,18 +8,27 @@ import {
   resolveInteractionPolicy,
   type InteractionPolicy,
 } from "../runtime/noninteractive";
-import type { ConfirmationMode, StdinMode } from "../runtime/types";
+import type {
+  ConfirmationMode,
+  RemptsHostInteractionMode,
+  RemptsInteractionMode,
+  StdinMode,
+} from "../runtime/types";
 import { createPlainPromptAdapter } from "./plain";
 import { createOpenTUIPromptAdapter } from "./opentui";
 
 export interface PromptRuntimeOptions {
+  readonly commandMode?: RemptsInteractionMode | undefined;
   readonly env: NodeJS.ProcessEnv;
+  readonly hostMode?: RemptsHostInteractionMode | undefined;
+  readonly interactive?: boolean | undefined;
   readonly noInput?: boolean | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
   readonly stdin: typeof process.stdin;
   readonly stdout: typeof process.stdout;
   readonly stderr: typeof process.stderr;
+  readonly tui?: boolean | undefined;
 }
 
 export interface ResolvedPromptRuntime {
@@ -75,13 +84,17 @@ function getDefaultPromptRuntimeOptions(
   partialOptions: Partial<PromptRuntimeOptions>,
 ): PromptRuntimeOptions {
   return {
+    commandMode: partialOptions.commandMode,
     env: partialOptions.env ?? process.env,
+    hostMode: partialOptions.hostMode,
+    interactive: partialOptions.interactive,
     noInput: partialOptions.noInput,
     noTTY: partialOptions.noTTY,
     noTUI: partialOptions.noTUI,
     stderr: partialOptions.stderr ?? process.stderr,
     stdin: partialOptions.stdin ?? process.stdin,
     stdout: partialOptions.stdout ?? process.stdout,
+    tui: partialOptions.tui,
   };
 }
 

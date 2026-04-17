@@ -38,6 +38,7 @@ export default defineCommand({
     notes:
       "This command is non-interactive by default. Pass packages as args and choose the target explicitly with --cwd or --target.",
   },
+  interactive: "never",
   conventions: {
     idempotent: true,
     supportsDryRun: true,
