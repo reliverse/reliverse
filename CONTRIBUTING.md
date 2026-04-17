@@ -112,6 +112,8 @@ components/    → UI libraries
 
 We try to keep boundaries clear so the system remains maintainable as it grows.
 
+Please see the end of this file to learn more about the folder structure.
+
 General direction:
 
 - Apps depend on packages.
@@ -187,6 +189,49 @@ Clear reports make it easier for everyone to understand what's happening and wor
 If you discover a security vulnerability, please do not disclose it publicly.
 
 Instead, follow the responsible disclosure process outlined in [SECURITY.md](SECURITY.md) file.
+
+## Folder Structure
+
+## What lives here
+
+Reliverse is organized into three main layers:
+
+- `apps/` - deployable runtimes such as the web app, API, mobile app, desktop app, wiki, and CLI
+- `packages/` - reusable platform modules such as `server`, `sdk`, `db`, `env`, and `rempts`
+- `plugins/` - file-based CLI command trees mounted into host CLIs through `@reliverse/rempts`
+
+Current top-level workspaces include:
+
+### Apps
+
+- `apps/api` - API runtime
+- `apps/cli` - `rse`, the Reliverse developer CLI
+- `apps/desktop` - desktop app shell
+- `apps/mobile` - mobile app
+- `apps/web` - main web app
+- `apps/wiki` - docs and wiki surface
+
+### Packages
+
+- `packages/rempts` - Bun-first file-based CLI foundation
+- `packages/server` - backend runtime core
+- `packages/sdk` - typed client contract layer
+- `packages/db` - persistence layer
+- `packages/auth` - auth and session logic
+- `packages/billing` - billing and entitlements
+- `packages/env` - typed environment handling
+- `packages/kv` - key-value and rate-limiting primitives
+- `packages/email` - transactional email layer
+- `packages/convex` - Convex-specific backend logic
+- `packages/tailwind` - shared design preset
+- `packages/tsconfig` - shared TS config
+
+### CLI plugins
+
+- `plugins/dler` - build and publish flows
+- `plugins/pm` - package management helpers
+- `plugins/tools` - file conversion helpers such as `escape`
+- `plugins/os` - OS automation commands
 
 ## Final Note
 

@@ -14,7 +14,7 @@ function isRemptsPlugin(value: unknown): value is RemptsPlugin {
   }
 
   const record = value as Record<string, unknown>;
-  return typeof record.id === "string" && typeof record.name === "string" && Array.isArray(record.commands);
+  return typeof record.name === "string" && typeof record.entry === "string";
 }
 
 function readDependencyCandidateListFromManifest(manifest: unknown): readonly string[] {

@@ -182,6 +182,7 @@
   },
   "type": "module",
   "scripts": {
+    "rse": "bun apps/cli/src/cli.ts",
     "dev": "bun dev:web",
     "build": "bun build:web",
     "start": "bun start:web",
@@ -195,7 +196,6 @@
     "build:web": "bun -F=@repo/reliverse-web build",
     "smoke:web": "bun -F=@repo/reliverse-web run smoke",
     "reliverse:rse": "bun -F=@reliverse/rse start",
-    "rse": "bun apps/cli/src/cli.ts",
     "latest": "bun rse pm update && bun install",
     "reliverse:pub": "bun run build && bun dler publish --skip-tip-2fa",
     "reliverse:build": "bun clean && bun typecheck && bun dler build",

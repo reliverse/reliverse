@@ -175,6 +175,26 @@ function getResult(
   };
 }
 
+function assertNoPluginNameCollisions(plugins: readonly RemptsPlugin[]): void {
+  const seen = new Set<string>();
+
+  for (const plugin of plugins) {
+    if (seen.has(plugin.name)) {
+      throw new RemptsUsageError(
+        [
+          `Duplicate plugin name \"${plugin.name}\" detected.`,
+          "",
+          "Each plugin must have a unique internal `name`.",
+          "Fix: rename one plugin's `definePlugin({ name })` value.",
+        ].join("\n"),
+        1,
+      );
+    }
+
+    seen.add(plugin.name);
+  }
+}
+
 async function finalizeResult(
   result: CLIExecutionResult,
   onExit: CreateCLIOptions["onExit"],
@@ -356,6 +376,8 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       }
     }
 
+    assertNoPluginNameCollisions(effectivePlugins);
+
     const sources = [
       createFileCommandSource(resolvedEntry),
       ...effectivePlugins.map((plugin) => createPluginCommandSource(plugin)),
@@ -506,7 +528,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
 
     const context = createCommandContext({
       args: parsed.args,
-      cliPluginIds: effectivePlugins.map((plugin) => plugin.id),
+      cliPluginNames: effectivePlugins.map((plugin) => plugin.name),
       command: toCommandRuntimeInfo(
         commandName,
         discovered.commandNode,

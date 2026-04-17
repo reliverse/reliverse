@@ -42,14 +42,6 @@ async function getMergedScope(
       sourceId: entry.sourceId,
     }));
 
-  if (commandNodes.length > 1) {
-    throw new RemptsUsageError(
-      `Command collision at "${formatPath(path)}" across sources: ${commandNodes
-        .map((entry) => entry.sourceId)
-        .join(", ")}.`,
-    );
-  }
-
   const subcommandsByName = new Map<
     string,
     { readonly sourceId: string; readonly subcommand: DiscoveredSubcommand }
@@ -57,18 +49,12 @@ async function getMergedScope(
 
   for (const entry of scopes) {
     for (const subcommand of entry.scope.subcommands) {
-      const existing = subcommandsByName.get(subcommand.name);
-
-      if (existing) {
-        throw new RemptsUsageError(
-          `Command collision at "${formatPath([...path, subcommand.name])}" between sources "${existing.sourceId}" and "${entry.sourceId}".`,
-        );
+      if (!subcommandsByName.has(subcommand.name)) {
+        subcommandsByName.set(subcommand.name, {
+          sourceId: entry.sourceId,
+          subcommand,
+        });
       }
-
-      subcommandsByName.set(subcommand.name, {
-        sourceId: entry.sourceId,
-        subcommand,
-      });
     }
   }
 
@@ -89,7 +75,9 @@ async function getMergedScope(
           entry.canonicalName !== null,
       );
 
-      if (matches.length > 1) {
+      const uniqueCanonicalNames = [...new Set(matches.map((entry) => entry.canonicalName))];
+
+      if (uniqueCanonicalNames.length > 1) {
         throw new RemptsUsageError(
           `Ambiguous command segment "${segment}" at "${formatPath(path)}". Matching sources: ${matches
             .map((entry) => entry.sourceId)
@@ -97,7 +85,7 @@ async function getMergedScope(
         );
       }
 
-      return matches[0]?.canonicalName ?? null;
+      return uniqueCanonicalNames[0] ?? null;
     },
     subcommands: [...subcommandsByName.values()]
       .map((entry) => entry.subcommand)

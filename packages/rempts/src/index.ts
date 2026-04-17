@@ -13,7 +13,6 @@ export {
 } from "./runtime/host-plugins";
 export {
   definePlugin,
-  type PluginCommandConfig,
   type RemptsPlugin,
 } from "./api/define-plugin";
 export {

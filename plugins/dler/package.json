@@ -11,7 +11,7 @@
     "./build-runtime": "./src/impl/build/index.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cmds/build/cmd.ts --outdir ./dist --target bun",
+    "build": "bun build ./src/index.ts ./src/cmds/dler/build/cmd.ts --outdir ./dist --target bun",
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
     "typecheck": "tsgo --noEmit"
   },

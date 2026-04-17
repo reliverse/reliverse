@@ -57,7 +57,7 @@ export interface CommandConventions {
   readonly acceptsStdin?: boolean | readonly OptionInputSource[] | undefined;
   readonly idempotent?: boolean | undefined;
   readonly supportsDryRun?: boolean | undefined;
-  readonly supportsForce?: boolean | undefined;
+  readonly supportsApply?: boolean | undefined;
   readonly supportsYes?: boolean | undefined;
 }
 
@@ -83,8 +83,8 @@ export interface CommandRuntimeInfo<
 
 export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCommandOptions> {
   readonly args: readonly string[];
-  /** Plugin ids passed to `createCLI({ plugins })`, in registration order. */
-  readonly cliPluginIds: readonly string[];
+  /** Plugin names passed to `createCLI({ plugins })`, in registration order. */
+  readonly cliPluginNames: readonly string[];
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
   readonly cwd: string;

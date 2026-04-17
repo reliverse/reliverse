@@ -9,7 +9,7 @@ const faqs = [
   {
     question: "Are Reliverse products open source?",
     answer:
-      "Many of our developer tools like Relivator, Versator, Dler, and RSE CLI are open source. We believe in giving back to the community and fostering collaboration. Check our GitHub for available repositories.",
+      "Many of our developer tools like Relivator, Versator, Dler, and Rse CLI are open source. We believe in giving back to the community and fostering collaboration. Check our GitHub for available repositories.",
   },
   {
     question: "How can I contribute to Reliverse projects?",

@@ -3,14 +3,14 @@ import { resolve } from "node:path";
 
 import { defineCommand } from "@reliverse/rempts";
 
-import { getIneligibilityReason } from "../../impl/pub/eligibility";
-import { runNpmPublish } from "../../impl/pub/npm-publish";
-import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
-import { runPrebuildForPackage } from "../../impl/pub/prebuild";
-import { createPublishStaging } from "../../impl/pub/staging";
-import { parseTargetsOption } from "../../impl/pub/targets";
+import { getIneligibilityReason } from "../../../impl/pub/eligibility";
+import { runNpmPublish } from "../../../impl/pub/npm-publish";
+import { isSafeRelativePublishFrom } from "../../../impl/pub/paths";
+import { runPrebuildForPackage } from "../../../impl/pub/prebuild";
+import { createPublishStaging } from "../../../impl/pub/staging";
+import { parseTargetsOption } from "../../../impl/pub/targets";
 
-const BUILDER_PLUGIN_ID = "dler-rse-plugin";
+const BUILDER_PLUGIN_NAME = "dler";
 const DEFAULT_PUBLISH_FROM = "dist";
 
 async function pathIsDirectory(path: string): Promise<boolean> {
@@ -93,7 +93,7 @@ export default defineCommand({
     }
 
     const prebuild = ctx.options.prebuild ?? true;
-    const hasBuilder = ctx.cliPluginIds.includes(BUILDER_PLUGIN_ID);
+    const hasBuilder = ctx.cliPluginNames.includes(BUILDER_PLUGIN_NAME);
 
     if (prebuild && !hasBuilder) {
       ctx.exit(

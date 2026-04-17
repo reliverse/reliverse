@@ -1,127 +1,59 @@
 import type { RemptsPlugin } from "../api/define-plugin";
-import type { CommandNode, CommandSource, CommandSourceScope, DiscoveredSubcommand } from "./command-source";
-import { isCommandDefinition } from "../api/define-command";
-import { RemptsUsageError } from "./errors";
+import type { CommandNode, CommandSource } from "./command-source";
+import { createFileCommandSource } from "./file-source";
+import { resolveEntry } from "./resolve-entry";
 
-function pathStartsWith(path: readonly string[], prefix: readonly string[]): boolean {
-  if (prefix.length > path.length) {
-    return false;
+function withPluginMetadata(plugin: RemptsPlugin, node: CommandNode | null): CommandNode | null {
+  if (!node) {
+    return null;
   }
 
-  return prefix.every((segment, index) => path[index] === segment);
+  return {
+    ...node,
+    sourceId: plugin.name,
+    sourceKind: "plugin",
+  };
 }
 
-function buildCommandNode(
-  plugin: RemptsPlugin,
-  command: RemptsPlugin["commands"][number],
-): CommandNode {
-  const loadCommand = command.loadCommand;
+function getSyntheticTopLevelNode(plugin: RemptsPlugin, path: readonly string[]): CommandNode | null {
+  if (path.length !== 1 || !plugin.description) {
+    return null;
+  }
 
   return {
-    agent: command.agent,
-    aliases: command.aliases ?? [],
-    conventions: command.conventions,
-    description: command.description,
-    examples: command.examples ?? [],
-    help: command.help,
-    loadCommand: loadCommand
-      ? async () => {
-          const loaded = await loadCommand();
-
-          if (!isCommandDefinition(loaded)) {
-            throw new RemptsUsageError(
-              `Plugin "${plugin.id}" command "${command.path.join(" ")}" must resolve to defineCommand(...).`,
-            );
-          }
-
-          return loaded;
-        }
-      : undefined,
-    name: command.path.at(-1) ?? plugin.id,
-    path: command.path,
-    sourceId: plugin.id,
+    aliases: [],
+    description: plugin.description,
+    examples: [],
+    name: path[0] ?? plugin.name,
+    path,
+    sourceId: plugin.name,
     sourceKind: "plugin",
   };
 }
 
 export function createPluginCommandSource(plugin: RemptsPlugin): CommandSource {
-  return {
-    id: plugin.id,
-    async getScope(path) {
-      const relevantCommands = plugin.commands.filter((command) =>
-        pathStartsWith(command.path, path),
-      );
+  const fileSource = createFileCommandSource(resolveEntry(plugin.entry));
 
-      if (relevantCommands.length === 0) {
+  return {
+    id: plugin.name,
+    async getScope(path) {
+      const scope = await fileSource.getScope(path);
+
+      if (!scope) {
         return null;
       }
 
-      const exactCommand = relevantCommands.find((command) => command.path.length === path.length);
-      const childGroups = new Map<
-        string,
-        {
-          aliases: readonly string[];
-          description?: string | undefined;
-        }
-      >();
-
-      for (const command of relevantCommands) {
-        if (command.path.length <= path.length) {
-          continue;
-        }
-
-        const childName = command.path[path.length];
-
-        if (childName === undefined) {
-          continue;
-        }
-
-        const existing = childGroups.get(childName);
-
-        if (existing) {
-          continue;
-        }
-
-        const exactChild = relevantCommands.find(
-          (candidate) =>
-            candidate.path.length === path.length + 1 &&
-            candidate.path[path.length] === childName,
-        );
-
-        childGroups.set(childName, {
-          aliases: exactChild?.aliases ?? [],
-          description: exactChild?.description,
-        });
-      }
-
-      const subcommands: DiscoveredSubcommand[] = [...childGroups.entries()]
-        .map(([name, child]) => ({
-          description: child.description,
-          name,
-        }))
-        .sort((left, right) => left.name.localeCompare(right.name));
-
-      const scope: CommandSourceScope = {
-        node: exactCommand ? buildCommandNode(plugin, exactCommand) : null,
-        async resolveSegment(segment) {
-          if (childGroups.has(segment)) {
-            return segment;
-          }
-
-          const aliasMatches = [...childGroups.entries()].filter(([, child]) =>
-            child.aliases.includes(segment),
-          );
-
-          if (aliasMatches.length !== 1) {
-            return aliasMatches.length > 1 ? aliasMatches[0]?.[0] ?? null : null;
-          }
-
-          return aliasMatches[0]?.[0] ?? null;
-        },
-        subcommands,
+      return {
+        node: withPluginMetadata(plugin, scope.node) ?? getSyntheticTopLevelNode(plugin, path),
+        resolveSegment: scope.resolveSegment,
+        subcommands:
+          path.length === 0 && plugin.description
+            ? scope.subcommands.map((subcommand) => ({
+                ...subcommand,
+                description: subcommand.description ?? plugin.description,
+              }))
+            : scope.subcommands,
       };
-
-      return scope;
     },
   };
 }

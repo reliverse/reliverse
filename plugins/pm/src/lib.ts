@@ -591,9 +591,9 @@ export async function fetchLatestVersion(packageName: string): Promise<string> {
 
 async function fetchRegistryPackageMetadata(
   packageName: string,
-  options?: { readonly force?: boolean | undefined },
+  options?: { readonly refresh?: boolean | undefined },
 ): Promise<RegistryPackageMetadata> {
-  if (options?.force !== true) {
+  if (options?.refresh !== true) {
     const cached = packageMetadataCache.get(packageName);
 
     if (cached) {
@@ -629,7 +629,7 @@ async function fetchRegistryPackageMetadata(
     };
   })();
 
-  if (options?.force !== true) {
+  if (options?.refresh !== true) {
     packageMetadataCache.set(packageName, request);
   }
 
@@ -731,13 +731,13 @@ function findLatestStableVersion(metadata: RegistryPackageMetadata): string | nu
 
 export async function resolveUpdateVersion(options: {
   readonly currentSpecifier: string;
-  readonly force?: boolean | undefined;
+  readonly refresh?: boolean | undefined;
   readonly latest?: boolean | undefined;
   readonly packageName: string;
   readonly smart?: boolean | undefined;
 }): Promise<string> {
   const metadata = await fetchRegistryPackageMetadata(options.packageName, {
-    force: options.force,
+    refresh: options.refresh,
   });
 
   if (options.smart === true) {
@@ -843,18 +843,18 @@ async function runBunCommand(
 
 export async function runBunInstall(
   cwd: string,
-  options?: { readonly force?: boolean | undefined },
+  options?: { readonly useBunForce?: boolean | undefined },
 ): Promise<InstallResult> {
   return runBunCommand(cwd, [
     "install",
-    ...(options?.force ? ["--force"] : []),
+    ...(options?.useBunForce ? ["--force"] : []),
   ]);
 }
 
 export async function runBunUpdate(
   cwd: string,
   options?: {
-    readonly force?: boolean | undefined;
+    readonly useBunForce?: boolean | undefined;
     readonly latest?: boolean | undefined;
     readonly packages?: readonly string[] | undefined;
     readonly recursive?: boolean | undefined;
@@ -862,7 +862,7 @@ export async function runBunUpdate(
 ): Promise<InstallResult> {
   return runBunCommand(cwd, [
     "update",
-    ...(options?.force ? ["--force"] : []),
+    ...(options?.useBunForce ? ["--force"] : []),
     ...(options?.latest ? ["--latest"] : []),
     ...(options?.recursive ? ["--recursive"] : []),
     ...(options?.packages ?? []),

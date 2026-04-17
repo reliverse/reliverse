@@ -42,7 +42,8 @@ These are framework-reserved and must stay distinct from final-command flags.
 
 - Prefer idempotent behavior where practical.
 - Support `--dry-run` for commands with side effects.
-- Support `--force` only for explicit overwrite/bypass semantics.
+- Support `--apply` when a command should switch from preview to real execution.
+- Prefer clear flags such as `--overwrite` when the behavior is specifically about replacing existing outputs rather than applying a previewed plan.
 - Support `--yes` only when a command has a real confirmation path to bypass.
 - Avoid hidden interactive requirements in automation and CI.
 - Make stdin support explicit in help and examples.

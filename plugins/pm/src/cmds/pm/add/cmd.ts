@@ -17,7 +17,7 @@ import {
   setCatalogEntry,
   setDependency,
   writeManifest,
-} from "../../lib";
+} from "../../../lib";
 
 interface AddAction {
   readonly action: "added" | "noop" | "skipped";

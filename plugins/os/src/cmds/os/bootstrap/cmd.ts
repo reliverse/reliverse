@@ -12,12 +12,11 @@ export default defineCommand({
   },
   agent: {
     notes:
-      "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --force is supplied.",
+      "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --overwrite is supplied.",
   },
   conventions: {
     idempotent: true,
     supportsDryRun: true,
-    supportsForce: true,
   },
   help: {
     examples: [
@@ -31,7 +30,7 @@ export default defineCommand({
       description: "Preview writes without modifying files",
       inputSources: ["flag"],
     },
-    force: {
+    overwrite: {
       type: "boolean",
       description: "Overwrite existing output files when the generated content differs",
       inputSources: ["flag"],

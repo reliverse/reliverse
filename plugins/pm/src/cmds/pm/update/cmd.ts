@@ -23,7 +23,7 @@ import {
   setCatalogEntry,
   setDependency,
   writeManifest,
-} from "../../lib";
+} from "../../../lib";
 
 interface UpdateAction {
   readonly action: "missing" | "noop" | "skipped" | "updated";
@@ -32,6 +32,7 @@ interface UpdateAction {
   readonly packageName: string;
   readonly previousSpecifier?: string | undefined;
   readonly reason?: string | undefined;
+  readonly resolutionStrategy?: string | undefined;
   readonly section?: string | undefined;
   readonly source: "catalog" | "target";
   readonly targetLabel?: string | undefined;
@@ -47,6 +48,115 @@ interface PendingUpdate {
   readonly targetManifestPath?: string | undefined;
 }
 
+function describeStrategy(options: {
+  readonly latest: boolean;
+  readonly smart: boolean;
+}): { label: string; text: string } {
+  if (options.smart && options.latest) {
+    return {
+      label: "smart-latest-stable",
+      text: "smart strategy: pick the newest stable overall",
+    };
+  }
+
+  if (options.smart && !options.latest) {
+    return {
+      label: "smart-range",
+      text: "smart strategy: stay within the current semver line and prefer the current prerelease branch when relevant",
+    };
+  }
+
+  if (!options.smart && options.latest) {
+    return {
+      label: "latest",
+      text: "latest strategy: jump to dist-tags.latest",
+    };
+  }
+
+  return {
+    label: "range",
+    text: "range strategy: stay within the current semver range",
+  };
+}
+
+function formatActionTarget(action: UpdateAction, fallbackLabel: string): string {
+  const location = action.targetLabel ?? fallbackLabel;
+
+  if (action.source === "catalog") {
+    return action.catalogName ? `${location} (catalog:${action.catalogName})` : `${location} (catalog)`;
+  }
+
+  return action.section ? `${location} (${action.section})` : location;
+}
+
+function buildInstallCommand(options: {
+  readonly useBunForce?: boolean | undefined;
+  readonly installCwd: string;
+  readonly latest: boolean;
+  readonly recursive: boolean;
+  readonly targetDir: string;
+}): string {
+  if (options.recursive) {
+    return `bun update${options.useBunForce ? " --force" : ""}${options.latest ? " --latest" : ""} --recursive`;
+  }
+
+  if (options.installCwd === options.targetDir) {
+    return `bun update${options.useBunForce ? " --force" : ""}${options.latest ? " --latest" : ""}`;
+  }
+
+  return `bun install${options.useBunForce ? " --force" : ""}`;
+}
+
+function createActionSummary(actions: readonly UpdateAction[]) {
+  return {
+    missing: actions.filter((action) => action.action === "missing").length,
+    noop: actions.filter((action) => action.action === "noop").length,
+    skipped: actions.filter((action) => action.action === "skipped").length,
+    updated: actions.filter((action) => action.action === "updated").length,
+  };
+}
+
+function groupUpdatedActions(actions: readonly UpdateAction[], fallbackLabel: string) {
+  const grouped = new Map<string, UpdateAction[]>();
+
+  for (const action of actions) {
+    if (action.action !== "updated") {
+      continue;
+    }
+
+    const key = formatActionTarget(action, fallbackLabel);
+    const bucket = grouped.get(key);
+
+    if (bucket) {
+      bucket.push(action);
+      continue;
+    }
+
+    grouped.set(key, [action]);
+  }
+
+  return grouped;
+}
+
+function resolveDryRunMode(options: {
+  readonly apply?: boolean | undefined;
+  readonly dryRun?: boolean | undefined;
+}): boolean {
+  if (options.dryRun === true) {
+    return true;
+  }
+
+  if (options.dryRun === false) {
+    return false;
+  }
+
+  if (options.apply === true) {
+    return false;
+  }
+
+  return true;
+}
+
 export default defineCommand({
   meta: {
     name: "update",
@@ -59,7 +169,7 @@ export default defineCommand({
   conventions: {
     idempotent: true,
     supportsDryRun: true,
-    supportsForce: true,
+    supportsApply: true,
   },
   help: {
     examples: [
@@ -72,9 +182,10 @@ export default defineCommand({
       "rse pm update typescript --dry-run --json",
       "rse pm update typescript --no-latest --dry-run --json",
       "rse pm update vite --no-smart --dry-run --json",
-      "rse pm update --cwd /path/to/project --target /path/to/project --force --dry-run --json",
+      "rse pm update --cwd /path/to/project --target /path/to/project --apply --dry-run --json",
+      "rse pm update --apply",
     ],
-    text: "By default this command updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+    text: "By default this command updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Dry-run is enabled by default. Pass `--apply` to execute real writes and the final Bun step, or pass `--dry-run --apply` to keep preview mode explicit. Dry-run output shows grouped specifier diffs and the final Bun command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
   },
   options: {
     cwd: {
@@ -85,12 +196,12 @@ export default defineCommand({
     },
     dryRun: {
       type: "boolean",
-      description: "Preview package.json changes without writing files",
+      description: "Enabled by default; preview package.json changes without writing files. Pass --apply to execute unless --dry-run is also set",
       inputSources: ["flag"],
     },
-    force: {
+    apply: {
       type: "boolean",
-      description: "Always refresh registry metadata and force the final Bun install/update step",
+      description: "Execute real writes and the final Bun step unless --dry-run is also set",
       inputSources: ["flag"],
     },
     latest: {
@@ -133,6 +244,15 @@ export default defineCommand({
     });
     const smartByDefault = ctx.options.smart !== false;
     const latestByDefault = ctx.options.latest !== false;
+    const executionRequested = ctx.options.apply === true;
+    const dryRun = resolveDryRunMode({
+      apply: ctx.options.apply,
+      dryRun: ctx.options.dryRun,
+    });
+    const strategy = describeStrategy({
+      latest: latestByDefault,
+      smart: smartByDefault,
+    });
     const recursiveByDefault = context.usesWorkspaces && context.targetDir === context.repoRootDir;
     const updateAllWorkspaceManifests =
       recursiveByDefault && ctx.options.recursive !== false;
@@ -152,23 +272,30 @@ export default defineCommand({
       requestedPackages.length > 0
         ? requestedPackages
         : manifestTargets.flatMap((target) => listTargetDependencies(target.manifest));
+    const installCommand = buildInstallCommand({
+      useBunForce: executionRequested,
+      installCwd: context.installCwd,
+      latest: latestByDefault,
+      recursive: updateAllWorkspaceManifests,
+      targetDir: context.targetDir,
+    });
 
     if (targetPackages.length === 0) {
       if (ctx.output.mode === "json") {
         ctx.output.result(
           {
             actions: [],
-            dryRun: ctx.options.dryRun === true,
+            dryRun,
             install: {
-              command: updateAllWorkspaceManifests
-                ? `bun update${latestByDefault ? " --latest" : ""} --recursive`
-                : `bun update${latestByDefault ? " --latest" : ""}`,
+              command: installCommand,
               cwd: context.installCwd,
               executed: false,
             },
             latest: latestByDefault,
             recursive: updateAllWorkspaceManifests,
             smart: smartByDefault,
+            strategy,
+            summary: createActionSummary([]),
             target: {
               cwd: context.targetDir,
               label: context.targetLabel,
@@ -188,7 +315,7 @@ export default defineCommand({
     const pendingUpdates: PendingUpdate[] = [];
 
     for (const manifestTarget of manifestTargets) {
-      let nextTargetManifest = nextManifests.get(manifestTarget.manifestPath);
+      const nextTargetManifest = nextManifests.get(manifestTarget.manifestPath);
 
       if (!nextTargetManifest) {
         continue;
@@ -242,6 +369,7 @@ export default defineCommand({
             packageName,
             previousSpecifier: targetLocation.specifier,
             reason: "workspace dependencies are managed separately",
+            resolutionStrategy: strategy.label,
             section: targetLocation.section,
             source: "target",
             targetLabel: manifestTarget.label,
@@ -260,6 +388,7 @@ export default defineCommand({
               packageName,
               previousSpecifier: targetLocation.specifier,
               reason: "catalog entry is missing from the repo root",
+              resolutionStrategy: strategy.label,
               section: targetLocation.section,
               source: "catalog",
               targetLabel: manifestTarget.label,
@@ -286,6 +415,7 @@ export default defineCommand({
           });
           continue;
         }
+
         pendingUpdates.push({
           currentSpecifier: targetLocation.specifier,
           packageName,
@@ -302,7 +432,7 @@ export default defineCommand({
       async (update) => {
         const nextVersion = await resolveUpdateVersion({
           currentSpecifier: update.currentSpecifier,
-          force: ctx.options.force,
+          refresh: executionRequested,
           latest: latestByDefault,
           packageName: update.packageName,
           smart: smartByDefault,
@@ -314,6 +444,7 @@ export default defineCommand({
         return {
           ...update,
           nextSpecifier,
+          resolutionStrategy: strategy.label,
         };
       },
       { concurrency: 8 },
@@ -330,6 +461,7 @@ export default defineCommand({
             reason: canRewriteSpecifier(update.currentSpecifier)
               ? "catalog entry is already up to date"
               : "catalog entry uses a non-rewritable specifier; Bun will refresh it during install/update",
+            resolutionStrategy: update.resolutionStrategy,
             section: update.section,
             source: "catalog",
             targetLabel: update.targetLabel,
@@ -350,6 +482,7 @@ export default defineCommand({
           packageName: update.packageName,
           previousSpecifier: update.currentSpecifier,
           reason: "updated repo catalog entry",
+          resolutionStrategy: update.resolutionStrategy,
           section: update.section,
           source: "catalog",
           targetLabel: update.targetLabel,
@@ -374,6 +507,7 @@ export default defineCommand({
           reason: canRewriteSpecifier(update.currentSpecifier)
             ? "already up to date"
             : "specifier is not rewritten; Bun will refresh it during install/update",
+          resolutionStrategy: update.resolutionStrategy,
           section: update.section,
           source: "target",
           targetLabel: update.targetLabel,
@@ -393,6 +527,7 @@ export default defineCommand({
         nextSpecifier: update.nextSpecifier,
         packageName: update.packageName,
         previousSpecifier: update.currentSpecifier,
+        resolutionStrategy: update.resolutionStrategy,
         section: update.section,
         source: "target",
         targetLabel: update.targetLabel,
@@ -420,19 +555,20 @@ export default defineCommand({
     });
     const rootChanged =
       JSON.stringify(nextRootManifest) !== JSON.stringify(context.repoRootManifest);
+    const summary = createActionSummary(actions);
     const resultPayload = {
       actions,
-      dryRun: ctx.options.dryRun === true,
+      dryRun,
       install: {
-        command: updateAllWorkspaceManifests
-          ? `bun update${ctx.options.force ? " --force" : ""}${latestByDefault ? " --latest" : ""} --recursive`
-          : `bun ${context.installCwd === context.targetDir ? "update" : "install"}${ctx.options.force ? " --force" : ""}${latestByDefault && context.installCwd === context.targetDir ? " --latest" : ""}`,
+        command: installCommand,
         cwd: context.installCwd,
         executed: false,
       },
       latest: latestByDefault,
       recursive: updateAllWorkspaceManifests,
       smart: smartByDefault,
+      strategy,
+      summary,
       targets: changedManifestTargets.map((target) => ({
         cwd: target.dir,
         label: target.label,
@@ -455,23 +591,51 @@ export default defineCommand({
       }
 
       ctx.out(`No dependency updates needed for ${context.targetLabel}.`);
+      ctx.out(`Strategy: ${strategy.text}.`);
+      ctx.out(`Install step: ${installCommand} (not needed).`);
       return;
     }
 
-    if (ctx.options.dryRun) {
+    if (dryRun) {
       if (ctx.output.mode === "json") {
         ctx.output.result(resultPayload, "pm update");
         return;
       }
 
-      ctx.out(`Dry run for ${context.targetLabel}:`);
+      ctx.out(`Dry run for ${context.targetLabel}.`);
+      ctx.out(`Strategy: ${strategy.text}.`);
+      ctx.out(
+        `Summary: ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
+      );
 
-      for (const action of actions.filter((action) => action.action === "updated")) {
-        ctx.out(
-          `Would update ${action.packageName} in ${action.targetLabel ?? context.targetLabel} from ${action.previousSpecifier} to ${action.nextSpecifier}`,
-        );
+      const grouped = groupUpdatedActions(actions, context.targetLabel);
+
+      if (grouped.size > 0) {
+        ctx.out("Planned specifier changes:");
+
+        for (const [targetLabel, targetActions] of grouped) {
+          ctx.out(`- ${targetLabel}`);
+
+          for (const action of targetActions) {
+            ctx.out(
+              `  ${action.packageName}: ${action.previousSpecifier} -> ${action.nextSpecifier}`,
+            );
+          }
+        }
       }
 
+      if (summary.skipped > 0 || summary.missing > 0) {
+        ctx.out("Notes:");
+
+        for (const action of actions.filter(
+          (action) => action.action === "skipped" || action.action === "missing",
+        )) {
+          ctx.out(`- ${formatActionTarget(action, context.targetLabel)} :: ${action.packageName} :: ${action.reason}`);
+        }
+      }
+
+      ctx.out(`Final Bun command: ${installCommand}`);
+      ctx.out(`Install cwd: ${context.installCwd}`);
       return;
     }
 
@@ -499,13 +663,13 @@ export default defineCommand({
 
     const installResult = shouldRunNativeUpdate
       ? await runBunUpdate(context.installCwd, {
-          force: ctx.options.force,
+          useBunForce: executionRequested,
           latest: latestByDefault,
           packages: requestedPackages,
           recursive: updateAllWorkspaceManifests,
         })
       : await runBunInstall(context.installCwd, {
-          force: ctx.options.force,
+          useBunForce: executionRequested,
         });
 
     if (!installResult.ok) {
@@ -535,13 +699,33 @@ export default defineCommand({
     }
 
     ctx.out(`Updated dependency versions for ${context.targetLabel}.`);
+    ctx.out(`Strategy: ${strategy.text}.`);
+    ctx.out(
+      `Summary: ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
+    );
 
-    for (const action of actions.filter((action) => action.action === "updated")) {
-      ctx.out(
-        `Updated ${action.packageName} in ${action.targetLabel ?? context.targetLabel} from ${action.previousSpecifier} to ${action.nextSpecifier}`,
-      );
+    const grouped = groupUpdatedActions(actions, context.targetLabel);
+
+    for (const [targetLabel, targetActions] of grouped) {
+      ctx.out(`- ${targetLabel}`);
+
+      for (const action of targetActions) {
+        ctx.out(
+          `  ${action.packageName}: ${action.previousSpecifier} -> ${action.nextSpecifier}`,
+        );
+      }
     }
 
-    ctx.out(`Ran bun install in ${context.installCwd}`);
+    if (summary.skipped > 0 || summary.missing > 0) {
+      ctx.out("Notes:");
+
+      for (const action of actions.filter(
+        (action) => action.action === "skipped" || action.action === "missing",
+      )) {
+        ctx.out(`- ${formatActionTarget(action, context.targetLabel)} :: ${action.packageName} :: ${action.reason}`);
+      }
+    }
+
+    ctx.out(`Ran ${installResult.command} in ${context.installCwd}`);
   },
 });

@@ -18,7 +18,7 @@ export interface CreateCommandContextOptions<
   TOptions extends CommandOptionsRecord = CommandOptionsRecord,
 > {
   readonly args: readonly string[];
-  readonly cliPluginIds?: readonly string[] | undefined;
+  readonly cliPluginNames?: readonly string[] | undefined;
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
   readonly cwd: string;
@@ -42,7 +42,7 @@ export function createCommandContext<TOptions extends CommandOptionsRecord>(
 ): CommandContext<TOptions> {
   return {
     args: options.args,
-    cliPluginIds: options.cliPluginIds ?? [],
+    cliPluginNames: options.cliPluginNames ?? [],
     command: options.command,
     confirmationMode: options.confirmationMode,
     cwd: options.cwd,

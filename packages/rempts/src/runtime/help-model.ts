@@ -149,7 +149,7 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
               : options.command.conventions.acceptsStdin,
           idempotent: options.command.conventions.idempotent,
           supportsDryRun: options.command.conventions.supportsDryRun,
-          supportsForce: options.command.conventions.supportsForce,
+          supportsApply: options.command.conventions.supportsApply,
           supportsYes: options.command.conventions.supportsYes,
         }
       : undefined,

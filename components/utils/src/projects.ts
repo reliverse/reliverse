@@ -63,7 +63,7 @@ Features include server components, Polar payments integration, authentication, 
     shortDescription:
       "Powerful command-line interface bringing Reliverse capabilities to your terminal workflow.",
     heroImage: "/placeholder.svg?height=600&width=1200",
-    body: `RSE CLI brings the power of Reliverse to your terminal. Build, deploy, and manage applications with simple commands.
+    body: `Rse CLI brings the power of Reliverse to your terminal. Build, deploy, and manage applications with simple commands.
 
 Features include project scaffolding, deployment automation, AI assistance, and integration with the broader Reliverse ecosystem.`,
     externalLink: "https://wiki.reliverse.org/docs/libraries/rse",

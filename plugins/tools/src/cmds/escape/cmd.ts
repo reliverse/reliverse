@@ -335,23 +335,22 @@ export default defineCommand({
   },
   agent: {
     notes:
-      "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --force is supplied.",
+      "This command is idempotent by default. Re-runs produce no-op results when outputs are already up to date, and differing existing outputs fail fast unless --overwrite is supplied.",
   },
   conventions: {
     idempotent: true,
     supportsDryRun: true,
-    supportsForce: true,
   },
   help: {
     examples: [
       'rse escape --input "path/to/file.md"',
       'rse escape --input "path/to/dir" --dry-run',
-      'rse escape --input "path/to/dir" --force',
+      'rse escape --input "path/to/dir" --overwrite',
       'rse escape --input "path/to/dir" --map "md:.rules,path/to/file json:*.markdown"',
       'rse escape --input "path/to/dir-escaped" --unescape',
       'rse escape --input "path/to/dir" --json',
     ],
-    text: "Input resolution is explicit: provide --input, optionally preview with --dry-run, and use --force only when overwriting differing outputs is intentional.",
+    text: "Input resolution is explicit: provide --input, optionally preview with --dry-run, and use --overwrite only when overwriting differing outputs is intentional.",
   },
   options: {
     dryRun: {
@@ -359,7 +358,7 @@ export default defineCommand({
       description: "Preview writes without modifying files",
       inputSources: ["flag"],
     },
-    force: {
+    overwrite: {
       type: "boolean",
       description: "Overwrite existing output files when the generated content differs",
       inputSources: ["flag"],
@@ -391,7 +390,7 @@ export default defineCommand({
   async handler(ctx) {
     const inputPath = resolve(ctx.options.input);
     const dryRun = ctx.options.dryRun === true;
-    const force = ctx.options.force === true;
+    const overwrite = ctx.options.overwrite === true;
     const kind: EscapeAction["kind"] = ctx.options.unescape ? "unescape" : "convert";
 
     try {
@@ -446,18 +445,18 @@ export default defineCommand({
           };
         }
 
-        if (existingOutput !== undefined && !force) {
+        if (existingOutput !== undefined && !overwrite) {
           return {
             action: {
               action: "blocked" as const,
               inputPath: file,
               kind,
               outputPath,
-              reason: "existing output differs; re-run with --force to overwrite",
+              reason: "existing output differs; re-run with --overwrite to overwrite",
             },
             messages: isJsonOutput
               ? []
-              : [`Blocked: ${outputPath} already exists. Re-run with --force to overwrite.`],
+              : [`Blocked: ${outputPath} already exists. Re-run with --overwrite to overwrite.`],
           };
         }
 
@@ -520,7 +519,7 @@ export default defineCommand({
       blocked: summary.blocked,
       command: "escape",
       dryRun,
-      force,
+      overwrite,
       kind,
       noop: summary.noop,
       planned: summary.planned,
@@ -546,7 +545,7 @@ export default defineCommand({
         });
       }
 
-      ctx.exit(1, "Some outputs were blocked. Re-run with --force to overwrite them.");
+      ctx.exit(1, "Some outputs were blocked. Re-run with --overwrite to overwrite them.");
     }
 
     if (isJsonOutput) {

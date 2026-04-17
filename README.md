@@ -20,10 +20,12 @@ Reliverse powers multiple systems, including parts of the Bleverse ecosystem.
 ## Design Goals
 
 - Developer-first architecture
+- Modules instead of monoliths
+- Explicit system behavior
 - Clear system boundaries
 - Long-term maintainability
-- Minimal cognitive overhead
-- Composable modules instead of monoliths
+- Low cognitive overhead
+- Consent-first automation
 
 ## Principles
 
@@ -43,19 +45,25 @@ Reliverse tooling follows several guiding ideas:
 - System actions are visible and reversible
 - Configuration is explicit and developer-controlled
 
+## Conventions
+
+- Bun-first tooling
+- TypeScript-first implementation
+- Favor production-ready fixes over brittle patches
+- Prefer explicit configuration over hidden behavior
+- Prefer file-based command trees over large programmatic manifests
+
 ## Contributing
 
 We welcome contributions ❤️
 
-- Contribute code (please visit [CONTRIBUTING.md](CONTRIBUTING.md) for details)
-- Support development via GitHub Sponsors: <https://github.com/sponsors/blefnk>
-- Report bugs or suggest features: <https://github.com/reliverse/reliverse/issues>
+- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md)
+- Open an issue: <https://github.com/reliverse/reliverse/issues>
+- Support development: <https://github.com/sponsors/blefnk>
 
-> If you discover a security vulnerability, report it privately. See [SECURITY.md](SECURITY.md).
+If you discover a security issue, report it privately. See [`SECURITY.md`](./SECURITY.md).
 
 ## Wiki
-
-Reliverse Wiki lives at:
 
 - Docs: <https://wiki.reliverse.org/docs>
 - Blog: <https://wiki.reliverse.org/blog>
@@ -66,4 +74,4 @@ Reliverse Wiki lives at:
 
 Copyright © 2026-present Nazarii Korniienko
 
-Licensed under the [MIT License](LICENSE). Some apps or packages may define additional licenses. See the `LICENSE` file inside each package for details.
+Licensed under the [MIT License](./LICENSE). Some packages may define additional licenses in their own directories.
