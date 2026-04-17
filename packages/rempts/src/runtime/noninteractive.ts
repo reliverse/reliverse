@@ -1,3 +1,5 @@
+import { isCI as detectCI, isTTY as detectTTY } from "@reliverse/myenv";
+
 import type {
   ConfirmationMode,
   RemptsHostInteractionMode,
@@ -92,9 +94,10 @@ export function resolveInteractionPolicy(
   const stdinMode = getStdinMode(options.stdin);
   const requestedHostMode = resolveRequestedHostMode(options);
   const commandMode = normalizeCommandMode(options);
-  const capabilityTTY = Boolean(options.stdin.isTTY && options.stdout.isTTY);
+  const capabilityTTY = Boolean(options.stdin.isTTY) && detectTTY("stdout", { stdout: options.stdout });
   const isTTY = capabilityTTY;
-  const environmentDisallowsInteraction = Boolean(options.env.CI) || !capabilityTTY;
+  const ci = detectCI({ env: options.env });
+  const environmentDisallowsInteraction = ci || !capabilityTTY;
   const requestedMode = intersectModes(requestedHostMode, commandMode);
   const effectiveMode: RemptsInteractionMode =
     options.noInput || environmentDisallowsInteraction ? "never" : requestedMode;
@@ -104,7 +107,7 @@ export function resolveInteractionPolicy(
 
   if (options.noInput) {
     reason = "interactive input is disabled by --no-input";
-  } else if (options.env.CI) {
+  } else if (ci) {
     reason = "CI environment detected";
   } else if (!capabilityTTY) {
     reason = "stdin/stdout is not an interactive TTY";

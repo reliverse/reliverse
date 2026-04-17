@@ -157,6 +157,18 @@ function resolveDryRunMode(options: {
   return true;
 }
 
+function infoLabel(ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
+}
+
+function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
+}
+
+function warnLabel(ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
+}
+
 export default defineCommand({
   meta: {
     name: "update",
@@ -308,7 +320,7 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`No direct dependencies found in ${context.targetLabel}.`);
+      ctx.out(`${warnLabel(ctx, "No direct dependencies:")} ${context.targetLabel}.`);
       return;
     }
 
@@ -591,9 +603,9 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`No dependency updates needed for ${context.targetLabel}.`);
-      ctx.out(`Strategy: ${strategy.text}.`);
-      ctx.out(`Install step: ${installCommand} (not needed).`);
+      ctx.out(`${warnLabel(ctx, "No dependency updates:")} ${context.targetLabel}.`);
+      ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
+      ctx.out(`${infoLabel(ctx, "Install step:")} ${installCommand} (not needed).`);
       return;
     }
 
@@ -603,40 +615,38 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`Dry run for ${context.targetLabel}.`);
-      ctx.out(`Strategy: ${strategy.text}.`);
-      ctx.out(
-        `Summary: ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
-      );
+      ctx.out(`${infoLabel(ctx, "Dry run:")} ${context.targetLabel}.`);
+      ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
+      ctx.out(`${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`);
 
       const grouped = groupUpdatedActions(actions, context.targetLabel);
 
       if (grouped.size > 0) {
-        ctx.out("Planned specifier changes:");
+        ctx.out(infoLabel(ctx, "Planned specifier changes:"));
 
         for (const [targetLabel, targetActions] of grouped) {
-          ctx.out(`- ${targetLabel}`);
+          ctx.out(`${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(targetLabel)}`);
 
           for (const action of targetActions) {
             ctx.out(
-              `  ${action.packageName}: ${action.previousSpecifier} -> ${action.nextSpecifier}`,
+              `  ${ctx.colors.stdout.bold(action.packageName)}: ${action.previousSpecifier} -> ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
             );
           }
         }
       }
 
       if (summary.skipped > 0 || summary.missing > 0) {
-        ctx.out("Notes:");
+        ctx.out(warnLabel(ctx, "Notes:"));
 
         for (const action of actions.filter(
           (action) => action.action === "skipped" || action.action === "missing",
         )) {
-          ctx.out(`- ${formatActionTarget(action, context.targetLabel)} :: ${action.packageName} :: ${action.reason}`);
+          ctx.out(`${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`);
         }
       }
 
-      ctx.out(`Final Bun command: ${installCommand}`);
-      ctx.out(`Install cwd: ${context.installCwd}`);
+      ctx.out(`${infoLabel(ctx, "Final Bun command:")} ${installCommand}`);
+      ctx.out(`${infoLabel(ctx, "Install cwd:")} ${ctx.colors.stdout.bold(context.installCwd)}`);
       return;
     }
 
@@ -699,34 +709,32 @@ export default defineCommand({
       return;
     }
 
-    ctx.out(`Updated dependency versions for ${context.targetLabel}.`);
-    ctx.out(`Strategy: ${strategy.text}.`);
-    ctx.out(
-      `Summary: ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
-    );
+    ctx.out(`${okLabel(ctx, "Updated dependency versions:")} ${context.targetLabel}.`);
+    ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
+    ctx.out(`${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`);
 
     const grouped = groupUpdatedActions(actions, context.targetLabel);
 
     for (const [targetLabel, targetActions] of grouped) {
-      ctx.out(`- ${targetLabel}`);
+      ctx.out(`${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(targetLabel)}`);
 
       for (const action of targetActions) {
         ctx.out(
-          `  ${action.packageName}: ${action.previousSpecifier} -> ${action.nextSpecifier}`,
+          `  ${ctx.colors.stdout.bold(action.packageName)}: ${action.previousSpecifier} -> ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
         );
       }
     }
 
     if (summary.skipped > 0 || summary.missing > 0) {
-      ctx.out("Notes:");
+      ctx.out(warnLabel(ctx, "Notes:"));
 
       for (const action of actions.filter(
         (action) => action.action === "skipped" || action.action === "missing",
       )) {
-        ctx.out(`- ${formatActionTarget(action, context.targetLabel)} :: ${action.packageName} :: ${action.reason}`);
+        ctx.out(`${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`);
       }
     }
 
-    ctx.out(`Ran ${installResult.command} in ${context.installCwd}`);
+    ctx.out(`${okLabel(ctx, "Ran:")} ${installResult.command} in ${ctx.colors.stdout.bold(context.installCwd)}`);
   },
 });

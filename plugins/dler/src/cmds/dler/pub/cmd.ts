@@ -13,6 +13,14 @@ import { parseTargetsOption } from "../../../impl/pub/targets";
 const BUILDER_PLUGIN_NAME = "dler";
 const DEFAULT_PUBLISH_FROM = "dist";
 
+function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
+}
+
+function warnLabel(ctx: { colors: { stderr: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+  return ctx.colors.stderr.yellow(ctx.colors.stderr.bold(text));
+}
+
 async function pathIsDirectory(path: string): Promise<boolean> {
   try {
     const s = await stat(path);
@@ -208,7 +216,7 @@ export default defineCommand({
       }
 
       for (const item of skipped) {
-        ctx.err(`Skipped ${item.label}: ${item.reason}`);
+        ctx.err(`${warnLabel(ctx, "Skipped:")} ${ctx.colors.stderr.bold(item.label)}: ${item.reason}`);
       }
 
       ctx.exit(1, "Nothing to publish.");
@@ -234,11 +242,11 @@ export default defineCommand({
     }
 
     for (const item of skipped) {
-      ctx.err(`Skipped ${item.label}: ${item.reason}`);
+      ctx.err(`${warnLabel(ctx, "Skipped:")} ${ctx.colors.stderr.bold(item.label)}: ${item.reason}`);
     }
 
     for (const r of results) {
-      ctx.out(`${dryRun ? "Dry run" : "Published"}: ${r.label}`);
+      ctx.out(`${okLabel(ctx, dryRun ? "Dry run" : "Published")} ${ctx.colors.stdout.bold(r.label)}`);
     }
   },
 });

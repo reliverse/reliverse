@@ -1,3 +1,5 @@
+import { createRelico } from "@reliverse/relico";
+
 import type {
   OutputMode,
   RuntimeOutput,
@@ -53,7 +55,14 @@ function writeJsonLine(stream: OutputStream, value: unknown): void {
 }
 
 export function createRuntimeOutput(options: OutputWriterOptions): RuntimeOutput {
+  const stdoutColors = createRelico({ stream: "stdout" });
+  const stderrColors = createRelico({ stream: "stderr" });
+
   return {
+    colors: {
+      stderr: stderrColors,
+      stdout: stdoutColors,
+    },
     data(value: unknown) {
       if (options.mode === "json") {
         writeJsonLine(options.stdout, value);
@@ -73,7 +82,7 @@ export function createRuntimeOutput(options: OutputWriterOptions): RuntimeOutput
         return;
       }
 
-      writeLine(options.stderr, values.map(formatTextValue).join(" "));
+      writeLine(options.stderr, stderrColors.red(values.map(formatTextValue).join(" ")));
     },
     mode: options.mode,
     problem(error: StructuredRemptsError) {
@@ -82,19 +91,22 @@ export function createRuntimeOutput(options: OutputWriterOptions): RuntimeOutput
         return;
       }
 
-      writeLine(options.stderr, `Error: ${error.message}`);
+      writeLine(options.stderr, `${stderrColors.red(stderrColors.bold("Error:"))} ${error.message}`);
 
       if (error.hint) {
-        writeLine(options.stderr, `Hint: ${error.hint}`);
+        writeLine(options.stderr, `${stderrColors.cyan(stderrColors.bold("Hint:"))} ${error.hint}`);
       }
 
       if (error.usage) {
-        writeLine(options.stderr, `Usage: ${error.usage}`);
+        writeLine(options.stderr, `${stderrColors.yellow(stderrColors.bold("Usage:"))} ${error.usage}`);
       }
 
       if (error.issues && error.issues.length > 0) {
         for (const issue of error.issues) {
-          writeLine(options.stderr, `  ${issue.flagName}: ${issue.message}`);
+          writeLine(
+            options.stderr,
+            `  ${stderrColors.magenta(issue.flagName)}: ${issue.message}`,
+          );
         }
       }
     },
@@ -112,7 +124,7 @@ export function createRuntimeOutput(options: OutputWriterOptions): RuntimeOutput
         return;
       }
 
-      writeLine(options.stdout, formatTextValue(value));
+      writeLine(options.stdout, stdoutColors.green(formatTextValue(value)));
     },
     text(...values: readonly unknown[]) {
       if (options.mode === "json") {

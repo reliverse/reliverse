@@ -29,6 +29,18 @@ interface AddAction {
   readonly usesCatalog: boolean;
 }
 
+function infoLabel(ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string; green(text: string): string; yellow(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
+}
+
+function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
+}
+
+function warnLabel(ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+  return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
+}
+
 export default defineCommand({
   meta: {
     name: "add",
@@ -271,11 +283,11 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`No changes for ${context.targetLabel}.`);
+      ctx.out(`${warnLabel(ctx, "No changes:")} ${context.targetLabel}.`);
 
       for (const action of actions) {
         ctx.out(
-          `${action.action}: ${action.packageName} (${action.reason ?? action.nextSpecifier ?? action.section})`,
+          `${infoLabel(ctx, `${action.action}:`)} ${ctx.colors.stdout.bold(action.packageName)} (${action.reason ?? action.nextSpecifier ?? action.section})`,
         );
       }
 
@@ -288,11 +300,11 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`Dry run for ${context.targetLabel}:`);
+      ctx.out(`${infoLabel(ctx, "Dry run:")} ${context.targetLabel}`);
 
       for (const action of actions.filter((action) => action.action === "added")) {
         ctx.out(
-          `Would add ${action.packageName} to ${action.section} as ${action.nextSpecifier}`,
+          `${infoLabel(ctx, "Would add")} ${ctx.colors.stdout.bold(action.packageName)} to ${action.section} as ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
         );
       }
 
@@ -339,14 +351,14 @@ export default defineCommand({
       return;
     }
 
-    ctx.out(`Updated ${context.targetLabel}.`);
+    ctx.out(`${okLabel(ctx, "Updated:")} ${context.targetLabel}.`);
 
     for (const action of actions.filter((action) => action.action === "added")) {
       ctx.out(
-        `Added ${action.packageName} to ${action.section} as ${action.nextSpecifier}`,
+        `${okLabel(ctx, "Added")} ${ctx.colors.stdout.bold(action.packageName)} to ${action.section} as ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
       );
     }
 
-    ctx.out(`Ran bun install in ${context.installCwd}`);
+    ctx.out(`${okLabel(ctx, "Ran:")} bun install in ${ctx.colors.stdout.bold(context.installCwd)}`);
   },
 });

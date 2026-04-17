@@ -389,6 +389,10 @@ export default defineCommand({
     },
   },
   async handler(ctx) {
+    const infoLabel = (text: string) => ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
+    const okLabel = (text: string) => ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
+    const warnLabel = (text: string) => ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
+
     const inputPath = resolve(ctx.options.input);
     const dryRun = ctx.options.dryRun === true;
     const overwrite = ctx.options.overwrite === true;
@@ -419,7 +423,7 @@ export default defineCommand({
     }
 
     if (!isJsonOutput) {
-      ctx.out(`Processing ${files.length} file(s)...`);
+      ctx.out(`${infoLabel("Processing:")} ${files.length} file(s)...`);
     }
 
     const fileResults = await pMap(
@@ -530,10 +534,10 @@ export default defineCommand({
 
     if (!isJsonOutput) {
       ctx.out(
-        `Summary: ${summary.written} written, ${summary.planned} planned, ${summary.noop} no-op, ${summary.blocked} blocked.`,
+        `${infoLabel("Summary:")} ${summary.written} written, ${summary.planned} planned, ${summary.noop} no-op, ${summary.blocked} blocked.`,
       );
       ctx.out(
-        dryRun ? "Dry run complete!" : kind === "unescape" ? "Unescape complete!" : "Conversion complete!",
+        dryRun ? okLabel("Dry run complete!") : kind === "unescape" ? okLabel("Unescape complete!") : okLabel("Conversion complete!"),
       );
     }
 
@@ -546,7 +550,7 @@ export default defineCommand({
         });
       }
 
-      ctx.exit(1, "Some outputs were blocked. Re-run with --overwrite to overwrite them.");
+      ctx.exit(1, `${warnLabel("Blocked outputs:")} Re-run with --overwrite to overwrite them.`);
     }
 
     if (isJsonOutput) {

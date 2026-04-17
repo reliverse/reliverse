@@ -1,3 +1,4 @@
+import type { RelicoInstance } from "@reliverse/relico";
 import type {
   CommandOptionsOutput,
   CommandOptionsRecord,
@@ -101,6 +102,10 @@ export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCom
   readonly interaction: InteractionPolicy;
   readonly nonInteractive: boolean;
   readonly output: RuntimeOutput;
+  readonly colors: {
+    readonly stderr: RelicoInstance;
+    readonly stdout: RelicoInstance;
+  };
   readonly confirmationMode: ConfirmationMode;
   readonly stdinMode: StdinMode;
   readonly prompt: CommandPromptAPI;

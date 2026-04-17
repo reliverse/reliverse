@@ -1,9 +1,11 @@
 import { basename, extname } from "node:path";
+import { detectTerminalSupport } from "@reliverse/myenv";
 
 import type { RemptsPlugin } from "./define-plugin";
 import type { CommandConventions, CommandRuntimeInfo } from "./define-command";
 import type { CommandOptionsRecord } from "../options/types";
 import { createPromptRuntime } from "../prompts/adapter";
+import { createRelico } from "@reliverse/relico";
 import type { CommandNode } from "../runtime/command-source";
 import { createCommandContext } from "../runtime/context";
 import { discoverCommandPath } from "../runtime/discover-command";
@@ -256,6 +258,11 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
   const stderr = options.stderr ?? process.stderr;
   const parsedGlobals = parseGlobalFlags(argv, options.globalFlags);
   const outputMode = getOutputMode(options.outputMode, parsedGlobals.flags);
+  const terminal = detectTerminalSupport({ stderr, stdout });
+  const helpColors = {
+    body: createRelico({ stream: "stdout" }),
+    heading: createRelico({ stream: "stdout" }),
+  };
   const renderJsonHelp = shouldRenderJsonHelp(options.help?.format, outputMode);
   const output = createRuntimeOutput({
     mode: outputMode,
@@ -425,7 +432,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
         });
 
         if (!renderJsonHelp) {
-          writeHelp(stderr, renderHelpDocument(launcherHelp));
+          writeHelp(stderr, renderHelpDocument(launcherHelp, helpColors));
         }
 
         return finalizeResult(
@@ -433,7 +440,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
             commandPath: discovered.matchedPath,
             exitCode: 1,
             globalFlags: parsedGlobals.flags,
-            isTTY: Boolean(stdin.isTTY && stdout.isTTY),
+            isTTY: Boolean(stdin.isTTY) && terminal.stdout.isTTY,
             isTUI: false,
             outputMode,
           }),
@@ -444,7 +451,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       if (renderJsonHelp) {
         output.data(serializeHelpDocument(launcherHelp));
       } else {
-        writeHelp(stdout, renderHelpDocument(launcherHelp));
+        writeHelp(stdout, renderHelpDocument(launcherHelp, helpColors));
       }
 
       return finalizeResult(
@@ -452,7 +459,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
           commandPath: discovered.matchedPath,
           exitCode: parsedGlobals.flags.help || discovered.matchedPath.length === 0 ? 0 : 1,
           globalFlags: parsedGlobals.flags,
-          isTTY: Boolean(stdin.isTTY && stdout.isTTY),
+          isTTY: Boolean(stdin.isTTY) && terminal.stdout.isTTY,
           isTUI: false,
           outputMode,
         }),
@@ -478,7 +485,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       if (renderJsonHelp) {
         output.data(serializeHelpDocument(commandHelp));
       } else {
-        writeHelp(stdout, renderHelpDocument(commandHelp));
+        writeHelp(stdout, renderHelpDocument(commandHelp, helpColors));
       }
 
       return finalizeResult(
@@ -487,7 +494,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
           commandPath: discovered.matchedPath,
           exitCode: 0,
           globalFlags: parsedGlobals.flags,
-          isTTY: Boolean(stdin.isTTY && stdout.isTTY),
+          isTTY: Boolean(stdin.isTTY) && terminal.stdout.isTTY,
           isTUI: false,
           outputMode,
         }),
@@ -514,7 +521,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
             commandPath: discovered.matchedPath,
             exitCode: error.exitCode,
             globalFlags: parsedGlobals.flags,
-            isTTY: Boolean(stdin.isTTY && stdout.isTTY),
+            isTTY: Boolean(stdin.isTTY) && terminal.stdout.isTTY,
             isTUI: false,
             outputMode,
           }),
@@ -605,7 +612,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
         commandPath: [],
         exitCode: 1,
         globalFlags: parsedGlobals.flags,
-        isTTY: Boolean(stdin.isTTY && stdout.isTTY),
+        isTTY: Boolean(stdin.isTTY) && terminal.stdout.isTTY,
         isTUI: false,
         outputMode,
       }),

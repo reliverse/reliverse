@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/rempts",
+  "name": "@reliverse/myenv",
   "version": "0.1.0",
   "private": false,
   "publishConfig": {
@@ -12,23 +12,19 @@
   "exports": {
     ".": "./src/index.ts"
   },
+  "sideEffects": false,
   "files": [
     "src",
     "README.md"
   ],
   "scripts": {
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
+    "test": "bun test",
     "typecheck": "tsgo --noEmit"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
-  },
-  "dependencies": {
-    "@reliverse/myenv": "workspace:*",
-    "@reliverse/relico": "workspace:*",
-    "p-map": "catalog:",
-    "valibot": "catalog:"
   }
 }

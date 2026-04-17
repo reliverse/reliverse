@@ -45,6 +45,7 @@ export function createCommandContext<TOptions extends CommandOptionsRecord>(
     cliPluginNames: options.cliPluginNames ?? [],
     command: options.command,
     confirmationMode: options.confirmationMode,
+    colors: options.output.colors,
     cwd: options.cwd,
     env: options.env,
     err(...values: readonly unknown[]) {

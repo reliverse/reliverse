@@ -1,3 +1,4 @@
+import type { RelicoInstance } from "@reliverse/relico";
 import type { NormalizedOptionIssue } from "../options/types";
 
 export type OutputMode = "json" | "text";
@@ -42,6 +43,10 @@ export interface StructuredRemptsResult<TData = unknown> {
 }
 
 export interface RuntimeOutput {
+  readonly colors: {
+    readonly stderr: RelicoInstance;
+    readonly stdout: RelicoInstance;
+  };
   readonly mode: OutputMode;
   data(value: unknown): void;
   problem(error: StructuredRemptsError): void;

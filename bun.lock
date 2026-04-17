@@ -499,10 +499,33 @@
         "@typescript/native-preview": "catalog:",
       },
     },
+    "packages/myenv": {
+      "name": "@reliverse/myenv",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
+    },
+    "packages/relico": {
+      "name": "@reliverse/relico",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reliverse/myenv": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
+    },
     "packages/rempts": {
       "name": "@reliverse/rempts",
       "version": "0.1.0",
       "dependencies": {
+        "@reliverse/myenv": "workspace:*",
+        "@reliverse/relico": "workspace:*",
         "p-map": "catalog:",
         "valibot": "catalog:",
       },
@@ -1777,9 +1800,13 @@
 
     "@reliverse/dler-rse-plugin": ["@reliverse/dler-rse-plugin@workspace:plugins/dler"],
 
+    "@reliverse/myenv": ["@reliverse/myenv@workspace:packages/myenv"],
+
     "@reliverse/os-rse-plugin": ["@reliverse/os-rse-plugin@workspace:plugins/os"],
 
     "@reliverse/pm-rse-plugin": ["@reliverse/pm-rse-plugin@workspace:plugins/pm"],
+
+    "@reliverse/relico": ["@reliverse/relico@workspace:packages/relico"],
 
     "@reliverse/rempts": ["@reliverse/rempts@workspace:packages/rempts"],
 
