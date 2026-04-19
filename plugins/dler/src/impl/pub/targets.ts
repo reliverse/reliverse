@@ -1,6 +1,1 @@
-export function parseTargetsOption(targets: string): string[] {
-  return targets
-    .split(",")
-    .map((target) => target.trim())
-    .filter(Boolean);
-}
+export { parseTargetsOption } from "../shared-targets";

@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/ai-rse-plugin",
+  "name": "@reliverse/agent-rse-plugin",
   "version": "0.1.0",
   "type": "module",
   "devDependencies": {

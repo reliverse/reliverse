@@ -1,1 +1,0 @@
-# `@reliverse/ai-rse-plugin`

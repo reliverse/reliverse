@@ -1,3 +1,4 @@
+import { createBuildProviderRegistry } from "./provider-registry";
 import type { BuildProvider, BuildReport, BuildTarget } from "./provider/types";
 
 export interface BuildPlan {
@@ -18,19 +19,13 @@ export interface CreateBuilderRuntimeOptions {
 export function createBuilderRuntime(
   options: CreateBuilderRuntimeOptions,
 ): BuilderRuntime {
-  const defaultProvider = options.defaultProvider ?? options.providers[0]?.id;
-
-  if (!defaultProvider) {
-    throw new Error("Builder runtime requires at least one provider.");
-  }
-
-  const providers = new Map(options.providers.map((provider) => [provider.id, provider]));
+  const registry = createBuildProviderRegistry(options);
 
   return {
-    defaultProvider,
+    defaultProvider: registry.defaultProvider,
     async run(plan) {
-      const providerId = plan.provider ?? defaultProvider;
-      const provider = providers.get(providerId);
+      const providerId = plan.provider ?? registry.defaultProvider;
+      const provider = registry.get(providerId);
 
       if (!provider) {
         throw new Error(`Unknown build provider "${providerId}".`);
