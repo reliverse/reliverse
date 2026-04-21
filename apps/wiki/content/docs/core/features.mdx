@@ -1,0 +1,49 @@
+---
+title: Features
+description: CLIs, packages, and ecosystem capabilities in Reliverse
+---
+
+Reliverse is a focused monorepo for developer tools.
+
+## Core Surfaces
+
+- **`rse` CLI** via `apps/cli`
+- **Docs and blog** via `apps/wiki`
+- **Tool landing pages** via `apps/web`
+
+## Key Packages
+
+Reliverse currently centers around packages such as:
+
+- **`@reliverse/rempts`** - file-based CLI foundation
+- **`@reliverse/relico`** - terminal color helpers
+- **`@reliverse/myenv`** - env helpers
+- **`@repo/ui`** - UI primitives
+- **`@repo/blocks`** - higher-level web blocks
+
+## RSE Plugins
+
+- **`build` / `pub`** - workspace build and publish orchestration
+- **`pm add` / `pm update`** - package-management helpers
+- **`escape`** and related utilities - conversion/tooling helpers
+
+Run from repo root:
+
+```bash
+bun rse --help
+```
+
+## Monorepo Structure
+
+- **apps/** - CLI, site, docs
+- **packages/** - reusable libraries and UI building blocks
+- **plugins/** - RSE plugins
+- **scripts/** - automation helpers
+
+## Philosophy
+
+Reliverse is intentionally narrower now:
+- tool-first
+- repo-level orchestration over per-package script sprawl
+- docs and landing pages for the tools themselves
+- no product-backend or end-user social features inside this repo

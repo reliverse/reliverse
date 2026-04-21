@@ -12,6 +12,8 @@
     "postcss": "catalog:",
     "postcss-load-config": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:"
+    "tw-animate-css": "catalog:",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
   }
 }

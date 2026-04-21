@@ -6,5 +6,8 @@
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
   }
 }

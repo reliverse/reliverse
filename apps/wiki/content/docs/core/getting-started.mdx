@@ -1,0 +1,112 @@
+---
+title: "Getting Started with Reliverse"
+description: A quick guide to the trimmed tool-first Reliverse monorepo
+---
+
+import { Steps } from "fumadocs-ui/components/steps";
+
+Welcome to Reliverse.
+
+This repo is now a focused monorepo for developer tooling, the `rse` CLI, reusable UI packages, and the web/docs surfaces around those tools.
+
+## Quick Setup
+
+<Steps>
+
+### 1. Clone the repository
+
+```bash
+git clone https://github.com/reliverse/reliverse.git
+cd reliverse
+```
+
+### 2. Install dependencies
+
+```bash
+bun install
+```
+
+### 3. Explore the CLI
+
+```bash
+bun rse --help
+```
+
+### 4. Start what you need
+
+```bash
+bun run dev:web
+bun run dev:docs
+bun run dev:cli
+```
+
+</Steps>
+
+## Current Structure
+
+```text
+reliverse/
+├── apps/
+│   ├── cli/      # rse CLI
+│   ├── web/      # landing pages for tools and plugins
+│   └── wiki/     # docs and blog
+├── packages/
+│   ├── rempts/   # file-based CLI framework
+│   ├── relico/   # terminal color helpers
+│   ├── myenv/    # env helpers
+│   ├── ui/       # UI primitives
+│   ├── ui-utils/ # tiny shared UI helpers
+│   ├── blocks/   # higher-level site blocks
+│   ├── tailwind/ # shared styling preset
+│   └── tsconfig/ # shared TS config
+├── plugins/
+│   ├── dler/     # build/publish flows
+│   ├── pm/       # package management helpers
+│   ├── tools/    # file conversion helpers
+│   ├── os/       # OS automation helpers
+│   └── agent/    # agent-related CLI extensions
+└── scripts/
+```
+
+## Common Commands
+
+### Development
+
+```bash
+bun run dev:web
+bun run dev:docs
+bun run dev:cli
+```
+
+### Build orchestration
+
+```bash
+bun rse build --dry-run
+bun rse build --targets plugins/pm,plugins/dler
+```
+
+### Publish orchestration
+
+```bash
+bun rse pub --dry-run
+```
+
+### Quality checks
+
+```bash
+bun test
+bun run check
+```
+
+## Notes
+
+- Workspace-level build and publish orchestration now lives in `dler`.
+- Package-level `build` and `pub` fields are intentionally not the source of truth anymore.
+- Packages named `@repo/*` are treated as internal-only and are ignored for publish, and by current workspace policy also ignored for generated build targeting.
+- Product/backend features that used to live here were intentionally moved out to Bleverse.
+
+## Next Steps
+
+- Read [features](/docs/core/features)
+- Inspect `apps/cli/src/cli.ts`
+- Inspect `plugins/dler` if you're working on build/publish orchestration

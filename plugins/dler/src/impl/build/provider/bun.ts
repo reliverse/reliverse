@@ -13,7 +13,7 @@ export function createBunBuildProvider(): BuildProvider {
     async buildTarget(target: BuildTarget): Promise<BuildTargetResult> {
       const startedAt = performance.now();
       const label = target.label ?? target.cwd;
-      const processHandle = Bun.spawn([process.execPath, "run", target.script ?? "build"], {
+      const processHandle = Bun.spawn([...target.command], {
         cwd: target.cwd,
         stderr: "pipe",
         stdout: "pipe",

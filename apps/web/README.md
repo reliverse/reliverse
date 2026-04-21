@@ -6,12 +6,11 @@ Main web app for Reliverse.
 
 This app provides the primary browser-based product surface for the monorepo.
 
-It is the place where shared frontend and platform packages come together, such as:
+It is the place where shared frontend packages come together, such as:
 
-- `@repo/env`
 - `@repo/tailwind`
 - `@repo/ui`
-- `@repo/sdk`
+- `@repo/blocks`
 
 ## Stack
 

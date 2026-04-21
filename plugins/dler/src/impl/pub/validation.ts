@@ -2,6 +2,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { fileExists, pathIsDirectory, type RequestedTarget, type SkippedTarget } from "../shared-targets";
+import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
 import { getIneligibilityReason } from "./eligibility";
 
 export interface PublishableTarget extends RequestedTarget {
@@ -35,6 +36,12 @@ export async function resolvePublishableTargets(options: {
       packageRecord = JSON.parse(await readFile(manifestPath, "utf8")) as Record<string, unknown>;
     } catch {
       skipped.push({ label: target.label, reason: "invalid package.json" });
+      continue;
+    }
+
+    const ignored = getWorkspacePackageIgnoreReason(packageRecord);
+    if (ignored) {
+      skipped.push({ label: target.label, reason: ignored });
       continue;
     }
 

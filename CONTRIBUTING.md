@@ -1,138 +1,42 @@
 # Contributing to Reliverse
 
-Reliverse is a modular ecosystem built with clarity, consent, and long-term sustainability in mind. It's evolving, so every thoughtful contribution helps move it forward. To contribute, you don't need a technical background here. If you care about the ideas behind Reliverse, you already belong here. Thank you for being here.
+Thanks for contributing.
 
-## Ways to Contribute
+Reliverse is now a focused monorepo for:
+- developer tooling
+- the `rse` CLI and its plugins
+- reusable UI packages
+- the web presence and docs for those tools
 
-There are many ways to participate. Code is just one of them. You can:
+User-facing product flows, auth, API, billing, and social features were intentionally moved out of this repo.
 
-- Support the project via [GitHub Sponsors](https://github.com/sponsors/blefnk)
-- Report bugs or suggest improvements
-- Improve documentation or tests
-- Improve accessibility or UX/UI
-- Refactor for clarity
-- Review pull requests
+## Tooling
 
-You can also:
-
-- Write blog posts
-- Create videos or tutorials
-- Share thoughtful criticism
-- Start discussions about architecture or philosophy
-- Talk about Reliverse on social platforms (for example on [Bleverse](https://bleverse.com))
-
-Clear thinking and honest feedback are always welcome.
-
-## The Spirit of the Project
-
-Reliverse is built around a few guiding values:
-
-- Calm by default
-- Explicit over implicit
-- Stable at the boundaries
-- Respectful of user sovereignty
-- Modular over tightly coupled systems
-
-They help us make consistent decisions as the platform evolves.
-
-If something feels unclear, starting a discussion is always welcome.
-
-## Before You Start
-
-A few gentle guidelines:
-
-- Be kind and constructive.
-- Small, focused changes are easier to review.
-- If you're planning something large or structural, opening an issue first can help align expectations.
-
-There's no rush. Thoughtful progress is better than fast progress.
-
-## About Larger Changes
-
-Some parts of Reliverse influence the platform at a structural level, such as:
-
-- Core architecture
-- Authentication
-- SDK contracts
-- Entitlements
-- Data models
-- Public APIs
-- Billing
-
-Changes in these areas can ripple across the system. Starting a conversation early helps us explore implications together and keep the ecosystem coherent.
-
-This isn't about gatekeeping. It's about shared responsibility for long-term stability.
-
-## Project Status
-
-> **v0.x**: Reliverse is evolving.
-
-Some APIs and internal structures are still stabilizing as the platform matures.
-
-Breaking changes are documented in `CHANGELOG.md`.
-
-## Development Setup
-
-1. Fork this repo
-2. **Clone your fork**
-3. Install dependencies
-4. Run the appropriate dev command
-
-```bash
-git clone https://github.com/your-username/reliverse.git
-cd reliverse
-bun install
-bun dev:web
-```
-
-Exact commands may vary by workspace. To learn more, please check the nearest `package.json` or documentation.
-
-**Some of the tools Reliverse uses**:
-
-- Bun (runtime, package manager, test runner)
-- TypeScript (strict mode)
+Core tools:
+- Bun
+- TypeScript
+- Turborepo
 
 ## Documentation
 
-Documentation lives at [https://wiki.reliverse.org/docs](https://wiki.reliverse.org/docs)
+Docs live in `apps/wiki/` and are published at <https://wiki.reliverse.org/docs>.
 
-If your change affects behavior, configuration, UX, or public APIs, please update the relevant documentation so others can understand and build on your work.
+If your change affects behavior, configuration, UX, or public APIs, update the relevant docs.
 
 ## Architecture Overview
 
-Reliverse is organized as a modular monorepo:
-
 ```bash
-apps/          → deployable runtimes
-apps/wiki/          → deployable docs and blog
-packages/      → reusable platform modules
-scripts/       → automation tools
-components/    → UI libraries
+apps/       → deployable surfaces (web, wiki, cli)
+packages/   → reusable packages (UI, blocks, rempts, reliverse libs)
+plugins/    → RSE plugins such as build/publish and package-management helpers
+scripts/    → automation helpers
 ```
 
-We try to keep boundaries clear so the system remains maintainable as it grows.
-
-Please see the end of this file to learn more about the folder structure.
-
 General direction:
-
-- Apps depend on packages.
-- Packages don't depend on apps.
-- Public APIs stay typed and documented.
-- SDK remains independent from server internals.
-
-These boundaries exist to reduce future friction.
-
-## Code Style
-
-There's no obsession with cleverness.
-
-- Avoid unnecessary abstractions.
-- Add dependencies thoughtfully.
-- Prefer clarity over tricks.
-- Keep functions focused.
-
-If something feels uncertain, starting a discussion is completely fine.
+- apps can depend on packages
+- packages should not depend on apps
+- plugins should stay automation-friendly and dry-run-first when possible
+- Reliverse stays tool-first, not product-backend-first
 
 ## Testing
 
@@ -142,101 +46,49 @@ Run all tests:
 bun test
 ```
 
-Or filter by workspace:
+Or run a specific workspace or file set:
 
 ```bash
-bun test --filter packages/sdk
+bun test plugins/dler
 ```
 
 Before opening a PR:
-
-- Ensure the project builds
-- Ensure TypeScript compiles cleanly
-- Ensure tests pass (if applicable)
-
-## Pull Requests
-
-When opening a PR, consider including:
-
-- What changed
-- Why it changed
-- Screenshots (for UI updates)
-- Notes about breaking changes
-
-Well-scoped PRs are easier to understand and collaborate on.
-
-## If Something Is Declined
-
-Not every contribution will be merged, and that's okay.
-
-Sometimes changes may conflict with long-term architectural direction or introduce complexity that isn't aligned with current goals.
-
-If something doesn't move forward, it's never personal. Open source works best when clarity and respect are maintained on both sides.
-
-## Reporting Issues
-
-When reporting an issue, the more context you can share, the better. Helpful details may include:
-
-- Steps to reproduce
-- Logs or screenshots
-- Your environment details
-- Expected vs actual behavior
-
-Clear reports make it easier for everyone to understand what's happening and work toward a fix.
-
-## Security
-
-If you discover a security vulnerability, please do not disclose it publicly.
-
-Instead, follow the responsible disclosure process outlined in [SECURITY.md](SECURITY.md) file.
+- ensure the relevant build works
+- ensure TypeScript compiles cleanly
+- ensure tests pass where applicable
 
 ## Folder Structure
 
-## What lives here
-
-Reliverse is organized into three main layers:
-
-- `apps/` - deployable runtimes such as the web app, API, mobile app, desktop app, wiki, and CLI
-- `packages/` - reusable platform modules such as `server`, `sdk`, `db`, `env`, and `rempts`
-- `plugins/` - file-based CLI command trees mounted into host CLIs through `@reliverse/rempts`
-
-Current top-level workspaces include:
-
 ### Apps
-
-- `apps/api` - API runtime
 - `apps/cli` - `rse`, the Reliverse developer CLI
-- `apps/desktop` - desktop app shell
-- `apps/mobile` - mobile app
-- `apps/web` - main web app
-- `apps/wiki` - docs and wiki surface
+- `apps/web` - marketing site and tool landing pages
+- `apps/wiki` - docs and blog surface
 
 ### Packages
-
 - `packages/rempts` - Bun-first file-based CLI foundation
-- `packages/server` - backend runtime core
-- `packages/sdk` - typed client contract layer
-- `packages/db` - persistence layer
-- `packages/auth` - auth and session logic
-- `packages/billing` - billing and entitlements
-- `packages/env` - typed environment handling
-- `packages/kv` - key-value and rate-limiting primitives
-- `packages/email` - transactional email layer
-- `packages/convex` - Convex-specific backend logic
+- `packages/relico` - terminal color helpers
+- `packages/myenv` - env helpers
 - `packages/tailwind` - shared design preset
 - `packages/tsconfig` - shared TS config
+- `packages/ui` - UI primitives
+- `packages/ui-utils` - small shared UI utilities
+- `packages/blocks` - higher-level web blocks
 
-### CLI plugins
-
+### Plugins
 - `plugins/dler` - build and publish flows
-- `plugins/pm` - package management helpers
+- `plugins/pm` - package-management helpers
 - `plugins/tools` - file conversion helpers such as `escape`
 - `plugins/os` - OS automation commands
+- `plugins/agent` - agent-related CLI extensions
 
-## Final Note
+## Reporting Issues
 
-Reliverse is evolving, intentionally and carefully.
+Helpful issue reports include:
+- steps to reproduce
+- logs or screenshots
+- environment details
+- expected vs actual behavior
 
-The priority is long-term stability over rapid growth.
+## Security
 
-If you're here, you're part of that effort. And that matters.
+If you discover a vulnerability, follow the responsible disclosure guidance in `SECURITY.md`.

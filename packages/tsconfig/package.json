@@ -11,5 +11,9 @@
   "exports": {
     "./ts-files-only.json": "./ts-files-only.json",
     "./tsx-support.json": "./tsx-support.json"
+  },
+  "devDependencies": {
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:"
   }
 }

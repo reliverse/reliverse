@@ -1,316 +1,92 @@
 # Reliverse Monorepo Roadmap
 
-This roadmap describes **direction**, not guarantees. Priorities may shift based on feedback, maintainer time, and architecture constraints.
+This roadmap describes direction, not guarantees.
 
 ## North Star
 
-- Calm, focused UX (no dark patterns)
-- Modular monorepo architecture
-- Explicit system behavior
-- Accessibility by default
-- Consent-first configuration
-- Clear architectural boundaries
+Reliverse is a calm, tool-first monorepo for:
+- developer workflows
+- the `rse` CLI and plugins
+- reusable UI packages
+- web and docs surfaces for those tools
 
 ## Definition of Done
 
 - Types validated
-- No boundary violations
-- Accessibility sanity pass
-- Documentation updated
-- Breaking changes documented
-- Dependency graph unchanged (unless intentional)
+- Docs updated when behavior changed
+- No stale workspace references
+- Clear CLI/help output for user-facing commands
+- Dry-run-first behavior where it materially reduces risk
 
-## Global TODOs (Cross-Cutting)
+## Current Focus Areas
 
-### Product / UX
+### Apps
 
-- [ ] Short onboarding with explicit personalization toggles
-- [ ] Unified privacy language + consistent visibility rules
-- [ ] Calm microcopy (no urgency mechanics)
-- [ ] Clear settings visibility (explainable system state)
+#### apps/web
+- [ ] tighten landing-page content for each major tool/plugin
+- [ ] remove remaining product-era placeholders
+- [ ] keep performance and accessibility sane
 
-### Platform / Security / Reliability
+#### apps/wiki
+- [ ] finish docs rewrite around the new tool-first scope
+- [ ] document `rse build` / `rse pub`
+- [ ] add migration notes for old package-level build scripts
 
-- [ ] Lightweight threat model + release checklist
-- [ ] Baseline rate limiting
-- [ ] Audit trail (auth, permissions, billing)
-- [ ] Backup + restore verification
-- [ ] Structured logging + health endpoints
-- [ ] Core metrics (latency, errors, usage)
+#### apps/cli
+- [ ] keep `rse` discoverable and pleasant to use
+- [ ] improve top-level help for direct commands like `build` and `pub`
+- [ ] keep plugin loading predictable in local development
 
-### DX / Repo Hygiene
+### Packages
 
-- [ ] One-command Quickstart
-- [ ] CI: typecheck / lint / test / build
-- [ ] Versioning policy (public API boundaries)
-- [ ] Conventional commits or equivalent
-- [ ] Issue/PR templates + label taxonomy
-- [ ] Clear dependency graph documentation
+#### packages/rempts
+- [ ] keep file-based command loading simple
+- [ ] improve plugin-host ergonomics
+- [ ] document host/plugin boundaries clearly
 
-## apps/
+#### packages/ui
+- [ ] keep primitives clean and dependency-light
+- [ ] audit accessibility defaults
 
-Deployable runtimes.
+#### packages/blocks
+- [ ] align blocks with the new site/docs direction
+- [ ] remove old app/backend assumptions
 
-### apps/api (api.reliverse.org)
+#### packages/relico / myenv / ui-utils
+- [ ] keep helpers small and boring in the best way
 
-Thin runtime wrapper over `@repo/server`.
+#### packages/tailwind / tsconfig
+- [ ] keep shared presets minimal and stable
 
-- [ ] Auth middleware wiring
-- [ ] Public API versioning (`/v1`)
-- [ ] Rate limiting (IP + account)
-- [ ] Health + readiness checks
-- [ ] Job orchestration (email, billing, cleanup)
-- [ ] Error normalization (public vs internal)
-- [ ] Observability wiring
+### Plugins
 
-### apps/web (reliverse.org)
+#### plugins/dler
+- [ ] finish the generated-command architecture cleanup
+- [ ] keep workspace-level build/pub flows authoritative
+- [ ] improve reporting around ignored packages and skipped targets
 
-- [ ] App shell (routing + layout)
-- [ ] Auth UX
-- [ ] User preferences + visibility controls
-- [ ] Accessibility pass
-- [ ] Core Web Vitals optimization
-- [ ] Consent-first personalization
+#### plugins/pm
+- [ ] improve examples after the repo trim
+- [ ] keep add/update flows dry-run-first
 
-### apps/mobile
+#### plugins/tools / os / agent
+- [ ] keep commands scoped and sharp
 
-- [ ] Auth flow
-- [ ] Secure session storage
-- [ ] Screen parity with web
-- [ ] Offline tolerance
-- [ ] Opt-in notifications
-- [ ] Accessibility review
+## Repo Hygiene
 
-### apps/desktop
+- [ ] finish removing docs references to deleted product-era packages/apps
+- [ ] audit root scripts for obsolete aliases
+- [ ] keep workspace metadata aligned with the actual repo
+- [ ] add CI that matches the trimmed monorepo reality
 
-- [ ] Shell + update strategy
-- [ ] Secure token storage
-- [ ] Deep links
-- [ ] Shared UI with web
-- [ ] Transparent crash reporting
+## Explicit Non-Goals for This Repo
 
-### apps/cli
+These moved out of Reliverse and should not quietly grow back here:
+- auth system
+- backend API runtime
+- billing stack
+- mobile app
+- desktop app
+- social/end-user frontend features
 
-- [ ] `reliverse dev`
-- [ ] `reliverse doctor`
-- [ ] Scaffold generators
-- [ ] Admin helpers (seed, migrate, create-user)
-- [ ] Release helpers
-
-## components/
-
-Presentation layer only.
-
-### components/web
-
-/blocks
-
-- [ ] Feature-level composition blocks
-- [ ] A11y primitives (focus, ARIA, keyboard patterns)
-- [ ] Shared composition conventions
-
-/ui
-
-- [ ] Button, form, dialog, toast primitives
-- [ ] Empty states
-- [ ] Accessible defaults
-
-## components/mobile
-
-/blocks
-
-- [ ] Feature-level mobile compositions
-- [ ] Navigation patterns
-
-/ui
-
-- [ ] Shared mobile primitives
-- [ ] Accessible defaults
-
-## packages/
-
-Reusable platform modules.
-
-### packages/server
-
-Backend runtime core.
-
-- [ ] Route composition system
-- [ ] Unified error model
-- [ ] Middleware architecture
-- [ ] Dependency injection pattern (if needed)
-- [ ] Observability hooks
-- [ ] Public API boundary enforcement
-
-### packages/sdk
-
-Public client contract layer.
-
-- [ ] Typed API client
-- [ ] DTO definitions
-- [ ] Error normalization
-- [ ] Auth-aware client (token refresh)
-- [ ] Stable versioning guarantees
-- [ ] Clear separation from server runtime
-
-### packages/db
-
-Persistence layer.
-
-- [ ] Canonical schema
-- [ ] Migration strategy
-- [ ] Indexing strategy
-- [ ] Seed fixtures
-- [ ] Backup/restore docs
-
-### packages/auth
-
-- [ ] Session lifecycle
-- [ ] Role/scopes model
-- [ ] Multi-device sessions
-- [ ] Audit events
-- [ ] Hardened recovery flow
-
-### packages/billing
-
-- [ ] Plans + entitlements
-- [ ] Subscription lifecycle
-- [ ] Webhook ingestion
-- [ ] Idempotency guarantees
-- [ ] Transparent billing UX principles
-
-### packages/storage
-
-- [ ] Storage abstraction
-- [ ] Signed URLs
-- [ ] Access policies
-- [ ] File constraints
-
-### packages/kv
-
-- [ ] Namespaced keys
-- [ ] TTL rules
-- [ ] Dev fallback
-- [ ] Rate limiting primitives
-
-### packages/email
-
-- [ ] Transactional templates
-- [ ] Optional i18n
-- [ ] Bounce handling
-- [ ] Rate limiting
-
-### packages/env
-
-- [ ] Typed schema
-- [ ] Server/client split
-- [ ] Fail-fast validation
-- [ ] `.env.example`
-
-### packages/convex
-
-Cloud-specific backend logic.
-
-- [ ] Clear scope definition
-- [ ] Sync contracts
-- [ ] Retry strategy
-- [ ] Observability
-- [ ] Data ownership clarity
-
-### packages/tailwind
-
-Design preset.
-
-- [ ] Design tokens
-- [ ] Light/dark themes
-- [ ] Accessible contrast
-- [ ] Shared preset across apps
-
-### packages/tsconfig
-
-- [ ] Unified strict policy
-- [ ] Shared base configs
-- [ ] Path aliases
-
-## documentation/
-
-- [ ] Architecture overview (apps vs packages)
-- [ ] Dependency graph
-- [ ] Setup guide
-- [ ] Contribution guide
-- [ ] Consent/privacy model
-- [ ] ADRs for major changes
-
-## scripts/
-
-- [ ] CI helpers
-- [ ] Release scripts
-- [ ] Migration scripts
-- [ ] Backup scripts
-
-## Polish Markdown Files (before 0.2.0 release)
-
-- [ ] apps/web/README.md
-- [ ] CHANGELOG.md
-- [ ] CODE_OF_CONDUCT.md
-- [ ] CONTRIBUTING.md
-- [ ] README.md
-- [ ] ROADMAP.md
-- [ ] SECURITY.md
-- [ ] TRADEMARK.md
-
-## Polish JSON Files (before 0.3.0 release)
-
-- [ ] .oxfmtrc.json
-- [ ] .oxlintrc.json
-- [ ] .vscode/extensions.json
-- [ ] .vscode/settings.json
-- [ ] apps/api/package.json
-- [ ] apps/api/tsconfig.json
-- [ ] apps/cli/package.json
-- [ ] apps/desktop/package.json
-- [ ] apps/desktop/tsconfig.json
-- [ ] apps/mobile/eas.json
-- [ ] apps/mobile/package.json
-- [ ] apps/mobile/tsconfig.json
-- [ ] apps/web/components.json
-- [ ] apps/web/package.json
-- [ ] apps/web/tsconfig.json
-- [ ] components/mobile/blocks/package.json
-- [ ] components/mobile/ui/package.json
-- [ ] components/web/blocks/components.json
-- [ ] components/web/blocks/package.json
-- [ ] components/web/blocks/tsconfig.json
-- [ ] components/web/ui/components.json
-- [ ] components/web/ui/package.json
-- [ ] components/web/ui/tsconfig.json
-- [ ] documentation/package.json
-- [ ] documentation/tsconfig.json
-- [ ] package.json
-- [ ] packages/auth/package.json
-- [ ] packages/auth/tsconfig.json
-- [ ] packages/billing/package.json
-- [ ] packages/billing/tsconfig.json
-- [ ] packages/convex/convex.json
-- [ ] packages/convex/package.json
-- [ ] packages/convex/tsconfig.json
-- [ ] packages/db/package.json
-- [ ] packages/db/tsconfig.json
-- [ ] packages/email/package.json
-- [ ] packages/email/tsconfig.json
-- [ ] packages/env/package.json
-- [ ] packages/env/tsconfig.json
-- [ ] packages/kv/package.json
-- [ ] packages/kv/tsconfig.json
-- [ ] packages/sdk/package.json
-- [ ] packages/server/package.json
-- [ ] packages/server/tsconfig.json
-- [ ] packages/storage/package.json
-- [ ] packages/storage/tsconfig.json
-- [ ] packages/tailwind/package.json
-- [ ] packages/tsconfig/package.json
-- [ ] packages/tsconfig/ts-files-only.json
-- [ ] packages/tsconfig/tsx-support.json
-- [ ] scripts/package.json
-- [ ] scripts/tsconfig.json
-- [ ] turbo.json
+Those belong to Bleverse or other dedicated repos.

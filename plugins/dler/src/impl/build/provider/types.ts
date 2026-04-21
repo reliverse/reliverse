@@ -1,7 +1,8 @@
 export interface BuildTarget {
+  readonly command: readonly string[];
   readonly cwd: string;
+  readonly displayCommand?: string | undefined;
   readonly label?: string | undefined;
-  readonly script?: string | undefined;
 }
 
 export interface BuildTargetResult {

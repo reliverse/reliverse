@@ -10,7 +10,6 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "build": "bun build ./src/index.ts ./src/cmds/os/bootstrap/cmd.ts --outdir ./dist --target bun",
     "check": "bun --eval \"import('./src/index.ts').then(() => console.log('ok'))\"",
     "typecheck": "tsgo --noEmit"
   },

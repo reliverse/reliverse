@@ -44,5 +44,5 @@ DO_NOT_COMMIT_HERE.md
 .githooks/pre-push
 
 # Excludes
-!/plugins/dler/src/cmds/dler/build/
+!/plugins/dler/src/cmds/build/
 !/plugins/dler/src/impl/build/

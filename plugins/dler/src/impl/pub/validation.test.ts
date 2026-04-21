@@ -48,4 +48,25 @@ describe("publish validation", () => {
       { label: "packages/missing-dist", reason: expect.stringContaining("missing publish directory:") },
     ]);
   });
+
+  test("ignores @repo scoped packages before publish eligibility checks", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-validation-"));
+    const pkgDir = join(root, "packages", "repo-only");
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({ name: "@repo/hidden", type: "module", publishConfig: { access: "public" } }),
+      "utf8",
+    );
+
+    const result = await resolvePublishableTargets({
+      publishFrom: "dist",
+      targets: [{ cwd: pkgDir, label: "packages/repo-only" }],
+    });
+
+    expect(result.publishable).toEqual([]);
+    expect(result.skipped).toEqual([
+      { label: "packages/repo-only", reason: "package @repo/hidden is ignored by workspace policy" },
+    ]);
+  });
 });

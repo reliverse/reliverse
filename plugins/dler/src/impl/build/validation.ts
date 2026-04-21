@@ -1,25 +1,18 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
+import { resolvePackageBuildCommand } from "./package-build-command";
 import { fileExists, type RequestedTarget, type SkippedTarget } from "../shared-targets";
+import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
 
 export interface BuildableTarget extends RequestedTarget {
+  readonly command: BuildCommandInvocation;
+  readonly executionCommand: BuildCommandInvocation;
   readonly manifestPath: string;
-  readonly script: string;
-}
-
-function hasScript(pkg: Record<string, unknown>, script: string): boolean {
-  const scripts = pkg.scripts;
-  return Boolean(
-    scripts &&
-      typeof scripts === "object" &&
-      typeof (scripts as Record<string, unknown>)[script] === "string" &&
-      ((scripts as Record<string, unknown>)[script] as string).trim().length > 0,
-  );
 }
 
 export async function resolveBuildableTargets(options: {
-  readonly script: string;
   readonly targets: readonly RequestedTarget[];
 }): Promise<{ readonly buildable: readonly BuildableTarget[]; readonly skipped: readonly SkippedTarget[] }> {
   const buildable: BuildableTarget[] = [];
@@ -40,16 +33,24 @@ export async function resolveBuildableTargets(options: {
       continue;
     }
 
-    if (!hasScript(pkg, options.script)) {
-      skipped.push({ label: target.label, reason: `missing scripts.${options.script}` });
+    const ignored = getWorkspacePackageIgnoreReason(pkg);
+    if (ignored) {
+      skipped.push({ label: target.label, reason: ignored });
+      continue;
+    }
+
+    const executionCommand = await resolvePackageBuildCommand(target);
+    if (!executionCommand) {
+      skipped.push({ label: target.label, reason: "no generated build command matched this package" });
       continue;
     }
 
     buildable.push({
+      command: createGeneratedBuildCommand(target),
       cwd: target.cwd,
+      executionCommand,
       label: target.label,
       manifestPath,
-      script: options.script,
     });
   }
 

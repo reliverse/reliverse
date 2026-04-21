@@ -1,6 +1,5 @@
 /// <reference types="vite/client" />
 
-import type { AuthQueryResult } from "@repo/auth/tanstack/queries";
 import { Toaster } from "@repo/blocks/sonner";
 import { ThemeProvider } from "@repo/blocks/theme-provider";
 import { TanStackDevtools } from "@tanstack/react-devtools";
@@ -21,7 +20,7 @@ import appCss from "~/styles.css?url";
 
 export const Route = createRootRouteWithContext<{
   queryClient: QueryClient;
-  user: AuthQueryResult;
+  user: null;
 }>()({
   // Typically we don't need the user immediately in landing pages.
   // For protected routes with loader data, see /_auth/route.tsx

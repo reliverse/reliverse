@@ -1,28 +1,20 @@
-import { SignOutButton } from "@repo/blocks/sign-out-button";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/_auth/app/")({
-  component: AppIndex,
+  component: AppPlaceholder,
 });
 
-function AppIndex() {
-  const { user } = Route.useRouteContext();
-  // we can also use the useAuth() or useAuthSuspense() hooks here from @repo/auth/tanstack/hooks
-  // this is just to demo that route context is available in route components, in addition to loaders/beforeLoad
-
+function AppPlaceholder() {
   return (
-    <div className="flex flex-col items-center gap-1">
-      App index page
-      <pre className="rounded-md border bg-card p-1 text-xs text-card-foreground">
-        routes/_auth/app/index.tsx
-      </pre>
-      <div className="mt-2 text-center text-xs sm:text-sm">
-        User data from route context:
-        <pre className="max-w-screen overflow-x-auto px-2 text-start">
-          {JSON.stringify(user, null, 2)}
-        </pre>
-      </div>
-      <SignOutButton />
+    <div className="flex flex-col items-center gap-4 text-center">
+      <h2 className="text-2xl font-semibold">No authenticated app surface in Reliverse</h2>
+      <p className="max-w-xl text-sm text-foreground/80">
+        This monorepo now focuses on developer tools and landing pages. Product-facing authenticated UI
+        moved out to Bleverse.
+      </p>
+      <Link to="/" className="underline underline-offset-4">
+        Back to home
+      </Link>
     </div>
   );
 }

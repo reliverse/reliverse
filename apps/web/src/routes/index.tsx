@@ -1,9 +1,5 @@
-import { useAuthSuspense } from "@repo/auth/tanstack/hooks";
-import { SignOutButton } from "@repo/blocks/sign-out-button";
 import { ThemeToggle } from "@repo/blocks/theme-toggle";
-import { Button } from "@repo/ui/button";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { Suspense } from "react";
+import { createFileRoute } from "@tanstack/react-router";
 
 export const Route = createFileRoute("/")({
   component: HomePage,
@@ -26,9 +22,28 @@ function HomePage() {
         </div>
       </div>
 
-      <Suspense fallback={<div className="py-6">Loading user...</div>}>
-        <UserAction />
-      </Suspense>
+      <div className="flex flex-col items-center gap-3 text-center">
+        <p className="max-w-2xl text-sm text-foreground/80 sm:text-base">
+          Reliverse is now focused on developer tools, reusable UI building blocks, and landing pages
+          for each tool and RSE plugin.
+        </p>
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            className="inline-flex h-10 items-center justify-center rounded-4xl bg-primary px-4 text-sm font-medium text-primary-foreground transition hover:bg-primary/80"
+            href="https://github.com/reliverse/reliverse"
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            Explore the monorepo
+          </a>
+          <a
+            className="inline-flex h-10 items-center justify-center rounded-4xl border border-border bg-input/30 px-4 text-sm font-medium transition hover:bg-input/50"
+            href="/health"
+          >
+            Health check
+          </a>
+        </div>
+      </div>
 
       <div className="flex flex-col items-center gap-2">
         <div className="flex items-center gap-3">
@@ -45,34 +60,6 @@ function HomePage() {
           <ThemeToggle />
         </div>
       </div>
-    </div>
-  );
-}
-
-function UserAction() {
-  const { user } = useAuthSuspense();
-
-  return user ? (
-    <div className="flex flex-col items-center gap-2">
-      <p>Welcome back, {user.name}!</p>
-      <Button render={<Link to="/app" />} className="mb-2 w-fit" size="lg" nativeButton={false}>
-        Go to App
-      </Button>
-      <div className="text-center text-xs sm:text-sm">
-        Session user:
-        <pre className="max-w-screen overflow-x-auto px-2 text-start">
-          {JSON.stringify(user, null, 2)}
-        </pre>
-      </div>
-
-      <SignOutButton />
-    </div>
-  ) : (
-    <div className="flex flex-col items-center gap-2">
-      <p>You are not signed in.</p>
-      <Button render={<Link to="/login" />} className="w-fit" size="lg" nativeButton={false}>
-        Log in
-      </Button>
     </div>
   );
 }
