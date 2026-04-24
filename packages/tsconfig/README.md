@@ -8,8 +8,8 @@ Provides reusable TS config presets for workspace packages and apps.
 
 ## Exports
 
-- `./ts-files-only.json`
-- `./tsx-support.json`
+- `./ts-only.json`
+- `./ts-tsx.json`
 
 ## Notes
 

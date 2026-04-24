@@ -4,16 +4,12 @@
   "private": true,
   "description": "Shared TypeScript configuration",
   "files": [
-    "./tsx-support.json",
-    "./ts-files-only.json"
+    "./ts-only.json",
+    "./ts-tsx.json"
   ],
   "type": "module",
   "exports": {
-    "./ts-files-only.json": "./ts-files-only.json",
-    "./tsx-support.json": "./tsx-support.json"
-  },
-  "devDependencies": {
-    "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "./ts-only.json": "./ts-only.json",
+    "./ts-tsx.json": "./ts-tsx.json"
   }
 }

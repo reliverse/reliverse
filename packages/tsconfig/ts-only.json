@@ -28,5 +28,5 @@
     "strictNullChecks": true,
     "types": ["bun"]
   },
-  "exclude": ["node_modules", "build", "dist", ".next", ".expo"]
+  "exclude": ["node_modules", "build", "dist", ".next"]
 }

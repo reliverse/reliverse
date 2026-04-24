@@ -96,7 +96,7 @@ describe("dler build command", () => {
       plannedTargets: [{ label: "plugins/dler" }],
       skipped: [{ label: "plugins/missing", reason: expect.stringContaining("not a directory:") }],
       skippedTargets: [{ label: "plugins/missing", reason: expect.stringContaining("not a directory:") }],
-      steps: [{ command: expect.stringContaining("internal-runner.ts"), label: "plugins/dler" }],
+      steps: [{ command: expect.stringContaining("internal-runner.ts"), label: "plugins/dler", packageCommand: expect.any(String) }],
       summary: { failed: 0, planned: 1, skipped: 1, succeeded: 0 },
       targets: ["plugins/dler", "plugins/missing"],
     });
@@ -168,7 +168,7 @@ describe("dler build command", () => {
     });
 
     await expect(command.handler(ctx as never)).rejects.toThrow(
-      "EXIT 1: Build failed for plugins/broken. Re-run with --targets plugins/broken for a narrower retry.",
+      "EXIT 1: Build failed for plugins/broken during generated command execution (exit 1). Re-run with --targets plugins/broken for a narrower retry.",
     );
 
     expect(textLines.some((line) => line.includes("Provider: bun"))).toBe(true);
@@ -197,6 +197,43 @@ describe("dler build command", () => {
       plannedTargets: [{ label: "plugins/pkg" }],
       skippedTargets: [],
       summary: { planned: 1, skipped: 0 },
+    });
+  });
+
+  test("json dry-run keeps a stable machine-readable shape", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-"));
+    const pkgDir = join(root, "plugins", "stable");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
+    await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "stable" }), "utf8");
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const stable = 1;\n", "utf8");
+
+    const { ctx, resultCalls } = createJsonCtx(root, {
+      dryRun: true,
+      provider: "bun",
+      targets: "plugins/stable",
+    });
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toStrictEqual({
+      dryRun: true,
+      executedTargets: [],
+      ok: true,
+      plannedTargets: [{ cwd: pkgDir, label: "plugins/stable" }],
+      provider: "bun",
+      skipped: [],
+      skippedTargets: [],
+      steps: [
+        {
+          command: expect.stringContaining("internal-runner.ts"),
+          cwd: pkgDir,
+          label: "plugins/stable",
+          packageCommand: "bun build ./src/index.ts --outdir ./dist --target bun",
+        },
+      ],
+      summary: { failed: 0, planned: 1, skipped: 0, succeeded: 0 },
+      targets: ["plugins/stable"],
     });
   });
 });

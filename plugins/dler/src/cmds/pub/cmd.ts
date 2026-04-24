@@ -4,13 +4,11 @@ import { runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
 import { runPrebuildForPackage } from "../../impl/pub/prebuild";
 import { createPublishStaging } from "../../impl/pub/staging";
-import { parseTargetsOption } from "../../impl/pub/targets";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
 import { findUnsafeDependencySpecifiers } from "../../impl/pub/workspace-deps";
-import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
-import { createPublishSummary, formatPublishSummary } from "../../impl/result-contract";
-import { pathIsDirectory, resolveDirectoryTargets } from "../../impl/shared-targets";
-import { resolveWorkspaceTargetsFromCwd } from "../../impl/workspace-targets";
+import { createPublishExecutedTargets, createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
+import { createPublishSummary, createPublishSummaryFromResults, formatPublishSummary } from "../../impl/result-contract";
+import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
 
 const BUILDER_PLUGIN_NAME = "dler";
 const DEFAULT_PUBLISH_FROM = "dist";
@@ -36,11 +34,11 @@ export default defineCommand({
   meta: {
     name: "pub",
     description:
-      "Publish selected workspace packages to npm using a staging directory (merged files + build output). Prebuild uses the builder plugin when it is registered on the CLI.",
+      "Publish selected workspace packages to npm using a staging directory that merges package metadata with prepared artifacts.",
   },
   agent: {
     notes:
-      "Eligible packages: not private, type module, publishConfig.access public. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
+      "Eligible packages: not private, type module, publishConfig.access public. With default prebuild enabled, dler first runs the generated build flow for each target. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
   },
   interactive: "never",
   conventions: {
@@ -53,7 +51,7 @@ export default defineCommand({
       "rse dler pub --targets packages/foo --no-prebuild --publish-from dist --dry-run",
       "rse dler pub --targets packages/foo --publish-from dist --tag next --dry-run",
     ],
-    text: "With default prebuild, the dler must be loaded by the CLI. Otherwise pass --no-prebuild and --publish-from (relative to each package root). Staging always includes package.json and the publish-from directory; existing package.json `files` entries are merged in.",
+    text: "Targets come from --targets or from cwd scope when omitted. With default prebuild, dler runs the generated build flow first and then stages package.json plus the chosen artifact directory before npm publish. With --no-prebuild, the caller is responsible for ensuring artifacts already exist.",
   },
   options: {
     dryRun: {
@@ -65,7 +63,7 @@ export default defineCommand({
       type: "boolean",
       defaultValue: true,
       description:
-        "Run bun run build before publish when dler is registered (use --no-prebuild to skip)",
+        "Run dler's generated prebuild flow before publish (use --no-prebuild to skip)",
       inputSources: ["flag", "default"],
     },
     publishFrom: {
@@ -87,18 +85,17 @@ export default defineCommand({
     },
   },
   async handler(ctx) {
-    const targetsRaw = ctx.options.targets?.trim() ?? "";
-    let autoTargetsResult: Awaited<ReturnType<typeof resolveWorkspaceTargetsFromCwd>> | undefined;
-    const targetLabels = targetsRaw.length > 0
-      ? parseTargetsOption(targetsRaw)
-      : ((autoTargetsResult = await resolveWorkspaceTargetsFromCwd(ctx.cwd).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          return ctx.exit(1, `Target discovery failed: ${message}`);
-        })),
-        autoTargetsResult.targets.map((target) => target.label));
+    const requestedTargets = await resolveRequestedTargets({
+      cwd: ctx.cwd,
+      rawTargets: ctx.options.targets,
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return ctx.exit(1, `Target discovery failed: ${message}`);
+    });
+    const targetLabels = requestedTargets.labels;
 
     if (targetLabels.length === 0) {
-      ctx.exit(1, 'Missing targets. Pass --targets path1,path2 (comma-separated, relative to cwd).');
+      ctx.exit(1, 'No publish targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.');
     }
 
     const prebuild = ctx.options.prebuild ?? true;
@@ -126,15 +123,12 @@ export default defineCommand({
 
     const dryRun = Boolean(ctx.options.dryRun);
     const startedAt = performance.now();
-    const resolution = targetsRaw.length > 0
-      ? await resolveDirectoryTargets(ctx.cwd, targetLabels)
-      : { resolved: autoTargetsResult!.targets, skipped: [] };
     const validation = await resolvePublishableTargets({
       requireArtifactDir: !prebuild,
       publishFrom,
-      targets: resolution.resolved,
+      targets: requestedTargets.resolution.resolved,
     });
-    const skipped: { label: string; reason: string }[] = [...resolution.skipped, ...validation.skipped];
+    const skipped: { label: string; reason: string }[] = [...requestedTargets.resolution.skipped, ...validation.skipped];
     const results: {
       cwd: string;
       durationMs: number;
@@ -169,7 +163,7 @@ export default defineCommand({
           ctx.exit(
             1,
             failed
-              ? `Prebuild failed for ${label} (exit ${failed.exitCode}). Fix the build or use --no-prebuild.`
+              ? `Prebuild failed for ${label} during generated build execution (exit ${failed.exitCode}). Fix the build or use --no-prebuild.`
               : `Prebuild failed for ${label}.`,
           );
         }
@@ -206,7 +200,7 @@ export default defineCommand({
             if (npmResult.stderr.trim()) ctx.err(npmResult.stderr.trim());
           }
 
-          ctx.exit(1, `npm publish failed for ${label} (exit ${npmResult.exitCode}).`);
+          ctx.exit(1, `npm publish failed for ${label} during staging publish (exit ${npmResult.exitCode}).`);
         }
       } finally {
         await staging.cleanup();
@@ -215,7 +209,7 @@ export default defineCommand({
 
     if (results.length === 0) {
       const summary = createPublishSummary({
-        planned: resolution.resolved.length,
+        planned: requestedTargets.resolution.resolved.length,
         published: 0,
         skipped,
       });
@@ -246,22 +240,17 @@ export default defineCommand({
         ctx.err(message.replace("Skipped:", warnLabel(ctx, "Skipped:")));
       }
 
-      ctx.exit(1, "Nothing to publish.");
+      ctx.exit(1, "No publishable workspace targets remain after validation and artifact checks.");
     }
 
     if (ctx.output.mode === "json") {
-      const summary = createPublishSummary({
-        planned: resolution.resolved.length,
-        published: results.length,
+      const summary = createPublishSummaryFromResults({
+        planned: requestedTargets.resolution.resolved.length,
+        resultsCount: results.length,
         skipped,
       });
       const targetSets = createTargetSets({
-        executedTargets: results.map((result) => ({
-          cwd: result.cwd,
-          exitCode: result.npm.exitCode,
-          label: result.label,
-          ok: result.npm.exitCode === 0,
-        })),
+        executedTargets: createPublishExecutedTargets(results),
         plannedTargets: validation.publishable,
         skippedTargets: skipped,
       });
@@ -307,6 +296,6 @@ export default defineCommand({
     }
 
     ctx.out(`Total duration: ${Math.round(performance.now() - startedAt)}ms`);
-    ctx.out(formatPublishSummary(createPublishSummary({ planned: resolution.resolved.length, published: results.length, skipped }), dryRun));
+    ctx.out(formatPublishSummary(createPublishSummaryFromResults({ planned: requestedTargets.resolution.resolved.length, resultsCount: results.length, skipped }), dryRun));
   },
 });

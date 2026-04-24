@@ -19,6 +19,14 @@ export interface DlerReportTargetSets {
   readonly skippedTargets: readonly SkippedTarget[];
 }
 
+export interface PublishExecutionResultLike {
+  readonly cwd: string;
+  readonly label: string;
+  readonly npm: {
+    readonly exitCode: number;
+  };
+}
+
 export function createTargetSets(options: {
   readonly executedTargets?: readonly BuildTargetResult[] | readonly ExecutedTarget[] | undefined;
   readonly plannedTargets: readonly PlannedTarget[];
@@ -44,4 +52,13 @@ export function createTargetSets(options: {
 
 export function formatSkippedMessages(skippedTargets: readonly SkippedTarget[]): string[] {
   return skippedTargets.map((target) => `Skipped: ${target.label}: ${target.reason}`);
+}
+
+export function createPublishExecutedTargets(results: readonly PublishExecutionResultLike[]): ExecutedTarget[] {
+  return results.map((result) => ({
+    cwd: result.cwd,
+    exitCode: result.npm.exitCode,
+    label: result.label,
+    ok: result.npm.exitCode === 0,
+  }));
 }

@@ -1,6 +1,8 @@
 import { access, constants, stat } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import { resolveWorkspaceTargetsFromCwd } from "./workspace-targets";
+
 export interface RequestedTarget {
   readonly cwd: string;
   readonly label: string;
@@ -14,6 +16,11 @@ export interface SkippedTarget {
 export interface ResolvedTargetsResult {
   readonly resolved: readonly RequestedTarget[];
   readonly skipped: readonly SkippedTarget[];
+}
+
+export interface RequestedTargetsResolution {
+  readonly labels: readonly string[];
+  readonly resolution: ResolvedTargetsResult;
 }
 
 export function parseTargetsOption(targets: string): string[] {
@@ -66,4 +73,25 @@ export async function resolveDirectoryTargets(cwd: string, labels: readonly stri
   }
 
   return { resolved, skipped };
+}
+
+export async function resolveRequestedTargets(options: {
+  readonly cwd: string;
+  readonly rawTargets: string | undefined;
+}): Promise<RequestedTargetsResolution> {
+  const explicitTargets = options.rawTargets?.trim();
+
+  if (explicitTargets && explicitTargets.length > 0) {
+    const labels = parseTargetsOption(explicitTargets);
+    return {
+      labels,
+      resolution: await resolveDirectoryTargets(options.cwd, labels),
+    };
+  }
+
+  const autoTargets = await resolveWorkspaceTargetsFromCwd(options.cwd);
+  return {
+    labels: autoTargets.targets.map((target) => target.label),
+    resolution: { resolved: autoTargets.targets, skipped: [] },
+  };
 }

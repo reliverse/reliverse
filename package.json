@@ -73,7 +73,7 @@
       "@tanstack/router-plugin": "^1.159.12",
       "@testing-library/dom": "^10.4.1",
       "@testing-library/react": "^16.3.2",
-      "@types/bun": "^1.3.11",
+      "@types/bun": "^1.3.13",
       "@types/mdx": "^2.0.13",
       "@types/pg": "^8.16.0",
       "@types/react": "^19.2.14",
@@ -229,9 +229,6 @@
     "build:all": "bun run -F='*' build"
   },
   "devDependencies": {
-    "@reliverse/dler-rse-plugin": "workspace:*",
-    "@reliverse/tools-rse-plugin": "workspace:*",
-    "@reliverse/pm-rse-plugin": "workspace:*",
     "@tanstack/eslint-plugin-query": "^5.91.4",
     "@tanstack/eslint-plugin-router": "^1.161.4",
     "eslint-plugin-react-hooks": "^7.0.1",
@@ -250,7 +247,7 @@
     "react-dom": "^19.2.4"
   },
   "engines": {
-    "bun": ">=1.3.11"
+    "bun": ">=1.3.13"
   },
-  "packageManager": "bun@1.3.11"
+  "packageManager": "bun@1.3.13"
 }

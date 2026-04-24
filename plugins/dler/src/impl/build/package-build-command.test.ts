@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { resolvePackageBuildCommand } from "./package-build-command";
+import { explainMissingPackageBuildCommand, resolvePackageBuildCommand } from "./package-build-command";
 
 describe("package build command", () => {
   test("uses node-targeted bun build for workspace packages with src/index.ts", async () => {
@@ -136,5 +136,32 @@ describe("package build command", () => {
       argv: ["bun", "typecheck"],
       display: "bun typecheck",
     });
+  });
+
+  test("explains missing package-library entrypoints with a specific reason", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const pkgDir = join(root, "packages", "empty");
+    await mkdir(pkgDir, { recursive: true });
+    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }), "utf8");
+    await writeFile(join(pkgDir, "package.json"), '{"name":"empty"}\n', "utf8");
+
+    await expect(resolvePackageBuildCommand({ cwd: pkgDir, label: "packages/empty" })).resolves.toBeNull();
+    await expect(explainMissingPackageBuildCommand({ cwd: pkgDir, label: "packages/empty" })).resolves.toBe(
+      "unsupported package shape: package target is missing src/index.ts, root index entrypoints, and manifest entrypoints",
+    );
+  });
+
+  test("explains incomplete desktop app shape with a specific reason", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const appDir = join(root, "apps", "desktop-broken");
+    await mkdir(appDir, { recursive: true });
+    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["apps/*"] } }), "utf8");
+    await writeFile(join(appDir, "package.json"), '{"name":"desktop-broken"}\n', "utf8");
+    await writeFile(join(appDir, "electrobun.config.ts"), "export default {};\n", "utf8");
+
+    await expect(resolvePackageBuildCommand({ cwd: appDir, label: "apps/desktop-broken" })).resolves.toBeNull();
+    await expect(explainMissingPackageBuildCommand({ cwd: appDir, label: "apps/desktop-broken" })).resolves.toBe(
+      "unsupported package shape: electrobun config detected without a matching vite config",
+    );
   });
 });

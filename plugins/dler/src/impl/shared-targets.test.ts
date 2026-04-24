@@ -3,7 +3,7 @@ import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-import { fileExists, parseTargetsOption, resolveDirectoryTargets } from "./shared-targets";
+import { fileExists, parseTargetsOption, resolveDirectoryTargets, resolveRequestedTargets } from "./shared-targets";
 
 describe("shared target helpers", () => {
   test("parseTargetsOption trims, drops empties, and deduplicates while preserving order", () => {
@@ -38,5 +38,21 @@ describe("shared target helpers", () => {
 
     expect(await fileExists(file)).toBe(true);
     expect(await fileExists(join(root, "missing.json"))).toBe(false);
+  });
+
+  test("resolveRequestedTargets uses explicit labels when provided", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-targets-"));
+    await mkdir(join(root, "packages", "ok"), { recursive: true });
+
+    const result = await resolveRequestedTargets({
+      cwd: root,
+      rawTargets: "packages/ok,packages/missing",
+    });
+
+    expect(result.labels).toEqual(["packages/ok", "packages/missing"]);
+    expect(result.resolution.resolved).toEqual([
+      { cwd: join(root, "packages", "ok"), label: "packages/ok" },
+    ]);
+    expect(result.resolution.skipped).toHaveLength(1);
   });
 });

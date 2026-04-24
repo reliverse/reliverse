@@ -49,3 +49,15 @@ export function formatBuildSummary(summary: DlerBuildSummary): string {
 export function formatPublishSummary(summary: DlerPublishSummary, dryRun: boolean): string {
   return `Summary: ${summary.published} ${dryRun ? "prepared" : "published"}, ${summary.failed} failed, ${summary.skipped} skipped.`;
 }
+
+export function createPublishSummaryFromResults(options: {
+  readonly planned: number;
+  readonly resultsCount: number;
+  readonly skipped: readonly SkippedTarget[];
+}): DlerPublishSummary {
+  return createPublishSummary({
+    planned: options.planned,
+    published: options.resultsCount,
+    skipped: options.skipped,
+  });
+}

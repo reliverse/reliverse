@@ -2,13 +2,13 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
 import { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
-import { resolvePackageBuildCommand } from "./package-build-command";
+import { explainMissingPackageBuildCommand, resolvePackageBuildCommand } from "./package-build-command";
 import { fileExists, type RequestedTarget, type SkippedTarget } from "../shared-targets";
 import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
 
 export interface BuildableTarget extends RequestedTarget {
-  readonly command: BuildCommandInvocation;
-  readonly executionCommand: BuildCommandInvocation;
+  readonly orchestratorCommand: BuildCommandInvocation;
+  readonly packageCommand: BuildCommandInvocation;
   readonly manifestPath: string;
 }
 
@@ -39,16 +39,16 @@ export async function resolveBuildableTargets(options: {
       continue;
     }
 
-    const executionCommand = await resolvePackageBuildCommand(target);
-    if (!executionCommand) {
-      skipped.push({ label: target.label, reason: "no generated build command matched this package" });
+    const packageCommand = await resolvePackageBuildCommand(target);
+    if (!packageCommand) {
+      skipped.push({ label: target.label, reason: await explainMissingPackageBuildCommand(target) });
       continue;
     }
 
     buildable.push({
-      command: createGeneratedBuildCommand(target),
+      orchestratorCommand: createGeneratedBuildCommand(target),
       cwd: target.cwd,
-      executionCommand,
+      packageCommand,
       label: target.label,
       manifestPath,
     });

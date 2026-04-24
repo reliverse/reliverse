@@ -1,6 +1,6 @@
 {
   "$schema": "https://json.schemastore.org/tsconfig",
-  "extends": "@repo/tsconfig/tsx-support.json",
+  "extends": "@repo/tsconfig/ts-tsx.json",
   "compilerOptions": {
     "paths": {
       "~/*": ["./*"]

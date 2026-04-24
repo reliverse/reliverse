@@ -162,7 +162,7 @@ describe("dler pub command", () => {
     });
 
     await expect(command.handler(ctx as never)).rejects.toThrow(
-      "EXIT 1: Prebuild failed for packages/broken (exit 1). Fix the build or use --no-prebuild.",
+      "EXIT 1: Prebuild failed for packages/broken during generated build execution (exit 1). Fix the build or use --no-prebuild.",
     );
 
     expect(errorLines.some((line) => line.length > 0)).toBe(true);
@@ -219,6 +219,75 @@ describe("dler pub command", () => {
         { label: "packages/solo", reason: expect.stringContaining("unsafe dependency specifiers") },
       ],
       summary: { planned: 1 },
+    });
+  });
+
+  test("build/pub dry-run stay aligned on the same package target boundary", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const pkgDir = join(root, "packages", "aligned");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }), "utf8");
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "aligned", type: "module", publishConfig: { access: "public" }, dependencies: { foo: "workspace:*" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const aligned = 1;\n", "utf8");
+
+    const { ctx, resultCalls } = createJsonCtx(pkgDir, {
+      dryRun: true,
+      prebuild: false,
+      publishFrom: "dist",
+    });
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      plannedTargets: [{ cwd: pkgDir, label: "packages/aligned" }],
+      summary: { planned: 1 },
+    });
+  });
+
+  test("json dry-run keeps a stable machine-readable shape when nothing is publishable", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const pkgDir = join(root, "packages", "private-pkg");
+    await mkdir(pkgDir, { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "private-pkg", private: true, type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+
+    const { ctx, resultCalls } = createJsonCtx(root, {
+      dryRun: true,
+      prebuild: false,
+      publishFrom: "dist",
+      targets: "packages/private-pkg",
+    });
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toStrictEqual({
+      dryRun: true,
+      executedTargets: [],
+      ok: false,
+      plannedTargets: [],
+      publishFrom: "dist",
+      published: [],
+      skipped: [
+        {
+          label: "packages/private-pkg",
+          reason: 'package.json has "private": true (npm publish is blocked)',
+        },
+      ],
+      skippedTargets: [
+        {
+          label: "packages/private-pkg",
+          reason: 'package.json has "private": true (npm publish is blocked)',
+        },
+      ],
+      summary: { failed: 0, planned: 1, published: 0, skipped: 1 },
     });
   });
 });

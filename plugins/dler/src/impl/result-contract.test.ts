@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { createBuildSummary, createPublishSummary, formatBuildSummary, formatPublishSummary } from "./result-contract";
+import { createBuildSummary, createPublishSummary, createPublishSummaryFromResults, formatBuildSummary, formatPublishSummary } from "./result-contract";
 
 describe("dler result contract helpers", () => {
   test("creates and formats build summaries consistently", () => {
@@ -27,5 +27,15 @@ describe("dler result contract helpers", () => {
     expect(summary).toEqual({ failed: 0, planned: 4, published: 2, skipped: 1 });
     expect(formatPublishSummary(summary, true)).toBe("Summary: 2 prepared, 0 failed, 1 skipped.");
     expect(formatPublishSummary(summary, false)).toBe("Summary: 2 published, 0 failed, 1 skipped.");
+  });
+
+  test("creates publish summaries from result counts consistently", () => {
+    const summary = createPublishSummaryFromResults({
+      planned: 3,
+      resultsCount: 1,
+      skipped: [{ label: "packages/private", reason: "private" }],
+    });
+
+    expect(summary).toEqual({ failed: 0, planned: 3, published: 1, skipped: 1 });
   });
 });

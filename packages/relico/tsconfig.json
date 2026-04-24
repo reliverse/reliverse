@@ -1,5 +1,5 @@
 {
-  "extends": "../tsconfig/ts-files-only.json",
+  "extends": "../tsconfig/ts-only.json",
   "include": ["src/**/*.ts"],
   "exclude": ["node_modules", "dist"]
 }

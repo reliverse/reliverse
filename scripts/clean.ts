@@ -1,3 +1,5 @@
+#!/usr/bin/env bun
+
 // Removes common build artifacts and deps
 
 import { readdir, rm } from "node:fs/promises";

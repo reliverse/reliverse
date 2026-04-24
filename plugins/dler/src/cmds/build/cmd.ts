@@ -1,41 +1,27 @@
 import {
+  createBuildPlan,
   createBuildProviderRegistry,
   createBuilderRuntime,
   createBunBuildProvider,
-  resolveBuildableTargets,
-  type BuildTarget,
 } from "../../impl/build";
 import { defineCommand } from "@reliverse/rempts";
 
-import { parseTargetsOption } from "../../impl/build/targets";
 import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
 import { createBuildSummary, formatBuildSummary } from "../../impl/result-contract";
-import { resolveDirectoryTargets } from "../../impl/shared-targets";
-import { resolveWorkspaceTargetsFromCwd } from "../../impl/workspace-targets";
+import { resolveRequestedTargets } from "../../impl/shared-targets";
 
 function formatBuildResultLine(result: { durationMs: number; label: string; ok: boolean }): string {
   return `${result.ok ? "Built" : "Failed"}: ${result.label} (${result.durationMs}ms)`;
 }
 
-function toBuildTargets(
-  targets: readonly { command: { argv: readonly string[]; display: string }; cwd: string; label: string }[],
-): BuildTarget[] {
-  return targets.map((target) => ({
-    command: target.command.argv,
-    cwd: target.cwd,
-    displayCommand: target.command.display,
-    label: target.label,
-  }));
-}
-
 export default defineCommand({
   meta: {
     name: "build",
-    description: "Build selected Reliverse workspaces through the provider-oriented builder runtime",
+    description: "Build selected Reliverse workspaces through generated per-package build commands",
   },
   agent: {
     notes:
-      "Use --dry-run first when you need a preview. When --targets is omitted, the command uses cwd scope: the current package or all workspace packages from the monorepo root.",
+      "Use --dry-run first when you need a preview. When --targets is omitted, dler derives targets from cwd: the current workspace package or all workspace packages from the monorepo root.",
   },
   conventions: {
     idempotent: true,
@@ -47,12 +33,12 @@ export default defineCommand({
       "rse dler build --targets plugins/pm,plugins/dler,apps/cli",
       "rse dler build --targets plugins/dler --provider bun --json",
     ],
-    text: "The Bun provider runs each target's build script in order and stops on the first failure so the result stays predictable for automation.",
+    text: "dler plans a generated build command for each eligible workspace target, then executes those commands in order through the selected provider. Dry-run shows the commands that would be executed for the resolved target scope.",
   },
   options: {
     dryRun: {
       type: "boolean",
-      description: "Preview the build plan without executing target build scripts",
+      description: "Preview resolved targets and generated build commands without executing them",
       inputSources: ["flag"],
     },
     provider: {
@@ -75,17 +61,17 @@ export default defineCommand({
     });
     const provider = ctx.options.provider ?? providerRegistry.defaultProvider;
     const explicitTargets = ctx.options.targets?.trim();
-    let autoTargetsResult: Awaited<ReturnType<typeof resolveWorkspaceTargetsFromCwd>> | undefined;
-    const targetLabels = explicitTargets
-      ? parseTargetsOption(explicitTargets)
-      : ((autoTargetsResult = await resolveWorkspaceTargetsFromCwd(ctx.cwd).catch((error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
-          return ctx.exit(1, `Target discovery failed: ${message}`);
-        })),
-        autoTargetsResult.targets.map((target) => target.label));
+    const requestedTargets = await resolveRequestedTargets({
+      cwd: ctx.cwd,
+      rawTargets: ctx.options.targets,
+    }).catch((error: unknown) => {
+      const message = error instanceof Error ? error.message : String(error);
+      return ctx.exit(1, `Target discovery failed: ${message}`);
+    });
+    const targetLabels = requestedTargets.labels;
 
     if (targetLabels.length === 0) {
-      ctx.exit(1, "Missing build targets. Pass --targets path1,path2 or use the default set.");
+      ctx.exit(1, "No build targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.");
     }
 
     if (!providerRegistry.get(provider)) {
@@ -95,16 +81,14 @@ export default defineCommand({
       );
     }
 
-    const resolution = explicitTargets
-      ? await resolveDirectoryTargets(ctx.cwd, targetLabels)
-      : { resolved: autoTargetsResult!.targets, skipped: [] };
-    const validation = await resolveBuildableTargets({
-      targets: resolution.resolved,
+    const plan = await createBuildPlan({
+      provider,
+      targets: requestedTargets.resolution.resolved,
     });
-    const skippedTargets = [...resolution.skipped, ...validation.skipped];
-    const targets = toBuildTargets(validation.buildable);
+    const skippedTargets = [...requestedTargets.resolution.skipped, ...plan.skippedTargets];
+    const targets = plan.executionTargets;
     const targetSets = createTargetSets({
-      plannedTargets: validation.buildable,
+      plannedTargets: plan.plannedTargets,
       skippedTargets,
     });
 
@@ -137,7 +121,7 @@ export default defineCommand({
         ctx.err(message);
       }
 
-      ctx.exit(1, "No valid build targets remain after validation.");
+      ctx.exit(1, "No buildable workspace targets remain after validation.");
     }
 
     if (ctx.options.dryRun) {
@@ -158,6 +142,7 @@ export default defineCommand({
           command: target.displayCommand ?? target.command.join(" "),
           cwd: target.cwd,
           label: target.label,
+          packageCommand: plan.plannedTargets.find((plannedTarget) => plannedTarget.label === target.label)?.packageCommand.display,
         })),
         summary,
         targets: targetLabels,
@@ -200,7 +185,7 @@ export default defineCommand({
     });
     const executedTargetSets = createTargetSets({
       executedTargets: report.targets,
-      plannedTargets: validation.buildable,
+      plannedTargets: plan.plannedTargets,
       skippedTargets,
     });
 
@@ -263,7 +248,7 @@ export default defineCommand({
 
       ctx.exit(
         1,
-        `Build failed for ${failedTarget.label}. Re-run with --targets ${failedTarget.label} for a narrower retry.`,
+        `Build failed for ${failedTarget.label} during generated command execution (exit ${failedTarget.exitCode}). Re-run with --targets ${failedTarget.label} for a narrower retry.`,
       );
     }
   },
