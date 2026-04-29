@@ -1,4 +1,5 @@
 import type { RelicoInstance } from "@reliverse/relico";
+
 import type { HelpDocument } from "./help-model";
 
 export interface HelpRenderColors {
@@ -94,15 +95,12 @@ function formatKeyValueRows(
 
   return rows.flatMap((row) => {
     const name = padAnsi(formatPrimary(row.name, colors), width);
-    const note = row.note ? ` ${colors ? colors.body.dim(row.note) : row.note}` : "";
+    const note = row.note ? ` ${colors ? colors.body.dim(`(${row.note})`) : `(${row.note})`}` : "";
     const wrappedDescription = wrapText(`${row.description}${note}`, ROW_DESCRIPTION_WIDTH);
     const [firstLine = "", ...rest] = wrappedDescription;
     const continuationIndent = `  ${" ".repeat(width)}  `;
 
-    return [
-      `  ${name}  ${firstLine}`,
-      ...rest.map((part) => `${continuationIndent}${part}`),
-    ];
+    return [`  ${name}  ${firstLine}`, ...rest.map((part) => `${continuationIndent}${part}`)];
   });
 }
 
@@ -135,18 +133,31 @@ function bullet(colors?: HelpRenderColors): string {
   return colors ? colors.body.cyan("•") : "-";
 }
 
+function formatInputSources(sources: readonly string[] | undefined): string | undefined {
+  if (!sources || sources.length === 0) {
+    return undefined;
+  }
+
+  const meaningfulSources = sources.filter((source) => source !== "flag" && source !== "default");
+
+  return meaningfulSources.length > 0 ? meaningfulSources.join(", ") : undefined;
+}
+
 function sectionSpacing(lines: string[], title: string, colors?: HelpRenderColors): void {
   lines.push("", `${heading(title, colors)} ${sectionRule(colors)}`);
 }
 
 export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderColors): string {
   const banner = colors
-    ? `${colors.heading.bold(colors.heading.blueBright(document.programName))} ${subtle("agent-first command runner", colors)}`
+    ? `${colors.heading.bold(colors.heading.blueBright(document.programName))} ${subtle("— agent-first command runner", colors)}`
     : document.programName;
   const lines = [banner, "", heading("Usage", colors)];
 
   lines.push(
-    ...document.usage.map((usageLine) => `  ${bullet(colors)} ${colors ? colors.body.whiteBright(usageLine) : usageLine}`),
+    ...document.usage.map(
+      (usageLine) =>
+        `  ${bullet(colors)} ${colors ? colors.body.whiteBright(usageLine) : usageLine}`,
+    ),
   );
 
   if (document.description) {
@@ -162,10 +173,10 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
   if (document.interactive) {
     const interactiveDescription =
       document.interactive === "never"
-        ? "Disabled by default, optimized for agents and scripts"
+        ? "Non-interactive by default; safe for agents and scripts"
         : document.interactive === "tty"
-          ? "Plain terminal prompts available only with explicit host opt-in (for example --interactive)"
-          : "TUI available only with explicit host opt-in (for example --tui), with terminal fallback when supported";
+          ? "Plain prompts are available only with explicit host opt-in, for example --interactive"
+          : "TUI prompts are available only with explicit host opt-in, for example --tui; terminal fallback is used when supported";
 
     sectionSpacing(lines, "Interaction", colors);
     lines.push(`  ${colors ? colors.body.yellow(interactiveDescription) : interactiveDescription}`);
@@ -182,7 +193,7 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
   }
 
   if (document.commandFlags.length > 0) {
-    sectionSpacing(lines, "Command Flags", colors);
+    sectionSpacing(lines, "Flags", colors);
 
     for (const flag of document.commandFlags) {
       const requiredHint = flag.required ? "required" : undefined;
@@ -201,8 +212,10 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
         lines.push(`    ${formatMetaLabel("hint:", colors)} ${flag.hint}`);
       }
 
-      if (flag.inputSources && flag.inputSources.length > 0) {
-        lines.push(`    ${formatMetaLabel("sources:", colors)} ${subtle(flag.inputSources.join(", "), colors)}`);
+      const inputSources = formatInputSources(flag.inputSources);
+
+      if (inputSources) {
+        lines.push(`    ${formatMetaLabel("accepts:", colors)} ${subtle(inputSources, colors)}`);
       }
     }
   }
@@ -222,7 +235,12 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
 
   if (document.examples.length > 0) {
     sectionSpacing(lines, "Examples", colors);
-    lines.push(...document.examples.map((example) => `  ${subtle("$", colors)} ${colors ? colors.body.greenBright(example) : example}`));
+    lines.push(
+      ...document.examples.map(
+        (example) =>
+          `  ${subtle("$", colors)} ${colors ? colors.body.greenBright(example) : example}`,
+      ),
+    );
   }
 
   if (document.agentNotes) {

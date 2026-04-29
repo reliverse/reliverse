@@ -80,8 +80,10 @@ describe("createCLI", () => {
 
     expect(result.ok).toBe(true);
     expect(result.exitCode).toBe(0);
+    expect(stdout.text()).toStartWith("\n");
     expect(stdout.text()).toContain("Usage");
     expect(stdout.text()).toContain("No commands are currently available in this CLI.");
+    expect(stdout.text()).toEndWith("\n\n");
   });
 
   test("launcher help for an empty CLI without plugin discovery still includes developer guidance", async () => {

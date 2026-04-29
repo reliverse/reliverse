@@ -1,3 +1,5 @@
+import { relative } from "node:path";
+
 import { defineCommand } from "@reliverse/rempts";
 
 import {
@@ -12,6 +14,105 @@ import { resolveRequestedTargets } from "../../impl/shared-targets";
 
 function formatBuildResultLine(result: { durationMs: number; label: string; ok: boolean }): string {
   return `${result.ok ? "Built" : "Failed"}: ${result.label} (${result.durationMs}ms)`;
+}
+
+function formatRelativePath(root: string, path: string): string {
+  const relativePath = relative(root, path);
+
+  return relativePath.length > 0 && !relativePath.startsWith("..") ? relativePath : path;
+}
+
+function normalizeSkippedReason(reason: string): string {
+  const ignoredPackageMatch = /^package (.+) is ignored by workspace policy$/.exec(reason);
+
+  if (ignoredPackageMatch) {
+    return `ignored by workspace policy (${ignoredPackageMatch[1]})`;
+  }
+
+  return reason;
+}
+
+function formatLabelRows(
+  rows: ReadonlyArray<{ readonly label: string; readonly detail?: string | undefined }>,
+): string[] {
+  if (rows.length === 0) {
+    return ["  none"];
+  }
+
+  const width = Math.max(...rows.map((row) => row.label.length));
+
+  return rows.map((row) => {
+    const label = row.label.padEnd(width);
+
+    return row.detail ? `  ${label}  ${row.detail}` : `  ${row.label}`;
+  });
+}
+
+function formatBuildPreviewText(options: {
+  readonly commandDetails: readonly {
+    readonly command: string;
+    readonly cwd: string;
+    readonly label: string;
+  }[];
+  readonly provider: string;
+  readonly root: string;
+  readonly skippedTargets: readonly { readonly label: string; readonly reason: string }[];
+  readonly showCommands: boolean;
+  readonly targets: readonly { readonly cwd: string; readonly label?: string | undefined }[];
+}): string[] {
+  const lines = [
+    "dler build preview",
+    "",
+    `Provider: ${options.provider}`,
+    `Targets: ${options.targets.length} planned, ${options.skippedTargets.length} skipped`,
+    "",
+    "Planned",
+    ...formatLabelRows(
+      options.targets.map((target) => {
+        const label = target.label ?? target.cwd;
+        const relativePath = formatRelativePath(options.root, target.cwd);
+
+        return {
+          detail: relativePath === label ? undefined : relativePath,
+          label,
+        };
+      }),
+    ),
+  ];
+
+  if (options.skippedTargets.length > 0) {
+    lines.push(
+      "",
+      "Skipped",
+      ...formatLabelRows(
+        options.skippedTargets.map((target) => ({
+          detail: normalizeSkippedReason(target.reason),
+          label: target.label,
+        })),
+      ),
+    );
+  }
+
+  if (options.showCommands) {
+    lines.push("", "Generated commands");
+
+    for (const [index, step] of options.commandDetails.entries()) {
+      lines.push(
+        `  ${index + 1}. ${step.label ?? step.cwd}`,
+        `     ${step.command.replaceAll(options.root, ".")}`,
+      );
+    }
+  }
+
+  lines.push(
+    "",
+    "No changes made. Pass --apply to run the planned builds.",
+    options.showCommands
+      ? "Use --json for the full machine-readable plan."
+      : "Use --show-commands or --json to inspect generated commands.",
+  );
+
+  return lines;
 }
 
 export default defineCommand({
@@ -34,9 +135,10 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse dler build",
-      "rse dler build --targets plugins/pm,plugins/dler,apps/rse --apply",
-      "rse dler build --targets plugins/dler --provider bun --apply --json",
+      "rse build",
+      "rse build --targets plugins/pm,plugins/dler,apps/rse --apply",
+      "rse build --targets plugins/dler --provider bun --apply --json",
+      "rse build --show-commands",
     ],
     text: "dler plans a generated build command for each eligible workspace target. Default mode previews the commands for the resolved target scope; pass --apply to execute them through the selected provider.",
   },
@@ -53,6 +155,11 @@ export default defineCommand({
       description:
         "Comma-separated workspace paths to build in order (defaults to cwd-derived scope when omitted)",
       hint: "Examples: plugins/pm,plugins/dler,apps/rse",
+      inputSources: ["flag"],
+    },
+    showCommands: {
+      type: "boolean",
+      description: "Show generated build commands in text preview output",
       inputSources: ["flag"],
     },
   },
@@ -147,7 +254,7 @@ export default defineCommand({
         steps: targets.map((target) => ({
           command: target.displayCommand ?? target.command.join(" "),
           cwd: target.cwd,
-          label: target.label,
+          label: target.label ?? target.cwd,
           packageCommand: plan.plannedTargets.find(
             (plannedTarget) => plannedTarget.label === target.label,
           )?.packageCommand.display,
@@ -161,15 +268,15 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`Provider: ${provider}`);
-      ctx.out(`Targets: ${targets.map((target) => target.label).join(", ")}`);
-
-      for (const message of formatSkippedMessages(skippedTargets)) {
-        ctx.err(message);
-      }
-
-      for (const step of preview.steps) {
-        ctx.out(`Preview: would run ${step.command} in ${step.label}`);
+      for (const line of formatBuildPreviewText({
+        commandDetails: preview.steps,
+        provider,
+        root: ctx.cwd,
+        skippedTargets,
+        showCommands: ctx.options.showCommands === true,
+        targets,
+      })) {
+        ctx.out(line);
       }
 
       return;

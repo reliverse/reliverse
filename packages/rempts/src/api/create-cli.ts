@@ -109,7 +109,7 @@ export interface CreateCLIOptions {
 }
 
 function writeHelp(stream: OutputStream, helpText: string): void {
-  stream.write(`${helpText}\n`);
+  stream.write(`\n${helpText}\n\n`);
 }
 
 function stripCLIExtension(cliName: string): string {

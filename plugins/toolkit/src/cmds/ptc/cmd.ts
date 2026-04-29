@@ -5,7 +5,7 @@ import { formatPtcSummary, runPtc } from "./impl/impl";
 export default defineCommand({
   meta: {
     name: "ptc",
-    description: "Pack project text files into one deterministic `.txt` context file.",
+    description: "Pack your project text files into one deterministic `.txt` context file.",
   },
   agent: {
     notes: "Use --apply when you need command to actually write the output file.",
@@ -27,7 +27,7 @@ export default defineCommand({
       "rse ptc . -o project-context.txt --ignore tmp,logs",
       "rse ptc . -o project-context.txt --max-size 500kb",
     ],
-    text: "Pack project text files into one deterministic `.txt` context file.",
+    text: "Pack your project text files into one deterministic `.txt` context file.",
   },
   options: {
     output: {

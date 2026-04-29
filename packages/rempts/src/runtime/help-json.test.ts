@@ -73,7 +73,7 @@ describe("help JSON contract", () => {
     expect(serialized.scope).toBe("command");
     expect(serialized.interactive).toBe("tui");
     expect(serialized.aliases).toEqual(["ship"]);
-    expect(serialized.usage).toEqual(["example-cli deploy [global-flags] [command-flags] [args]"]);
+    expect(serialized.usage).toEqual(["example-cli [global-flags] deploy [flags] [args]"]);
     expect(serialized.commandFlags).toHaveLength(1);
     expect(serialized.commandFlags[0]?.names).toContain("--target");
     expect(serialized.safety?.requiresApply).toBe(true);
@@ -94,7 +94,7 @@ describe("help JSON contract", () => {
 
     expect(serialized.scope).toBe("launcher");
     expect(serialized.scopeLabel).toBe("Subcommands");
-    expect(serialized.usage).toEqual(["example-cli dler <subcommand> [command-flags]"]);
+    expect(serialized.usage).toEqual(["example-cli [global-flags] dler <subcommand> [flags] [args]"]);
     expect(serialized.interactive).toBe("tty");
     expect(serialized.subcommands[0]).toEqual({
       description: "Publish artifacts",

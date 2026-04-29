@@ -1,6 +1,6 @@
 ---
-title: "ptc (pack text context)"
-description: "Pack project text files into one deterministic `.txt` context file."
+title: "How to Prepare Context for AI Agents"
+description: "Pack your project text files into one deterministic `.txt` context file."
 ---
 
 `ptc` is a command of the toolkit-rse-plugin. It allow you to pack your project's text files into one deterministic `.txt` context file.
@@ -46,19 +46,19 @@ rse ptc <input-path...> -o <output-file>
 Summary-only example:
 
 ```bash
-rse ptc ./src -o src-context.txt
+rse ptc ./README.md ./src -o src-context.txt
 ```
 
 Apply example:
 
 ```bash
-rse ptc ./src -o src-context.txt --apply
+rse ptc ./README.md ./src -o src-context.txt --apply
 ```
 
-Multiple input paths:
+Multiple input paths (`<path>` = `./<path>`):
 
 ```bash
-rse ptc ./apps/omp/gamemodes/systems/attachment ./apps/omp/gamemodes/systems/prop apps/omp/gamemodes/systems/action -o attachment-system-context.txt --ext pwn --apply
+rse ptc game/systems/admin ./game/systems/object ./game/systems/vehicle -o attachment-system-context.txt --ext pwn --apply
 ```
 
 More examples:
@@ -108,7 +108,7 @@ File inputs are processed as a single file.
 Overlapping inputs are deduplicated by absolute normalized path. For example:
 
 ```bash
-rse ptc ./src ./src/utils -o context.txt
+rse ptc ./README.md ./src ./src/utils -o context.txt
 ```
 
 Files from `./src/utils` will not be included twice. The summary will show a warning/recommendation about overlapping inputs.
@@ -124,7 +124,7 @@ Actually writes the output file.
 Without `--apply`, the script only prints a summary.
 
 ```bash
-rse ptc ./src -o src-context.txt --apply
+rse ptc ./README.md ./src -o src-context.txt --apply
 ```
 
 ### `-o`, `--output`
@@ -132,15 +132,15 @@ rse ptc ./src -o src-context.txt --apply
 Sets the output file path.
 
 ```bash
-rse ptc ./src -o src-context.txt
-rse ptc ./src --output src-context.txt
-rse ptc ./src --output=src-context.txt
+rse ptc ./README.md ./src -o src-context.txt
+rse ptc ./README.md ./src --output src-context.txt
+rse ptc ./README.md ./src --output=src-context.txt
 ```
 
 If the output value starts with `-`, use inline form:
 
 ```bash
-rse ptc ./src --output=-context.txt
+rse ptc ./README.md ./src --output=-context.txt
 ```
 
 ### `--ext`
@@ -516,7 +516,7 @@ rse ptc . -o project-context.txt --apply
 Source-only context:
 
 ```bash
-rse ptc ./src -o src-context.txt --apply
+rse ptc ./README.md ./src -o src-context.txt --apply
 ```
 
 TypeScript + Markdown context:

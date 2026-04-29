@@ -82,12 +82,12 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse pm add zod --cwd .",
-      "rse pm add typescript @types/bun --dev --cwd .",
-      "rse pm add react --target apps/web",
-      "rse pm add zod --target packages/rempts --json",
-      "rse pm add valibot --target packages/rempts --apply --json",
-      "rse pm add jest --target apps/web --catalog testing --apply --json",
+      "rse add zod --cwd .",
+      "rse add typescript @types/bun --dev --cwd .",
+      "rse add react --target apps/web",
+      "rse add zod --target packages/rempts --json",
+      "rse add valibot --target packages/rempts --apply --json",
+      "rse add jest --target apps/web --catalog testing --apply --json",
     ],
     text: "For workspace packages, the command prefers the default Bun catalog when available. Use --catalog <name> to target a named Bun catalog and write catalog:<name> references.",
   },
@@ -133,7 +133,7 @@ export default defineCommand({
     const packageInputs: PackageInput[] = (ctx.args as string[]).map(parsePackageInput);
 
     if (packageInputs.length === 0) {
-      ctx.exit(1, "Missing package names. Example: rse pm add zod --target packages/rempts");
+      ctx.exit(1, "Missing package names. Example: rse add zod --target packages/rempts");
     }
 
     const dependencySection = getRequestedSection({
@@ -241,7 +241,7 @@ export default defineCommand({
           action: "noop",
           packageName: input.name,
           previousSpecifier: existing.specifier,
-          reason: "already present; use `rse pm update` to change versions",
+          reason: "already present; use `rse update` to change versions",
           section: dependencySection,
           usesCatalog: existing.specifier.startsWith("catalog:"),
         });

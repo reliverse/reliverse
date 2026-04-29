@@ -66,9 +66,9 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse dler pub --targets packages/foo",
-      "rse dler pub --targets packages/foo --no-prebuild --publish-from dist",
-      "rse dler pub --targets packages/foo --publish-from dist --tag next --apply",
+      "rse pub --targets packages/foo",
+      "rse pub --targets packages/foo --no-prebuild --publish-from dist",
+      "rse pub --targets packages/foo --publish-from dist --tag next --apply",
     ],
     text: "Targets come from --targets or from cwd scope when omitted. With default prebuild, dler runs the generated build flow first and then stages package.json plus the chosen artifact directory before npm publish. With --no-prebuild, the caller is responsible for ensuring artifacts already exist.",
   },

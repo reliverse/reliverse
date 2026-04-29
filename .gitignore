@@ -35,6 +35,7 @@ Thumbs.db
 .turbo/
 
 # Temporary
+*-context.**
 temp
 *~
 

@@ -107,8 +107,10 @@ export function buildLauncherHelpDocument(options: {
 }): HelpDocument {
   const usage =
     options.commandPath.length > 0
-      ? [`${options.programName} ${options.commandPath.join(" ")} <subcommand> [command-flags]`]
-      : [`${options.programName} [global-flags] <command> [command-flags]`];
+      ? [
+          `${options.programName} [global-flags] ${options.commandPath.join(" ")} <subcommand> [flags] [args]`,
+        ]
+      : [`${options.programName} [global-flags] <command> [flags] [args]`];
 
   return {
     aliases: [],
@@ -138,8 +140,8 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
 }): HelpDocument {
   const invocationPath =
     options.commandPath.length > 0
-      ? `${options.programName} ${options.commandPath.join(" ")}`
-      : options.programName;
+      ? `${options.programName} [global-flags] ${options.commandPath.join(" ")}`
+      : `${options.programName} [global-flags]`;
 
   return {
     aliases: options.command.meta?.aliases ?? [],
@@ -167,6 +169,6 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
     scope: "command",
     scopeLabel: "Subcommands",
     subcommands: toSubcommandItems(options.availableSubcommands),
-    usage: [`${invocationPath} [global-flags] [command-flags] [args]`],
+    usage: [`${invocationPath} [flags] [args]`],
   };
 }

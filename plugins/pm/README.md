@@ -8,8 +8,8 @@ This plugin contributes Bun-first package management commands to Reliverse CLI w
 
 Current command families include:
 
-- `rse pm add`
-- `rse pm update`
+- `rse add`
+- `rse update`
 
 ## Behavior highlights
 

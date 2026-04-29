@@ -182,6 +182,77 @@ describe("dler build command", () => {
     });
   });
 
+  test("text preview renders concise human summary and hides generated commands by default", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-"));
+    await mkdir(join(root, "plugins", "ok", "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "plugins", "ok", "package.json"),
+      JSON.stringify({ name: "ok" }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "plugins", "ok", "src", "index.ts"),
+      "export const ok = 1;\n",
+      "utf8",
+    );
+
+    const { ctx, textLines } = createTextCtx(root, {
+      provider: "bun",
+      targets: "plugins/ok,plugins/missing",
+    });
+
+    await command.handler(ctx as never);
+
+    const text = textLines.join("\n");
+    expect(text).toContain("dler build preview");
+    expect(text).toContain("Targets: 1 planned, 1 skipped");
+    expect(text).toContain("Planned\n  plugins/ok");
+    expect(text).toContain("Skipped\n  plugins/missing");
+    expect(text).toContain("No changes made. Pass --apply to run the planned builds.");
+    expect(text).toContain("Use --show-commands or --json to inspect generated commands.");
+    expect(text).not.toContain("internal-runner.ts");
+  });
+
+  test("text preview can show generated commands on request", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-"));
+    await mkdir(join(root, "plugins", "ok", "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "plugins", "ok", "package.json"),
+      JSON.stringify({ name: "ok" }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "plugins", "ok", "src", "index.ts"),
+      "export const ok = 1;\n",
+      "utf8",
+    );
+
+    const { ctx, textLines } = createTextCtx(root, {
+      provider: "bun",
+      showCommands: true,
+      targets: "plugins/ok",
+    });
+
+    await command.handler(ctx as never);
+
+    const text = textLines.join("\n");
+    expect(text).toContain("Generated commands");
+    expect(text).toContain("1. plugins/ok");
+    expect(text).toContain("internal-runner.ts");
+    expect(text).toContain("--cwd ./plugins/ok");
+    expect(text).toContain("Use --json for the full machine-readable plan.");
+  });
+
   test("fails early on unknown provider with a clear message", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     const { ctx } = createJsonCtx(root, {

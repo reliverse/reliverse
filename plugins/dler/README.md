@@ -8,8 +8,8 @@ This plugin contributes file-based `dler` command trees to the Reliverse develop
 
 Typical command families include build and publishing flows such as:
 
-- `rse dler build`
-- `rse dler pub`
+- `rse build`
+- `rse pub`
 
 Current command policy:
 
