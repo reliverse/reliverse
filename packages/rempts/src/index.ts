@@ -1,8 +1,4 @@
-export {
-  createCLI,
-  type CLIExecutionResult,
-  type CreateCLIOptions,
-} from "./api/create-cli";
+export { createCLI, type CLIExecutionResult, type CreateCLIOptions } from "./api/create-cli";
 export {
   findHostPluginPackageRoot,
   inspectPluginsFromHostManifest,
@@ -15,11 +11,7 @@ export {
   type InspectPluginsFromHostManifestResult,
   type ResolveHostPluginsResult,
 } from "./runtime/host-plugins";
-export {
-  REMPTS_PLUGIN_API_VERSION,
-  definePlugin,
-  type RemptsPlugin,
-} from "./api/define-plugin";
+export { REMPTS_PLUGIN_API_VERSION, definePlugin, type RemptsPlugin } from "./api/define-plugin";
 export {
   inspectCommandTree,
   type CommandCandidate,
@@ -48,6 +40,9 @@ export {
   type CommandContext,
   type CommandConventions,
   type CommandDefinition,
+  type CommandEffect,
+  type CommandSafety,
+  type CommandSafetyAPI,
   type CommandInputAPI,
   type CommandPromptAPI,
   type CommandRuntimeInfo,
@@ -84,4 +79,8 @@ export type {
   StructuredRemptsResult,
 } from "./runtime/types";
 export type { InteractionPolicy } from "./runtime/noninteractive";
-export type { StandardJSONSchemaV1, StandardSchemaV1, StandardTypedV1 } from "./types/standard-schema";
+export type {
+  StandardJSONSchemaV1,
+  StandardSchemaV1,
+  StandardTypedV1,
+} from "./types/standard-schema";

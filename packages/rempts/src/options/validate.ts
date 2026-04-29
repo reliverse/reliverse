@@ -1,21 +1,19 @@
+import { RemptsValidationError } from "../runtime/errors";
+import type { StandardSchemaV1 } from "../types/standard-schema";
+import { toFlagName } from "./flag-name";
 import type {
   CommandOptionDefinition,
   CommandOptionsOutput,
   CommandOptionsRecord,
   NormalizedOptionIssue,
 } from "./types";
-import { toFlagName } from "./flag-name";
-import type { StandardSchemaV1 } from "../types/standard-schema";
-import { RemptsValidationError } from "../runtime/errors";
 
 interface RuntimeStandardSchema {
   readonly "~standard": {
     readonly validate: (
       value: unknown,
-      options?: StandardSchemaV1.Options | undefined,
-    ) =>
-      | StandardSchemaV1.Result<unknown>
-      | Promise<StandardSchemaV1.Result<unknown>>;
+      options?: StandardSchemaV1.Options,
+    ) => StandardSchemaV1.Result<unknown> | Promise<StandardSchemaV1.Result<unknown>>;
   };
 }
 
@@ -24,11 +22,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isPropertyKey(value: unknown): value is PropertyKey {
-  return (
-    typeof value === "string" ||
-    typeof value === "number" ||
-    typeof value === "symbol"
-  );
+  return typeof value === "string" || typeof value === "number" || typeof value === "symbol";
 }
 
 function isStandardSchema(value: unknown): value is RuntimeStandardSchema {
@@ -49,7 +43,9 @@ function isStandardSchema(value: unknown): value is RuntimeStandardSchema {
   );
 }
 
-function normalizeIssuePath(path: StandardSchemaV1.Issue["path"]): readonly PropertyKey[] | undefined {
+function normalizeIssuePath(
+  path: StandardSchemaV1.Issue["path"],
+): readonly PropertyKey[] | undefined {
   if (!path) {
     return undefined;
   }
@@ -77,6 +73,34 @@ function runSchemaValidation(
   return schema["~standard"].validate(value);
 }
 
+function validatePrimitiveOptionValue(
+  optionName: string,
+  definition: CommandOptionDefinition,
+  value: unknown,
+): NormalizedOptionIssue | null {
+  const flagName = `--${toFlagName(optionName)}`;
+
+  if (definition.type === "number") {
+    return typeof value === "number" && Number.isFinite(value)
+      ? null
+      : {
+          flagName,
+          message: `Option "${optionName}" expected a finite number value.`,
+          optionName,
+        };
+  }
+
+  if (typeof value === definition.type) {
+    return null;
+  }
+
+  return {
+    flagName,
+    message: `Option "${optionName}" expected a ${definition.type} value.`,
+    optionName,
+  };
+}
+
 async function validateSingleOption(
   optionName: string,
   definition: CommandOptionDefinition,
@@ -85,6 +109,15 @@ async function validateSingleOption(
   readonly issues: readonly NormalizedOptionIssue[];
   readonly value: unknown;
 }> {
+  const primitiveIssue = validatePrimitiveOptionValue(optionName, definition, value);
+
+  if (primitiveIssue) {
+    return {
+      issues: [primitiveIssue],
+      value,
+    };
+  }
+
   if (!definition.schema) {
     return {
       issues: [],

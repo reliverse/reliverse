@@ -74,7 +74,7 @@ function isFlagEnabled(key: GlobalFlagKey, config: GlobalFlagConfig | undefined)
 }
 
 export function getGlobalFlagDefinitions(
-  config?: GlobalFlagConfig | undefined,
+  config?: GlobalFlagConfig,
 ): readonly GlobalFlagDefinition[] {
   return (Object.keys(DEFAULT_GLOBAL_FLAGS) as GlobalFlagKey[])
     .map((key) => ({
@@ -86,7 +86,7 @@ export function getGlobalFlagDefinitions(
 
 export function parseGlobalFlags(
   argv: readonly string[],
-  config?: GlobalFlagConfig | undefined,
+  config?: GlobalFlagConfig,
 ): ParsedGlobalFlagsResult {
   const enabledDefinitions = getGlobalFlagDefinitions(config);
   const byLongName = new Map<string, GlobalFlagDefinition>();
@@ -171,9 +171,13 @@ export function assertNoReservedOptionCollisions(
     return;
   }
 
-  const reservedLongNames = new Set(getReservedOptionLongNames());
+  const enabledGlobalFlags = getGlobalFlagDefinitions(options?.config);
+  const reservedLongNames = new Set([
+    ...enabledGlobalFlags.map((definition) => definition.longName),
+    ...RESERVED_RUNTIME_OPTION_LONG_NAMES,
+  ]);
   const reservedShortNames = new Map(
-    Object.values(DEFAULT_GLOBAL_FLAGS).flatMap((definition) =>
+    enabledGlobalFlags.flatMap((definition) =>
       definition.shortName ? [[definition.shortName, definition.longName] as const] : [],
     ),
   );

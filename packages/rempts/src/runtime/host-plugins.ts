@@ -14,7 +14,9 @@ function isRemptsPlugin(value: unknown): value is RemptsPlugin {
   }
 
   const record = value as Record<string, unknown>;
-  return record.apiVersion === 1 && typeof record.name === "string" && typeof record.entry === "string";
+  return (
+    record.apiVersion === 1 && typeof record.name === "string" && typeof record.entry === "string"
+  );
 }
 
 export interface HostPluginLoadIssue {
@@ -34,34 +36,34 @@ export interface InspectPluginsFromHostManifestResult {
   readonly rejected: readonly HostPluginLoadIssue[];
 }
 
+function readDependencyNames(block: unknown): readonly string[] {
+  if (!block || typeof block !== "object") {
+    return [];
+  }
+
+  return Object.keys(block as Record<string, unknown>).filter((key) => key.length > 0);
+}
+
 function readDependencyCandidateListFromManifest(manifest: unknown): readonly string[] {
   if (!manifest || typeof manifest !== "object") {
     return [];
   }
 
   const root = manifest as Record<string, unknown>;
-  const dependencies = root.dependencies;
-  const devDependencies = root.devDependencies;
+  const names = new Set<string>();
 
-  const names: string[] = [];
-
-  if (dependencies && typeof dependencies === "object") {
-    for (const key of Object.keys(dependencies as Record<string, unknown>)) {
-      if (typeof key === "string" && key.length > 0) {
-        names.push(key);
-      }
+  for (const block of [
+    root.dependencies,
+    root.devDependencies,
+    root.optionalDependencies,
+    root.peerDependencies,
+  ]) {
+    for (const name of readDependencyNames(block)) {
+      names.add(name);
     }
   }
 
-  if (devDependencies && typeof devDependencies === "object") {
-    for (const key of Object.keys(devDependencies as Record<string, unknown>)) {
-      if (typeof key === "string" && key.length > 0 && !names.includes(key)) {
-        names.push(key);
-      }
-    }
-  }
-
-  return names;
+  return [...names];
 }
 
 export function parseHostPluginSpecifier(entry: string): {
@@ -157,7 +159,13 @@ function manifestDeclaresRemptsDependency(manifest: unknown): boolean {
   }
 
   const root = manifest as Record<string, unknown>;
-  const depBlocks = [root.dependencies, root.peerDependencies, root.devDependencies];
+  const depBlocks = [
+    root.dependencies,
+    root.peerDependencies,
+    root.devDependencies,
+    root.optionalDependencies,
+  ];
+
   return depBlocks.some((block) => {
     if (!block || typeof block !== "object") {
       return false;
@@ -250,43 +258,40 @@ export async function inspectPluginsFromHostManifest(
     specifiers,
     async (entry) => {
       const { exportName, packageName } = parseHostPluginSpecifier(entry);
-      let resolved: string;
+
+      if (packageName.length === 0) {
+        return {
+          ok: false as const,
+          packageName,
+          reason: "Empty Rempts plugin package specifier.",
+          specifier: entry,
+        };
+      }
 
       try {
-        resolved = hostRequire.resolve(
+        const resolved = hostRequire.resolve(
           packageName,
           options?.resolvePaths ? { paths: [...options.resolvePaths] } : undefined,
         );
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Cannot resolve Rempts plugin package "${packageName}": ${message}`);
-      }
 
-      const pluginPackageJsonPath = await findNearestPackageJsonPath(resolved);
-      if (!pluginPackageJsonPath) {
-        throw new Error(
-          `Rempts plugin package "${packageName}" is missing a package.json near "${resolved}".`,
-        );
-      }
+        const pluginPackageJsonPath = await findNearestPackageJsonPath(resolved);
+        if (!pluginPackageJsonPath) {
+          throw new Error(
+            `Rempts plugin package "${packageName}" is missing a package.json near "${resolved}".`,
+          );
+        }
 
-      try {
         const pluginManifestRaw = await readFile(pluginPackageJsonPath, "utf8");
         const pluginManifest = JSON.parse(pluginManifestRaw) as unknown;
         if (!manifestDeclaresRemptsDependency(pluginManifest)) {
           throw new Error(
-            `Rempts plugin package "${packageName}" must declare "@reliverse/rempts" in its package.json (dependencies/peerDependencies/devDependencies).`,
+            `Rempts plugin package "${packageName}" must declare "@reliverse/rempts" in its package.json (dependencies/peerDependencies/devDependencies/optionalDependencies).`,
           );
         }
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        throw new Error(
-          `Failed to validate Rempts plugin package "${packageName}" manifest: ${message}`,
-        );
-      }
 
-      try {
         const mod = (await import(pathToFileURL(resolved).href)) as Record<string, unknown>;
         const plugin = pickPluginExport(mod, exportName);
+
         return {
           ok: true as const,
           packageName,
@@ -319,7 +324,9 @@ export interface ResolveHostPluginsResult {
   readonly pluginSpecifiers: readonly string[];
 }
 
-export async function resolveHostPluginsFromDirectory(cwd: string): Promise<ResolveHostPluginsResult> {
+export async function resolveHostPluginsFromDirectory(
+  cwd: string,
+): Promise<ResolveHostPluginsResult> {
   const hostRoot = await findHostPluginPackageRoot(cwd);
 
   if (!hostRoot) {

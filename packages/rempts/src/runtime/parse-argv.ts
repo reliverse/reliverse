@@ -1,9 +1,10 @@
+import { toFlagName } from "../options/flag-name";
 import type {
   CommandOptionDefinition,
   CommandOptionsOutput,
   CommandOptionsRecord,
+  OptionInputSource,
 } from "../options/types";
-import { toFlagName } from "../options/flag-name";
 import { validateParsedOptions } from "../options/validate";
 import { RemptsUsageError } from "./errors";
 
@@ -12,31 +13,144 @@ export interface ParseArgvResult<TOptions extends CommandOptionsRecord> {
   readonly options: CommandOptionsOutput<TOptions>;
 }
 
-function isBooleanString(value: string): boolean {
-  return value === "true" || value === "false";
+function isInputSourceEnabled(
+  definition: CommandOptionDefinition,
+  source: OptionInputSource,
+): boolean {
+  return !definition.inputSources || definition.inputSources.includes(source);
 }
 
-function toBoolean(value: string): boolean {
-  if (!isBooleanString(value)) {
-    throw new RemptsUsageError(`Expected a boolean value, received "${value}".`);
+function assertInputSourceEnabled(
+  definition: CommandOptionDefinition,
+  source: OptionInputSource,
+  label: string,
+): void {
+  if (isInputSourceEnabled(definition, source)) {
+    return;
   }
 
-  return value === "true";
+  throw new RemptsUsageError(`Option "${label}" does not accept ${source} input.`);
 }
 
-function toNumber(value: string): number {
+function isBooleanString(value: string): boolean {
+  const normalized = value.toLowerCase();
+  return ["true", "false", "1", "0", "yes", "no", "on", "off"].includes(normalized);
+}
+
+function toBoolean(value: string, label: string): boolean {
+  const normalized = value.toLowerCase();
+
+  if (!isBooleanString(normalized)) {
+    throw new RemptsUsageError(`Expected a boolean value for "${label}", received "${value}".`);
+  }
+
+  return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
+}
+
+function toNumber(value: string, label: string): number {
+  if (value.trim().length === 0) {
+    throw new RemptsUsageError(`Expected a number value for "${label}", received an empty value.`);
+  }
+
   const parsed = Number(value);
 
-  if (Number.isNaN(parsed)) {
-    throw new RemptsUsageError(`Expected a number value, received "${value}".`);
+  if (!Number.isFinite(parsed)) {
+    throw new RemptsUsageError(
+      `Expected a finite number value for "${label}", received "${value}".`,
+    );
   }
 
   return parsed;
 }
 
+function coerceOptionValue(
+  label: string,
+  definition: CommandOptionDefinition,
+  rawValue: string,
+): unknown {
+  if (definition.type === "boolean") {
+    return toBoolean(rawValue, label);
+  }
+
+  if (definition.type === "number") {
+    return toNumber(rawValue, label);
+  }
+
+  return rawValue;
+}
+
+function setLongOption(
+  longOptions: Map<string, readonly [string, CommandOptionDefinition]>,
+  flagName: string,
+  optionName: string,
+  definition: CommandOptionDefinition,
+): void {
+  const existing = longOptions.get(flagName);
+
+  if (existing && existing[0] !== optionName) {
+    throw new RemptsUsageError(
+      `Option flag "--${flagName}" is ambiguous between "${existing[0]}" and "${optionName}".`,
+    );
+  }
+
+  longOptions.set(flagName, [optionName, definition]);
+}
+
+function setShortOption(
+  shortOptions: Map<string, readonly [string, CommandOptionDefinition]>,
+  shortName: string,
+  optionName: string,
+  definition: CommandOptionDefinition,
+): void {
+  if (shortName.length !== 1 || shortName === "-") {
+    throw new RemptsUsageError(
+      `Option "${optionName}" has invalid short flag "${shortName}". Short flags must be one character.`,
+    );
+  }
+
+  const existing = shortOptions.get(shortName);
+
+  if (existing && existing[0] !== optionName) {
+    throw new RemptsUsageError(
+      `Option short flag "-${shortName}" is ambiguous between "${existing[0]}" and "${optionName}".`,
+    );
+  }
+
+  shortOptions.set(shortName, [optionName, definition]);
+}
+
+function addEnvOptionValues(
+  rawOptionValues: Map<string, unknown>,
+  optionDefinitions: CommandOptionsRecord | undefined,
+  env: NodeJS.ProcessEnv | undefined,
+): void {
+  if (!optionDefinitions || !env) {
+    return;
+  }
+
+  for (const [optionName, definition] of Object.entries(optionDefinitions)) {
+    if (rawOptionValues.has(optionName) || !definition.env) {
+      continue;
+    }
+
+    if (!isInputSourceEnabled(definition, "env")) {
+      continue;
+    }
+
+    const envValue = env[definition.env];
+
+    if (envValue === undefined) {
+      continue;
+    }
+
+    rawOptionValues.set(optionName, coerceOptionValue(`$${definition.env}`, definition, envValue));
+  }
+}
+
 export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
   argv: readonly string[],
   optionDefinitions: TOptions | undefined,
+  env?: NodeJS.ProcessEnv,
 ): Promise<ParseArgvResult<TOptions>> {
   const args: string[] = [];
   const rawOptionValues = new Map<string, unknown>();
@@ -47,15 +161,12 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
 
   if (optionDefinitions) {
     for (const [optionName, definition] of Object.entries(optionDefinitions)) {
-      longOptions.set(optionName, [optionName, definition]);
       const flagName = toFlagName(optionName);
-
-      if (!longOptions.has(flagName)) {
-        longOptions.set(flagName, [optionName, definition]);
-      }
+      setLongOption(longOptions, optionName, optionName, definition);
+      setLongOption(longOptions, flagName, optionName, definition);
 
       if (definition.short) {
-        shortOptions.set(definition.short, [optionName, definition]);
+        setShortOption(shortOptions, definition.short, optionName, definition);
       }
     }
   }
@@ -96,20 +207,26 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
       const optionEntry = longOptions.get(normalizedKey);
 
       if (!optionEntry) {
-        throw new RemptsUsageError(`Unknown option "--${normalizedKey}".`);
+        throw new RemptsUsageError(`Unknown option "--${key}".`);
       }
 
       const [optionName, definition] = optionEntry;
+      const flagLabel = `--${key}`;
+      assertInputSourceEnabled(definition, "flag", flagLabel);
 
       if (definition.type === "boolean") {
         if (negated) {
+          if (explicitValue !== undefined) {
+            throw new RemptsUsageError(`Option "${flagLabel}" does not accept a value.`);
+          }
+
           rawOptionValues.set(optionName, false);
           cursor += 1;
           continue;
         }
 
         if (explicitValue !== undefined) {
-          rawOptionValues.set(optionName, toBoolean(explicitValue));
+          rawOptionValues.set(optionName, toBoolean(explicitValue, flagLabel));
           cursor += 1;
           continue;
         }
@@ -127,13 +244,10 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
       const rawValue = explicitValue ?? nextToken;
 
       if (rawValue === undefined) {
-        throw new RemptsUsageError(`Option "--${normalizedKey}" expects a value.`);
+        throw new RemptsUsageError(`Option "${flagLabel}" expects a value.`);
       }
 
-      rawOptionValues.set(
-        optionName,
-        definition.type === "number" ? toNumber(rawValue) : rawValue,
-      );
+      rawOptionValues.set(optionName, coerceOptionValue(flagLabel, definition, rawValue));
       cursor += explicitValue === undefined ? 2 : 1;
       continue;
     }
@@ -146,6 +260,8 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
     }
 
     const [optionName, definition] = optionEntry;
+    const flagLabel = `-${shortKey}`;
+    assertInputSourceEnabled(definition, "flag", flagLabel);
 
     if (definition.type === "boolean") {
       rawOptionValues.set(optionName, true);
@@ -156,12 +272,14 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
     const nextToken = argv[cursor + 1];
 
     if (nextToken === undefined) {
-      throw new RemptsUsageError(`Option "-${shortKey}" expects a value.`);
+      throw new RemptsUsageError(`Option "${flagLabel}" expects a value.`);
     }
 
-    rawOptionValues.set(optionName, definition.type === "number" ? toNumber(nextToken) : nextToken);
+    rawOptionValues.set(optionName, coerceOptionValue(flagLabel, definition, nextToken));
     cursor += 2;
   }
+
+  addEnvOptionValues(rawOptionValues, optionDefinitions, env);
 
   return {
     args,

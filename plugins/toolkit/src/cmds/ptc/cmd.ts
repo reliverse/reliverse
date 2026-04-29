@@ -5,10 +5,12 @@ import { formatPtcSummary, runPtc } from "./impl/impl";
 export default defineCommand({
   meta: {
     name: "ptc",
-    description: "Pack your project text files into one deterministic `.txt` context file.",
+    description:
+      "Pack project text files into one `.txt` context file, or unpack a packed context back into files.",
   },
   agent: {
-    notes: "Use --apply when you need command to actually write the output file.",
+    notes:
+      "Use --apply when you need this command to write files. Use --overwrite when replacing an existing packed output file or unpacked target files.",
   },
   conventions: {
     idempotent: true,
@@ -23,19 +25,21 @@ export default defineCommand({
     examples: [
       "rse ptc . -o project-context.txt",
       "rse ptc . -o project-context.txt --apply",
+      "rse ptc . -o project-context.txt --overwrite --apply",
+      "rse ptc rempts-context.patched.txt --unpack --overwrite --apply",
+      "rse ptc rempts-context.patched.txt --unpack -o /home/blefnk/dev/reliverse/reliverse --overwrite --apply",
       "rse ptc . -o project-context.txt --ext ts,tsx,json,md",
       "rse ptc . -o project-context.txt --ignore tmp,logs",
       "rse ptc . -o project-context.txt --max-size 500kb",
     ],
-    text: "Pack your project text files into one deterministic `.txt` context file.",
+    text: "Pack your project text files into one deterministic `.txt` context file, or unpack a packed context file back into the original project tree recorded in its metadata.",
   },
   options: {
     output: {
       type: "string",
       short: "o",
-      defaultValue: "packed-context.txt",
-      description: "Output file path",
-      inputSources: ["flag", "default"],
+      description: "Output file path for packing, or original packed project root for unpacking",
+      inputSources: ["flag"],
     },
     ext: {
       type: "string",
@@ -63,6 +67,17 @@ export default defineCommand({
       description: "Include hidden paths inside walked directories",
       inputSources: ["flag"],
     },
+    unpack: {
+      type: "boolean",
+      description:
+        "Unpack a packed context file back into the original project tree from its metadata",
+      inputSources: ["flag"],
+    },
+    overwrite: {
+      type: "boolean",
+      description: "Allow replacing an existing packed output file or unpacked target files",
+      inputSources: ["flag"],
+    },
   },
   async handler(ctx) {
     try {
@@ -79,6 +94,8 @@ export default defineCommand({
         ignore: ctx.options.ignore,
         maxSize: ctx.options.maxSize,
         includeHidden: ctx.options.includeHidden === true,
+        unpack: ctx.options.unpack === true,
+        overwrite: ctx.options.overwrite === true,
       });
 
       ctx.out(formatPtcSummary(run));

@@ -176,7 +176,7 @@ function assertNoPluginNameCollisions(plugins: readonly RemptsPlugin[]): void {
     if (seen.has(plugin.name)) {
       throw new RemptsUsageError(
         [
-          `Duplicate plugin name \"${plugin.name}\" detected.`,
+          `Duplicate plugin name "${plugin.name}" detected.`,
           "",
           "Each plugin must have a unique internal `name`.",
           "Fix: rename one plugin's `definePlugin({ name })` value.",
@@ -457,11 +457,18 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       resolvedCommandNode.sourceKind === "plugin"
         ? effectivePlugins.find((plugin) => plugin.name === resolvedCommandNode.sourceId)
         : undefined;
-    assertNoReservedOptionCollisions(options.options, { owner: "CLI inherited" });
+    assertNoReservedOptionCollisions(options.options, {
+      config: options.globalFlags,
+      owner: "CLI inherited",
+    });
     assertNoReservedOptionCollisions(owningPlugin?.options, {
+      config: options.globalFlags,
       owner: owningPlugin ? `Plugin "${owningPlugin.name}"` : "Plugin",
     });
-    assertNoReservedOptionCollisions(command.options, { owner: "Command" });
+    assertNoReservedOptionCollisions(command.options, {
+      config: options.globalFlags,
+      owner: "Command",
+    });
 
     const mergedCommandOptions = mergeInheritedOptions(
       options.options,
@@ -507,7 +514,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     let parsed: ParseArgvResult<CommandOptionsRecord>;
 
     try {
-      parsed = await parseArgvTail(discovered.remainingArgv, effectiveCommand.options);
+      parsed = await parseArgvTail(discovered.remainingArgv, effectiveCommand.options, env);
     } catch (error) {
       if (error instanceof RemptsUsageError || error instanceof RemptsValidationError) {
         output.problem({

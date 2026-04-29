@@ -5,6 +5,8 @@ export type PtcOptions = {
   inputPaths: string[];
   outputPath?: string | undefined;
   apply?: boolean | undefined;
+  unpack?: boolean | undefined;
+  overwrite?: boolean | undefined;
   ext?: string | string[] | undefined;
   extMerge?: string | string[] | undefined;
   ignore?: string | string[] | undefined;
@@ -14,8 +16,10 @@ export type PtcOptions = {
 
 type CliConfig = {
   inputPaths: string[];
-  outputPath: string;
+  outputPath: string | undefined;
   apply: boolean;
+  unpack: boolean;
+  overwrite: boolean;
   allowedExts: ReadonlySet<string>;
   allowedTextFileNames: ReadonlySet<string>;
   ignoredNames: ReadonlySet<string>;
@@ -24,12 +28,22 @@ type CliConfig = {
   extMode: ExtMode;
 };
 
-export type PtcRunResult = {
+type PtcPackRunResult = {
+  mode: "pack";
   config: CliConfig;
   result: CollectResult;
   outputInfo: OutputInfo;
   bytesWritten?: number | undefined;
 };
+
+type PtcUnpackRunResult = {
+  mode: "unpack";
+  config: CliConfig;
+  unpack: UnpackResult;
+  bytesWritten?: number | undefined;
+};
+
+export type PtcRunResult = PtcPackRunResult | PtcUnpackRunResult;
 
 type ExtMode = "default" | "exact" | "merge";
 
@@ -90,6 +104,47 @@ type OutputInfo = {
   isFile: boolean;
 };
 
+type PackedInputRoot = {
+  index: number;
+  label: string;
+  resolvedPath: string;
+  relativeRoot: string;
+};
+
+type UnpackFile = {
+  packedPath: string;
+  relativeTargetPath: string;
+  targetAbsPath: string;
+  inputLabel: string;
+  expectedSizeBytes: number;
+  contentBytes: number;
+  content: string;
+  exists: boolean;
+  action: "write" | "overwrite";
+  skippedReason: string | null;
+};
+
+type UnpackResult = {
+  inputAbsPath: string;
+  packedProjectRoot: string;
+  baseAbsPath: string;
+  baseProvidedBy: "cwd" | "output";
+  inputRoots: PackedInputRoot[];
+  files: UnpackFile[];
+  warnings: string[];
+  recommendations: string[];
+};
+
+type PackedBlockHeader = {
+  index: number;
+  contentStart: number;
+  filePath: string;
+  inputLabel: string;
+  sizeBytes: number;
+};
+
+class PackedPathError extends Error {}
+
 type OutputWriter = {
   write: (chunk: string) => Promise<void>;
   end: () => Promise<void>;
@@ -105,6 +160,8 @@ type SizeUnit = "b" | "kb" | "kib" | "mb" | "mib" | "gb" | "gib";
 const DEFAULT_OUTPUT_FILE = "packed-context.txt";
 const DEFAULT_MAX_SIZE_BYTES = 1024 * 1024;
 const BINARY_SAMPLE_BYTES = 8192;
+const PACKED_BLOCK_SEPARATOR =
+  "================================================================================";
 
 const SIZE_MULTIPLIERS: Record<SizeUnit, number> = {
   b: 1,
@@ -202,17 +259,32 @@ const DEFAULT_TEXT_FILE_NAMES = new Set([
 
 export async function runPtc(options: PtcOptions): Promise<PtcRunResult> {
   const config = createPtcConfig(options);
+
+  if (config.unpack) {
+    return runPtcUnpack(config);
+  }
+
+  return runPtcPack(config);
+}
+
+async function runPtcPack(config: CliConfig): Promise<PtcPackRunResult> {
   const result = await collectFiles(config);
   const outputInfo = await inspectOutputPath(result);
 
   addOutputWarnings(config, result, outputInfo);
 
   if (!config.apply) {
-    return { config, result, outputInfo };
+    return { mode: "pack", config, result, outputInfo };
   }
 
   if (hasFailedInputs(result)) {
     throw new Error("Apply aborted because one or more input paths failed.");
+  }
+
+  if (outputInfo.exists && !config.overwrite) {
+    throw new Error(
+      `Output file already exists: ${result.outputAbsPath}. Pass --overwrite to replace it.`,
+    );
   }
 
   await prepareOutputFile(result.outputAbsPath);
@@ -235,21 +307,78 @@ export async function runPtc(options: PtcOptions): Promise<PtcRunResult> {
     }
   }
 
-  return { config, result, outputInfo, bytesWritten: writer.bytesWritten() };
+  return {
+    mode: "pack",
+    config,
+    result,
+    outputInfo,
+    bytesWritten: writer.bytesWritten(),
+  };
+}
+
+async function runPtcUnpack(config: CliConfig): Promise<PtcUnpackRunResult> {
+  const inputAbsPath = resolveUserPath(config.inputPaths[0] ?? "");
+  const inputStats = await lstat(inputAbsPath).catch((error: unknown) => {
+    if (isNodeError(error) && error.code === "ENOENT") {
+      throw new Error(`Packed context file does not exist: ${inputAbsPath}`);
+    }
+
+    throw error;
+  });
+
+  if (!inputStats.isFile()) {
+    throw new Error(`Packed context input must be a file: ${inputAbsPath}`);
+  }
+
+  const packedText = await readTextFile(inputAbsPath);
+  const unpack = await createUnpackPlan({
+    configuredBasePath: config.outputPath,
+    inputAbsPath,
+    overwrite: config.overwrite,
+    packedText,
+  });
+
+  if (!config.apply) {
+    return { mode: "unpack", config, unpack };
+  }
+
+  let bytesWritten = 0;
+
+  for (const file of unpack.files) {
+    if (file.skippedReason) {
+      continue;
+    }
+
+    await mkdir(path.dirname(file.targetAbsPath), { recursive: true });
+    await Bun.write(file.targetAbsPath, file.content);
+    bytesWritten += file.contentBytes;
+  }
+
+  return { mode: "unpack", config, unpack, bytesWritten };
 }
 
 function createPtcConfig(options: PtcOptions): CliConfig {
   const inputPaths = options.inputPaths.map((inputPath) => inputPath.trim()).filter(Boolean);
-  const outputPath = options.outputPath?.trim() || DEFAULT_OUTPUT_FILE;
+  const unpack = options.unpack === true;
+  const outputPath = options.outputPath?.trim() || (unpack ? undefined : DEFAULT_OUTPUT_FILE);
   const extFilter = normalizeCsvInput(options.ext);
   const extMergeFilter = normalizeCsvInput(options.extMerge);
   const maxSizeBytes = normalizeMaxSize(options.maxSize);
   const includeHidden = options.includeHidden === true;
   const apply = options.apply === true;
+  const overwrite = options.overwrite === true;
   const extraIgnoredNames = new Set(normalizeCsvInput(options.ignore));
 
   if (inputPaths.length === 0) {
-    throw new Error("At least one input path is required. Example: rse ptc . -o packed-context.txt");
+    throw new Error(
+      "At least one input path is required. Example: rse ptc . -o packed-context.txt",
+    );
+  }
+
+  if (unpack && inputPaths.length !== 1) {
+    throw new Error(
+      "Unpack mode expects exactly one packed context file. Example: rse ptc rempts-context.txt --unpack --apply",
+    );
   }
 
   if (extFilter && extMergeFilter) {
@@ -262,9 +391,13 @@ function createPtcConfig(options: PtcOptions): CliConfig {
     inputPaths,
     outputPath,
     apply,
+    unpack,
+    overwrite,
     allowedExts: textRules.allowedExts,
     allowedTextFileNames: textRules.allowedTextFileNames,
-    ignoredNames: new Set([...DEFAULT_IGNORED_NAMES, ...extraIgnoredNames].map((name) => name.trim()).filter(Boolean)),
+    ignoredNames: new Set(
+      [...DEFAULT_IGNORED_NAMES, ...extraIgnoredNames].map((name) => name.trim()).filter(Boolean),
+    ),
     maxSizeBytes,
     includeHidden,
     extMode: textRules.extMode,
@@ -315,7 +448,9 @@ function parseSizeToBytes(rawValue: string): number {
   const match = value.match(/^(\d+(?:\.\d+)?)\s*(b|kb|kib|mb|mib|gb|gib)?$/);
 
   if (!match) {
-    throw new Error(`Invalid max size: ${rawValue}. Use values like 500kb, 1mb, 2000b, or unlimited.`);
+    throw new Error(
+      `Invalid max size: ${rawValue}. Use values like 500kb, 1mb, 2000b, or unlimited.`,
+    );
   }
 
   const rawAmount = match[1];
@@ -354,7 +489,7 @@ function resolveUserPath(userPath: string): string {
 }
 
 async function collectFiles(config: CliConfig): Promise<CollectResult> {
-  const outputAbsPath = resolveUserPath(config.outputPath);
+  const outputAbsPath = resolveUserPath(config.outputPath ?? DEFAULT_OUTPUT_FILE);
   const inputs = await inspectInputPaths(config.inputPaths);
   assignInputLabels(inputs);
 
@@ -377,7 +512,9 @@ async function collectFiles(config: CliConfig): Promise<CollectResult> {
   };
 
   if (result.warnings.some((warning) => warning.includes("Overlapping inputs"))) {
-    result.recommendations.push("Remove overlapping input paths if you want a shorter summary and fewer duplicate-skip entries.");
+    result.recommendations.push(
+      "Remove overlapping input paths if you want a shorter summary and fewer duplicate-skip entries.",
+    );
   }
 
   for (const input of inputs) {
@@ -407,7 +544,10 @@ async function collectFiles(config: CliConfig): Promise<CollectResult> {
   }
 
   state.included.sort((left, right) => left.displayPath.localeCompare(right.displayPath));
-  state.skipped.sort((left, right) => left.displayPath.localeCompare(right.displayPath) || left.reason.localeCompare(right.reason));
+  state.skipped.sort(
+    (left, right) =>
+      left.displayPath.localeCompare(right.displayPath) || left.reason.localeCompare(right.reason),
+  );
 
   return result;
 }
@@ -525,17 +665,23 @@ function detectInputWarnings(inputs: InputInfo[]): string[] {
       }
 
       if (isSamePath(left.absPath, right.absPath)) {
-        warnings.push(`Duplicate input path detected: ${left.userPath} and ${right.userPath}. Files will be included once.`);
+        warnings.push(
+          `Duplicate input path detected: ${left.userPath} and ${right.userPath}. Files will be included once.`,
+        );
         continue;
       }
 
       if (left.type === "directory" && isPathInside(left.absPath, right.absPath)) {
-        warnings.push(`Overlapping inputs detected: ${left.userPath} contains ${right.userPath}. Duplicate files will be skipped.`);
+        warnings.push(
+          `Overlapping inputs detected: ${left.userPath} contains ${right.userPath}. Duplicate files will be skipped.`,
+        );
         continue;
       }
 
       if (right.type === "directory" && isPathInside(right.absPath, left.absPath)) {
-        warnings.push(`Overlapping inputs detected: ${right.userPath} contains ${left.userPath}. Duplicate files will be skipped.`);
+        warnings.push(
+          `Overlapping inputs detected: ${right.userPath} contains ${left.userPath}. Duplicate files will be skipped.`,
+        );
       }
     }
   }
@@ -651,7 +797,9 @@ async function walkDirectory(
       continue;
     }
 
-    const nameSkipReason = getNameSkipReason(entry.name, config, { skipHidden: true });
+    const nameSkipReason = getNameSkipReason(entry.name, config, {
+      skipHidden: true,
+    });
 
     if (nameSkipReason) {
       addSkipped(input, state, relPath, nameSkipReason, entryAbsPath);
@@ -684,7 +832,13 @@ async function walkDirectory(
   }
 }
 
-function addSkipped(input: InputInfo, state: CollectState, relPath: string, reason: string, absPath: string | null) {
+function addSkipped(
+  input: InputInfo,
+  state: CollectState,
+  relPath: string,
+  reason: string,
+  absPath: string | null,
+) {
   input.skippedCount += 1;
 
   state.skipped.push({
@@ -724,7 +878,11 @@ function makeDisplayPath(input: InputInfo, relPath: string, hasMultipleInputs: b
   return normalizePathForDisplay(path.posix.join(input.label, cleanRelPath));
 }
 
-function getNameSkipReason(name: string, config: CliConfig, options: { skipHidden: boolean }): string | null {
+function getNameSkipReason(
+  name: string,
+  config: CliConfig,
+  options: { skipHidden: boolean },
+): string | null {
   if (config.ignoredNames.has(name)) {
     return "ignored name";
   }
@@ -772,7 +930,9 @@ function isPathInside(parentPath: string, childPath: string): boolean {
 async function looksBinary(filePath: string): Promise<boolean> {
   try {
     const absPath = path.normalize(path.resolve(filePath));
-    const sample = new Uint8Array(await Bun.file(absPath).slice(0, BINARY_SAMPLE_BYTES).arrayBuffer());
+    const sample = new Uint8Array(
+      await Bun.file(absPath).slice(0, BINARY_SAMPLE_BYTES).arrayBuffer(),
+    );
 
     if (sample.length === 0) {
       return false;
@@ -838,14 +998,349 @@ function addOutputWarnings(config: CliConfig, result: CollectResult, outputInfo:
     return;
   }
 
-  if (config.apply) {
-    result.warnings.push(`Output file already exists and will be overwritten: ${result.outputAbsPath}`);
+  if (config.overwrite) {
+    result.warnings.push(
+      `Output file already exists and will be overwritten because --overwrite is enabled: ${result.outputAbsPath}`,
+    );
     return;
   }
 
-  result.warnings.push(`Output file already exists: ${result.outputAbsPath}. Summary-only mode will not change it.`);
+  if (config.apply) {
+    result.warnings.push(
+      `Output file already exists and apply will fail without --overwrite: ${result.outputAbsPath}`,
+    );
+    return;
+  }
+
+  result.warnings.push(
+    `Output file already exists: ${result.outputAbsPath}. Pass --overwrite with --apply to replace it.`,
+  );
 }
 
+async function createUnpackPlan(options: {
+  configuredBasePath: string | undefined;
+  inputAbsPath: string;
+  overwrite: boolean;
+  packedText: string;
+}): Promise<UnpackResult> {
+  const packedProjectRoot = parsePackedProjectRoot(options.packedText);
+  const baseAbsPath = options.configuredBasePath
+    ? resolveUserPath(options.configuredBasePath)
+    : path.normalize(process.cwd());
+  const baseProvidedBy = options.configuredBasePath ? "output" : "cwd";
+
+  if (!isSamePath(baseAbsPath, packedProjectRoot)) {
+    throw new Error(
+      [
+        "Unpack base path does not match the original packed project root.",
+        `Expected: ${packedProjectRoot}`,
+        `Actual: ${baseAbsPath}`,
+        "Fix: run the command from the original project root, or pass that exact path with -o.",
+      ].join("\n"),
+    );
+  }
+
+  const inputRoots = parsePackedInputRoots(options.packedText, packedProjectRoot);
+  const headers = parsePackedBlockHeaders(options.packedText);
+
+  if (headers.length === 0) {
+    throw new Error("No packed file blocks found. Expected a PTC file generated by `rse ptc`.");
+  }
+
+  const inputRootsByLabel = new Map(inputRoots.map((root) => [root.label, root]));
+  const files: UnpackFile[] = [];
+  const warnings: string[] = [];
+  const recommendations: string[] = [];
+  const seenTargets = new Set<string>();
+
+  for (let index = 0; index < headers.length; index += 1) {
+    const header = headers[index];
+    const nextHeader = headers[index + 1];
+
+    if (!header) {
+      continue;
+    }
+
+    const rawContent = options.packedText.slice(
+      header.contentStart,
+      nextHeader ? nextHeader.index : options.packedText.length,
+    );
+    const content = normalizeUnpackedContent(rawContent, header.sizeBytes);
+    const contentBytes = getUtf8ByteLength(content);
+    const inputRoot = inputRootsByLabel.get(header.inputLabel);
+    let targetAbsPath = "";
+    let relativeTargetPath = header.filePath;
+    let exists = false;
+    let skippedReason: string | null = null;
+
+    if (contentBytes !== header.sizeBytes) {
+      skippedReason = `content bytes do not match metadata: expected ${header.sizeBytes}, got ${contentBytes}`;
+    }
+
+    if (!inputRoot) {
+      skippedReason = skippedReason ?? `unknown input label: ${header.inputLabel}`;
+    }
+
+    if (inputRoot) {
+      try {
+        const resolvedTarget = resolvePackedOutputPath(
+          baseAbsPath,
+          inputRoot.relativeRoot,
+          header.filePath,
+        );
+        targetAbsPath = resolvedTarget.targetAbsPath;
+        relativeTargetPath = resolvedTarget.relativeTargetPath;
+      } catch (error) {
+        if (error instanceof PackedPathError) {
+          skippedReason = skippedReason ?? error.message;
+        } else {
+          throw error;
+        }
+      }
+    }
+
+    if (targetAbsPath) {
+      if (seenTargets.has(targetAbsPath)) {
+        skippedReason = skippedReason ?? "duplicate target path in packed context";
+      }
+
+      seenTargets.add(targetAbsPath);
+
+      try {
+        const targetStats = await lstat(targetAbsPath);
+        exists = true;
+
+        if (targetStats.isDirectory()) {
+          skippedReason = skippedReason ?? "target path is a directory";
+        } else if (targetStats.isSymbolicLink()) {
+          skippedReason = skippedReason ?? "target path is a symlink";
+        } else if (!targetStats.isFile()) {
+          skippedReason = skippedReason ?? "target path is not a regular file";
+        } else if (!options.overwrite) {
+          skippedReason = skippedReason ?? "target file already exists";
+        }
+      } catch (error) {
+        if (!isNodeError(error) || error.code !== "ENOENT") {
+          skippedReason = skippedReason ?? "cannot inspect target path";
+        }
+      }
+    }
+
+    files.push({
+      packedPath: header.filePath,
+      relativeTargetPath,
+      targetAbsPath,
+      inputLabel: header.inputLabel,
+      expectedSizeBytes: header.sizeBytes,
+      contentBytes,
+      content,
+      exists,
+      action: exists ? "overwrite" : "write",
+      skippedReason,
+    });
+  }
+
+  const skippedFiles = files.filter((file) => file.skippedReason);
+
+  if (skippedFiles.length > 0) {
+    warnings.push(
+      `${skippedFiles.length} file(s) will be skipped. See the skipped file list above.`,
+    );
+  }
+
+  if (!options.overwrite && files.some((file) => file.exists)) {
+    recommendations.push(
+      "Re-run with --overwrite --apply if replacing existing target files is intentional.",
+    );
+  }
+
+  return {
+    inputAbsPath: options.inputAbsPath,
+    packedProjectRoot,
+    baseAbsPath,
+    baseProvidedBy,
+    inputRoots,
+    files,
+    warnings,
+    recommendations,
+  };
+}
+
+function parsePackedProjectRoot(packedText: string): string {
+  const outputFileMatch = packedText.match(/^- Output file: (.+)$/m);
+
+  if (!outputFileMatch?.[1]) {
+    throw new Error(
+      "Packed context is missing `Output file` metadata, so the original project root cannot be verified.",
+    );
+  }
+
+  return path.normalize(path.dirname(outputFileMatch[1].trim()));
+}
+
+function parsePackedInputRoots(packedText: string, packedProjectRoot: string): PackedInputRoot[] {
+  const lines = packedText.split(/\r?\n/);
+  const roots: PackedInputRoot[] = [];
+  let current: (Partial<PackedInputRoot> & { index: number }) | null = null;
+
+  const pushCurrent = () => {
+    if (!current) {
+      return;
+    }
+
+    if (!current.label || !current.resolvedPath) {
+      current = null;
+      return;
+    }
+
+    const resolvedPath = path.normalize(current.resolvedPath);
+
+    if (
+      !isSamePath(resolvedPath, packedProjectRoot) &&
+      !isPathInside(packedProjectRoot, resolvedPath)
+    ) {
+      throw new Error(
+        `Packed input root is outside the original project root: ${resolvedPath}. Refusing to unpack absolute paths outside the project tree.`,
+      );
+    }
+
+    roots.push({
+      index: current.index,
+      label: current.label,
+      resolvedPath,
+      relativeRoot: normalizePathForDisplay(path.relative(packedProjectRoot, resolvedPath)),
+    });
+    current = null;
+  };
+
+  for (const line of lines) {
+    const inputMatch = line.match(/^- Input (\d+): /);
+
+    if (inputMatch) {
+      pushCurrent();
+      current = { index: Number(inputMatch[1]) - 1 };
+      continue;
+    }
+
+    if (!current) {
+      continue;
+    }
+
+    const labelMatch = line.match(/^  - Label: (.+)$/);
+
+    if (labelMatch?.[1]) {
+      current.label = labelMatch[1].trim();
+      continue;
+    }
+
+    const resolvedMatch = line.match(/^  - Resolved: (.+)$/);
+
+    if (resolvedMatch?.[1]) {
+      current.resolvedPath = resolvedMatch[1].trim();
+    }
+  }
+
+  pushCurrent();
+
+  if (roots.length === 0) {
+    throw new Error("Packed context is missing input root metadata.");
+  }
+
+  return roots;
+}
+
+function parsePackedBlockHeaders(packedText: string): PackedBlockHeader[] {
+  const headerPattern = new RegExp(
+    String.raw`^${escapeRegExp(PACKED_BLOCK_SEPARATOR)}\nFILE: ([^\n]+)\nINPUT: ([^\n]*)\nSIZE: (\d+) bytes\n${escapeRegExp(PACKED_BLOCK_SEPARATOR)}\n`,
+    "gm",
+  );
+  const headers: PackedBlockHeader[] = [];
+
+  for (const match of packedText.matchAll(headerPattern)) {
+    const filePath = match[1];
+    const inputLabel = match[2] ?? "";
+    const rawSizeBytes = match[3];
+
+    if (!filePath || !rawSizeBytes) {
+      continue;
+    }
+
+    headers.push({
+      index: match.index,
+      contentStart: match.index + match[0].length,
+      filePath,
+      inputLabel,
+      sizeBytes: Number(rawSizeBytes),
+    });
+  }
+
+  return headers;
+}
+
+function normalizeUnpackedContent(rawContent: string, expectedSizeBytes: number): string {
+  let content = rawContent;
+
+  while (
+    content.length > 0 &&
+    content.endsWith("\n") &&
+    getUtf8ByteLength(content) > expectedSizeBytes
+  ) {
+    content = content.slice(0, -1);
+  }
+
+  return content;
+}
+
+function resolvePackedOutputPath(
+  baseAbsPath: string,
+  relativeInputRoot: string,
+  packedPath: string,
+): { relativeTargetPath: string; targetAbsPath: string } {
+  const normalizedPackedPath = packedPath.replaceAll("\\", "/");
+
+  if (path.posix.isAbsolute(normalizedPackedPath) || path.win32.isAbsolute(normalizedPackedPath)) {
+    throw new PackedPathError(`Packed file path must be relative: ${packedPath}`);
+  }
+
+  const normalizedRelativeFilePath = path.posix.normalize(normalizedPackedPath);
+
+  if (
+    normalizedRelativeFilePath === "." ||
+    normalizedRelativeFilePath === ".." ||
+    normalizedRelativeFilePath.startsWith("../")
+  ) {
+    throw new PackedPathError(`Packed file path escapes the input root: ${packedPath}`);
+  }
+
+  const normalizedRelativeInputRoot = relativeInputRoot === "." ? "" : relativeInputRoot;
+  const relativeTargetPath = normalizePathForDisplay(
+    path.posix.normalize(path.posix.join(normalizedRelativeInputRoot, normalizedRelativeFilePath)),
+  );
+
+  if (
+    relativeTargetPath === "." ||
+    relativeTargetPath === ".." ||
+    relativeTargetPath.startsWith("../")
+  ) {
+    throw new PackedPathError(`Packed target path escapes the output directory: ${packedPath}`);
+  }
+
+  const targetAbsPath = path.normalize(path.resolve(baseAbsPath, relativeTargetPath));
+
+  if (!isSamePath(targetAbsPath, baseAbsPath) && !isPathInside(baseAbsPath, targetAbsPath)) {
+    throw new PackedPathError(`Packed file path escapes the output directory: ${packedPath}`);
+  }
+
+  return { relativeTargetPath, targetAbsPath };
+}
+
+function getUtf8ByteLength(value: string): number {
+  return new TextEncoder().encode(value).byteLength;
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
 function hasFailedInputs(result: CollectResult): boolean {
   return result.inputs.some((input) => input.status === "failed");
 }
@@ -862,7 +1357,10 @@ function createOutputWriter(outputPath: string): OutputWriter {
   return {
     async write(chunk: string) {
       const writeResult = await sink.write(chunk);
-      writtenBytes += typeof writeResult === "number" && Number.isFinite(writeResult) ? writeResult : encoder.encode(chunk).byteLength;
+      writtenBytes +=
+        typeof writeResult === "number" && Number.isFinite(writeResult)
+          ? writeResult
+          : encoder.encode(chunk).byteLength;
     },
     async end() {
       await sink.end();
@@ -873,7 +1371,12 @@ function createOutputWriter(outputPath: string): OutputWriter {
   };
 }
 
-async function writeOutput(writer: OutputWriter, config: CliConfig, result: CollectResult, outputInfo: OutputInfo) {
+async function writeOutput(
+  writer: OutputWriter,
+  config: CliConfig,
+  result: CollectResult,
+  outputInfo: OutputInfo,
+) {
   await writeSummary(writer, config, result, outputInfo);
   await writer.write("\n## Content\n");
 
@@ -883,7 +1386,12 @@ async function writeOutput(writer: OutputWriter, config: CliConfig, result: Coll
   }
 }
 
-async function writeSummary(writer: OutputWriter, config: CliConfig, result: CollectResult, outputInfo: OutputInfo) {
+async function writeSummary(
+  writer: OutputWriter,
+  config: CliConfig,
+  result: CollectResult,
+  outputInfo: OutputInfo,
+) {
   const totalIncludedBytes = getTotalIncludedBytes(result);
 
   await writer.write("# Packed Text Context\n\n");
@@ -896,7 +1404,9 @@ async function writeSummary(writer: OutputWriter, config: CliConfig, result: Col
   await writer.write(`- Included files: ${result.included.length}\n`);
   await writer.write(`- Skipped files: ${result.skipped.length}\n`);
   await writer.write(`- Total included bytes: ${totalIncludedBytes}\n`);
-  await writer.write(`- Max file size: ${Number.isFinite(config.maxSizeBytes) ? `${config.maxSizeBytes} bytes` : "unlimited"}\n`);
+  await writer.write(
+    `- Max file size: ${Number.isFinite(config.maxSizeBytes) ? `${config.maxSizeBytes} bytes` : "unlimited"}\n`,
+  );
   await writer.write(`- Hidden files included: ${config.includeHidden ? "yes" : "no"}\n`);
   await writer.write(`- Extension mode: ${config.extMode}\n\n`);
 
@@ -928,7 +1438,9 @@ async function writeSummary(writer: OutputWriter, config: CliConfig, result: Col
     await writer.write("- None\n");
   } else {
     for (const file of result.included) {
-      await writer.write(`- ${file.displayPath} (${file.sizeBytes} bytes, input: ${file.inputLabel})\n`);
+      await writer.write(
+        `- ${file.displayPath} (${file.sizeBytes} bytes, input: ${file.inputLabel})\n`,
+      );
     }
   }
 
@@ -938,7 +1450,9 @@ async function writeSummary(writer: OutputWriter, config: CliConfig, result: Col
     await writer.write("- None\n");
   } else {
     for (const skipped of result.skipped) {
-      await writer.write(`- ${skipped.displayPath} — ${skipped.reason} (input: ${skipped.inputLabel})\n`);
+      await writer.write(
+        `- ${skipped.displayPath} — ${skipped.reason} (input: ${skipped.inputLabel})\n`,
+      );
     }
   }
 }
@@ -955,11 +1469,15 @@ async function writeStringList(writer: OutputWriter, values: string[]) {
 }
 
 async function writeFileBlock(writer: OutputWriter, file: CollectedFile, content: string) {
-  await writer.write("\n================================================================================\n");
+  await writer.write(
+    "\n================================================================================\n",
+  );
   await writer.write(`FILE: ${file.displayPath}\n`);
   await writer.write(`INPUT: ${file.inputLabel}\n`);
   await writer.write(`SIZE: ${file.sizeBytes} bytes\n`);
-  await writer.write("================================================================================\n");
+  await writer.write(
+    "================================================================================\n",
+  );
   await writer.write(content);
 
   if (!content.endsWith("\n")) {
@@ -998,7 +1516,11 @@ function buildTextRules(
   };
 }
 
-function buildAllowedExts(rawExts: string[], optionName: string, mode: "exact" | "merge"): ReadonlySet<string> {
+function buildAllowedExts(
+  rawExts: string[],
+  optionName: string,
+  mode: "exact" | "merge",
+): ReadonlySet<string> {
   const allowedExts = mode === "merge" ? new Set(DEFAULT_TEXT_EXTS) : new Set<string>();
   const unsupported = new Set<string>();
 
@@ -1018,7 +1540,9 @@ function buildAllowedExts(rawExts: string[], optionName: string, mode: "exact" |
   }
 
   if (unsupported.size > 0) {
-    throw new Error(`Unsupported extension from ${optionName}: ${[...unsupported].sort().join(", ")}. Only safe text extensions are allowed.`);
+    throw new Error(
+      `Unsupported extension from ${optionName}: ${[...unsupported].sort().join(", ")}. Only safe text extensions are allowed.`,
+    );
   }
 
   if (allowedExts.size === 0) {
@@ -1029,12 +1553,22 @@ function buildAllowedExts(rawExts: string[], optionName: string, mode: "exact" |
 }
 
 export function formatPtcSummary(run: PtcRunResult): string {
+  if (run.mode === "unpack") {
+    return formatPtcUnpackSummary(run);
+  }
+
+  return formatPtcPackSummary(run);
+}
+
+function formatPtcPackSummary(run: PtcPackRunResult): string {
   const { config, result, outputInfo, bytesWritten } = run;
   const lines: string[] = [];
 
   lines.push(`Mode: ${config.apply ? "apply" : "summary-only"}`);
+  lines.push("Operation: pack");
   lines.push(`Input count: ${result.inputs.length}`);
   lines.push(`Output file: ${result.outputAbsPath}`);
+  lines.push(`Overwrite enabled: ${config.overwrite ? "yes" : "no"}`);
   lines.push(`Included files: ${result.included.length}`);
   lines.push(`Skipped files: ${result.skipped.length}`);
   lines.push(`Total included bytes: ${getTotalIncludedBytes(result)}`);
@@ -1090,6 +1624,91 @@ export function formatPtcSummary(run: PtcRunResult): string {
   return lines.join("\n");
 }
 
+function formatPtcUnpackSummary(run: PtcUnpackRunResult): string {
+  const { config, unpack, bytesWritten } = run;
+  const lines: string[] = [];
+  const skippedFiles = unpack.files.filter((file) => file.skippedReason);
+  const writeFiles = unpack.files.filter((file) => file.action === "write" && !file.skippedReason);
+  const overwriteFiles = unpack.files.filter(
+    (file) => file.action === "overwrite" && !file.skippedReason,
+  );
+
+  lines.push(`Mode: ${config.apply ? "apply" : "summary-only"}`);
+  lines.push("Operation: unpack");
+  lines.push(`Input file: ${unpack.inputAbsPath}`);
+  lines.push(`Original project root: ${unpack.packedProjectRoot}`);
+  lines.push(`Base path: ${unpack.baseAbsPath}`);
+  lines.push(`Base provided by: ${unpack.baseProvidedBy}`);
+  lines.push(`Overwrite enabled: ${config.overwrite ? "yes" : "no"}`);
+  lines.push(`Packed files: ${unpack.files.length}`);
+  lines.push(`Files to write: ${writeFiles.length}`);
+  lines.push(`Files to overwrite: ${overwriteFiles.length}`);
+  lines.push(`Files skipped: ${skippedFiles.length}`);
+
+  if (typeof bytesWritten === "number") {
+    lines.push(`Bytes written: ${bytesWritten}`);
+  }
+
+  lines.push("");
+  lines.push("Input roots:");
+
+  for (const root of unpack.inputRoots) {
+    lines.push(`  - ${root.label}: ${root.resolvedPath}`);
+  }
+
+  if (writeFiles.length > 0) {
+    lines.push("");
+    lines.push("Files to write:");
+
+    for (const file of writeFiles) {
+      lines.push(`- ${file.relativeTargetPath}`);
+    }
+  }
+
+  if (overwriteFiles.length > 0) {
+    lines.push("");
+    lines.push("Files to overwrite:");
+
+    for (const file of overwriteFiles) {
+      lines.push(`- ${file.relativeTargetPath}`);
+    }
+  }
+
+  if (skippedFiles.length > 0) {
+    lines.push("");
+    lines.push("Skipped files:");
+
+    for (const file of skippedFiles) {
+      lines.push(`- ${file.relativeTargetPath} — ${file.skippedReason}`);
+    }
+  }
+
+  if (unpack.warnings.length > 0) {
+    lines.push("");
+    lines.push("Warnings:");
+
+    for (const warning of unpack.warnings) {
+      lines.push(`- ${warning}`);
+    }
+  }
+
+  if (unpack.recommendations.length > 0) {
+    lines.push("");
+    lines.push("Recommendations:");
+
+    for (const recommendation of unpack.recommendations) {
+      lines.push(`- ${recommendation}`);
+    }
+  }
+
+  if (!config.apply) {
+    lines.push("");
+    lines.push("No files were written. Re-run with --apply to unpack the context file.");
+  }
+
+  return lines.join("\n");
+}
+
 function getTotalIncludedBytes(result: CollectResult): number {
   return result.included.reduce((total, file) => total + file.sizeBytes, 0);
 }
@@ -1101,4 +1720,3 @@ function isSizeUnit(value: string): value is SizeUnit {
 function isNodeError(error: unknown): error is NodeError {
   return error instanceof Error;
 }
-

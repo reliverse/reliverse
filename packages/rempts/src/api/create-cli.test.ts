@@ -188,6 +188,65 @@ describe("createCLI", () => {
     expect(stdout.text()).toContain('"cliOnly":true');
     expect(stdout.text()).toContain('"shared":"leaf-value"');
   });
+
+  test("reads env-backed options and honors inputSources", async () => {
+    const root = await mkdtemp(join(tmpdir(), "rempts-env-options-"));
+    const entryPath = join(root, "cli.ts");
+    const commandDir = join(root, "cmds", "demo");
+    await mkdir(commandDir, { recursive: true });
+    await writeFile(entryPath, "#!/usr/bin/env bun\n", "utf8");
+    await writeFile(
+      join(commandDir, "cmd.ts"),
+      [
+        'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+        "",
+        "export default defineCommand({",
+        "  options: {",
+        '    token: { type: "string", env: "REMPTS_TEST_TOKEN", inputSources: ["env"] },',
+        "  },",
+        "  async handler(ctx) {",
+        "    ctx.out(JSON.stringify(ctx.options));",
+        "  },",
+        "});",
+        "",
+      ].join("\n"),
+      "utf8",
+    );
+
+    const stdout = createBufferStream();
+    const result = await createCLI({
+      argv: ["demo"],
+      cwd: root,
+      entry: entryPath,
+      env: { ...process.env, REMPTS_TEST_TOKEN: "from-env" },
+      meta: {
+        name: "env-option-test",
+      },
+      stdin: { isTTY: false } as never,
+      stdout: stdout.stream as never,
+      stderr: createBufferStream().stream as never,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(stdout.text()).toContain('"token":"from-env"');
+
+    const stderr = createBufferStream();
+    const rejected = await createCLI({
+      argv: ["demo", "--token", "from-flag"],
+      cwd: root,
+      entry: entryPath,
+      env: { ...process.env, REMPTS_TEST_TOKEN: "from-env" },
+      meta: {
+        name: "env-option-test",
+      },
+      stdin: { isTTY: false } as never,
+      stdout: createBufferStream().stream as never,
+      stderr: stderr.stream as never,
+    });
+
+    expect(rejected.ok).toBe(false);
+    expect(stderr.text()).toContain('Option "--token" does not accept flag input.');
+  });
 });
 
 test("injects --apply for commands that require apply and exposes ctx.safety", async () => {
