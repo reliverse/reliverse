@@ -64,8 +64,8 @@ Legend:
 
 - [x] Structured JSON output for automation
 - [x] Action-level statuses: `updated`, `noop`, `skipped`, `missing`
-- [x] Readable dry-run summary
-- [x] Grouped dry-run specifier diff preview
+- [x] Readable preview summary
+- [x] Grouped specifier diff preview
 - [x] Explicit update strategy reporting
 - [x] Explicit final Bun command reporting
 - [x] Explicit install cwd reporting
@@ -77,7 +77,7 @@ Legend:
 - [ ] Add focused tests for `pm add`
 - [ ] Add focused tests for `pm update`
 - [ ] Add snapshot-like tests for JSON result payloads
-- [ ] Add snapshot-like tests for human-readable dry-run output
+- [ ] Add snapshot-like tests for human-readable preview output
 - [ ] Normalize wording and payload shapes across `pm add` and `pm update`
 
 ### Update controls

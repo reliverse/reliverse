@@ -11,7 +11,7 @@ set -Eeuo pipefail
 # - lingering for user services
 #
 # Safety model:
-# - dry-run by default
+# - preview by default
 # - mutates only with --apply
 # - conservative on existing users: warns on risky mismatches, fixes only low-risk identity items
 
@@ -34,7 +34,7 @@ usage() {
 Usage: 10-host-identity.sh [options]
 
 Options:
-  --apply                    Perform mutations. Default is dry-run.
+  --apply                    Perform mutations. Default is preview.
   --hostname <name>          Expected hostname (default: reliverse-os)
   --blefnk-user <name>       Dev/maintenance user (default: blefnk)
   --deploy-user <name>       Prod/runtime user (default: deploy)
@@ -54,7 +54,7 @@ Environment overrides:
   RELIVERSE_DEPLOY_SHELL
 
 Notes:
-  - dry-run by default
+  - preview by default
   - changing existing uid/gid/home ownership policy is intentionally conservative
   - this script does not create runtime/service files; it only establishes host identity basics
 EOF
@@ -337,7 +337,7 @@ ensure_linger() {
 
 summary() {
   section "Summary"
-  printf 'mode=%s\n' "$([[ $APPLY -eq 1 ]] && echo apply || echo dry-run)"
+  printf 'mode=%s\n' "$([[ $APPLY -eq 1 ]] && echo apply || echo preview)"
   printf 'actions=%d passes=%d warns=%d fails=%d\n' "$ACTION_COUNT" "$PASS_COUNT" "$WARN_COUNT" "$FAIL_COUNT"
 
   if (( FAIL_COUNT > 0 )); then
@@ -357,7 +357,7 @@ summary() {
 main() {
   section "Reliverse OS Host Identity"
   info "script: bootstrap/10-host-identity.sh"
-  info "mode: $([[ $APPLY -eq 1 ]] && echo apply || echo dry-run)"
+  info "mode: $([[ $APPLY -eq 1 ]] && echo apply || echo preview)"
 
   section "Preconditions"
   require_apply_privilege || true

@@ -15,7 +15,7 @@ Current command families include:
 
 - workspace-aware target resolution
 - Bun catalog support
-- dry-run-friendly mutating flows
+- preview-first mutating flows
 - `--apply` for real execution in `pm update`
 - JSON-friendly result payloads for automation
 

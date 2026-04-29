@@ -1,10 +1,10 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "./define-plugin";
 import { RemptsUsageError } from "../runtime/errors";
+import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "./define-plugin";
 
 describe("definePlugin", () => {
   test("accepts the current plugin api version", async () => {

@@ -38,18 +38,22 @@ describe("help JSON contract", () => {
       },
       interactive: "tui",
       help: {
-        examples: ["example-cli deploy --dry-run"],
-        text: "Use dry-run before apply.",
+        examples: ["example-cli deploy", "example-cli deploy --apply"],
+        text: "Preview by default; use apply to mutate.",
       },
       options: {
-        dryRun: {
-          type: "boolean",
-          description: "Preview changes without writing",
+        target: {
+          type: "string",
+          description: "Deployment target.",
           inputSources: ["flag"],
         },
       },
+      safety: {
+        defaultMode: "preview",
+        requiresApply: true,
+        effects: ["network.publish"],
+      },
       conventions: {
-        supportsDryRun: true,
         supportsApply: true,
       },
       async handler() {
@@ -71,9 +75,9 @@ describe("help JSON contract", () => {
     expect(serialized.aliases).toEqual(["ship"]);
     expect(serialized.usage).toEqual(["example-cli deploy [global-flags] [command-flags] [args]"]);
     expect(serialized.commandFlags).toHaveLength(1);
-    expect(serialized.commandFlags[0]?.names).toContain("--dry-run");
-    expect(serialized.commandFlags[0]?.inputSources).toEqual(["flag"]);
-    expect(serialized.helpText).toBe("Use dry-run before apply.");
+    expect(serialized.commandFlags[0]?.names).toContain("--target");
+    expect(serialized.safety?.requiresApply).toBe(true);
+    expect(serialized.helpText).toBe("Preview by default; use apply to mutate.");
   });
 
   test("launcher help JSON for nested scope carries explicit interaction policy", () => {
@@ -92,6 +96,9 @@ describe("help JSON contract", () => {
     expect(serialized.scopeLabel).toBe("Subcommands");
     expect(serialized.usage).toEqual(["example-cli dler <subcommand> [command-flags]"]);
     expect(serialized.interactive).toBe("tty");
-    expect(serialized.subcommands[0]).toEqual({ description: "Publish artifacts", name: "publish" });
+    expect(serialized.subcommands[0]).toEqual({
+      description: "Publish artifacts",
+      name: "publish",
+    });
   });
 });

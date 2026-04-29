@@ -13,12 +13,12 @@ const result = await createCLI({
   },
   help: {
     examples: [
-      "rse escape --input README.md --dry-run",
-      "rse pm add zod --target packages/rempts --dry-run --json",
-      "rse dler build --targets plugins/pm,plugins/dler,apps/rse --dry-run",
+      "rse escape --input README.md",
+      "rse pm add zod --target packages/rempts --json",
+      "rse dler build --targets plugins/pm,plugins/dler,apps/rse",
       "rse dler --help",
       "rse rempts plugins doctor --json",
-      "rse pm update typescript --dry-run --json",
+      "rse pm update typescript --json",
       "rse dler build --targets plugins/dler --provider bun --json",
     ],
     format: "auto",

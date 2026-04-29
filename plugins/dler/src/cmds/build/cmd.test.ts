@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import command from "./cmd";
 
@@ -24,6 +24,16 @@ function createJsonCtx(cwd: string, options: Record<string, unknown>) {
         throw new Error(`EXIT ${code}: ${message}`);
       },
       options,
+      safety: {
+        apply: options.apply === true,
+        effects: [],
+        preview: options.apply !== true,
+        requiresApply: true,
+        assertApplied(effect?: string) {
+          if (options.apply === true) return;
+          throw new Error(`requires --apply${effect ? ` for ${effect}` : ""}`);
+        },
+      },
       out: (...values: unknown[]) => textLines.push(values.join(" ")),
       output: {
         mode: "json" as const,
@@ -55,6 +65,16 @@ function createTextCtx(cwd: string, options: Record<string, unknown>) {
         throw new Error(`EXIT ${code}: ${message}`);
       },
       options,
+      safety: {
+        apply: options.apply === true,
+        effects: [],
+        preview: options.apply !== true,
+        requiresApply: true,
+        assertApplied(effect?: string) {
+          if (options.apply === true) return;
+          throw new Error(`requires --apply${effect ? ` for ${effect}` : ""}`);
+        },
+      },
       out: (...values: unknown[]) => textLines.push(values.join(" ")),
       output: {
         mode: "text" as const,
@@ -68,19 +88,26 @@ function createTextCtx(cwd: string, options: Record<string, unknown>) {
 }
 
 describe("dler build command", () => {
-  test("dry-run json includes skipped targets summary", async () => {
+  test("preview json includes skipped targets summary", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     await mkdir(join(root, "plugins", "dler", "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
     await writeFile(
       join(root, "plugins", "dler", "package.json"),
       JSON.stringify({ name: "dler" }),
       "utf8",
     );
-    await writeFile(join(root, "plugins", "dler", "src", "index.ts"), "export const dler = 1;\n", "utf8");
+    await writeFile(
+      join(root, "plugins", "dler", "src", "index.ts"),
+      "export const dler = 1;\n",
+      "utf8",
+    );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       provider: "bun",
       targets: "plugins/dler,plugins/missing",
     });
@@ -90,38 +117,56 @@ describe("dler build command", () => {
     expect(resultCalls).toHaveLength(1);
     expect(resultCalls[0]?.command).toBe("dler build");
     expect(resultCalls[0]?.value).toMatchObject({
-      dryRun: true,
       executedTargets: [],
       ok: true,
       plannedTargets: [{ label: "plugins/dler" }],
       skipped: [{ label: "plugins/missing", reason: expect.stringContaining("not a directory:") }],
-      skippedTargets: [{ label: "plugins/missing", reason: expect.stringContaining("not a directory:") }],
-      steps: [{ command: expect.stringContaining("internal-runner.ts"), label: "plugins/dler", packageCommand: expect.any(String) }],
+      skippedTargets: [
+        { label: "plugins/missing", reason: expect.stringContaining("not a directory:") },
+      ],
+      steps: [
+        {
+          command: expect.stringContaining("internal-runner.ts"),
+          label: "plugins/dler",
+          packageCommand: expect.any(String),
+        },
+      ],
       summary: { failed: 0, planned: 1, skipped: 1, succeeded: 0 },
       targets: ["plugins/dler", "plugins/missing"],
     });
   });
 
-  test("dry-run skips directories without package.json but no longer requires scripts.build", async () => {
+  test("preview skips directories without package.json but no longer requires scripts.build", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     await mkdir(join(root, "plugins", "ok", "src"), { recursive: true });
     await mkdir(join(root, "plugins", "no-script", "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
     await writeFile(
       join(root, "plugins", "ok", "package.json"),
       JSON.stringify({ name: "ok" }),
       "utf8",
     );
-    await writeFile(join(root, "plugins", "ok", "src", "index.ts"), "export const ok = 1;\n", "utf8");
+    await writeFile(
+      join(root, "plugins", "ok", "src", "index.ts"),
+      "export const ok = 1;\n",
+      "utf8",
+    );
     await writeFile(
       join(root, "plugins", "no-script", "package.json"),
       JSON.stringify({ name: "no-script" }),
       "utf8",
     );
-    await writeFile(join(root, "plugins", "no-script", "src", "index.ts"), "export const noScript = 1;\n", "utf8");
+    await writeFile(
+      join(root, "plugins", "no-script", "src", "index.ts"),
+      "export const noScript = 1;\n",
+      "utf8",
+    );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       provider: "bun",
       targets: "plugins/ok,plugins/no-script,plugins/missing",
     });
@@ -140,7 +185,6 @@ describe("dler build command", () => {
   test("fails early on unknown provider with a clear message", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     const { ctx } = createJsonCtx(root, {
-      dryRun: true,
       provider: "webpack",
       targets: "plugins/dler",
     });
@@ -154,15 +198,16 @@ describe("dler build command", () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     const pkgDir = join(root, "plugins", "broken");
     await mkdir(join(pkgDir, "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
     await writeFile(
-      join(pkgDir, "package.json"),
-      JSON.stringify({ name: "broken" }),
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
       "utf8",
     );
+    await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "broken" }), "utf8");
     await writeFile(join(pkgDir, "src", "index.ts"), "export const broken = ;\n", "utf8");
 
     const { ctx, errorLines, textLines } = createTextCtx(root, {
+      apply: true,
       provider: "bun",
       targets: "plugins/broken",
     });
@@ -174,7 +219,9 @@ describe("dler build command", () => {
     expect(textLines.some((line) => line.includes("Provider: bun"))).toBe(true);
     expect(textLines.some((line) => line.includes("Failed: plugins/broken"))).toBe(true);
     expect(textLines.some((line) => line.includes("Total duration:"))).toBe(true);
-    expect(textLines.some((line) => line.includes("Summary: 0 built, 1 failed, 0 skipped."))).toBe(true);
+    expect(textLines.some((line) => line.includes("Summary: 0 built, 1 failed, 0 skipped."))).toBe(
+      true,
+    );
     expect(errorLines.some((line) => line.length > 0)).toBe(true);
   });
 
@@ -182,12 +229,15 @@ describe("dler build command", () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     const pkgDir = join(root, "plugins", "pkg");
     await mkdir(join(pkgDir, "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
     await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "pkg" }), "utf8");
     await writeFile(join(pkgDir, "src", "index.ts"), "export const pkg = 1;\n", "utf8");
 
     const { ctx, resultCalls } = createJsonCtx(pkgDir, {
-      dryRun: true,
       provider: "bun",
     });
 
@@ -200,16 +250,19 @@ describe("dler build command", () => {
     });
   });
 
-  test("json dry-run keeps a stable machine-readable shape", async () => {
+  test("json preview keeps a stable machine-readable shape", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     const pkgDir = join(root, "plugins", "stable");
     await mkdir(join(pkgDir, "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
     await writeFile(join(pkgDir, "package.json"), JSON.stringify({ name: "stable" }), "utf8");
     await writeFile(join(pkgDir, "src", "index.ts"), "export const stable = 1;\n", "utf8");
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       provider: "bun",
       targets: "plugins/stable",
     });
@@ -217,7 +270,8 @@ describe("dler build command", () => {
     await command.handler(ctx as never);
 
     expect(resultCalls[0]?.value).toStrictEqual({
-      dryRun: true,
+      apply: false,
+      preview: true,
       executedTargets: [],
       ok: true,
       plannedTargets: [{ cwd: pkgDir, label: "plugins/stable" }],

@@ -1,4 +1,4 @@
-import type { CommandConventions, CommandDefinition } from "../api/define-command";
+import type { CommandConventions, CommandDefinition, CommandSafety } from "../api/define-command";
 import { toFlagName } from "../options/flag-name";
 import type { CommandOptionsRecord } from "../options/types";
 import type { DiscoveredSubcommand } from "./command-source";
@@ -25,6 +25,7 @@ export interface HelpDocument {
   readonly commandFlags: readonly HelpFlagItem[];
   readonly commandPath: readonly string[];
   readonly conventions?: CommandConventions | undefined;
+  readonly safety?: CommandSafety | undefined;
   readonly description?: string | undefined;
   readonly examples: readonly string[];
   readonly globalFlags: readonly HelpFlagItem[];
@@ -96,6 +97,7 @@ export function buildLauncherHelpDocument(options: {
   readonly availableSubcommands: readonly DiscoveredSubcommand[];
   readonly commandPath: readonly string[];
   readonly conventions?: CommandConventions | undefined;
+  readonly safety?: CommandSafety | undefined;
   readonly description?: string | undefined;
   readonly examples?: readonly string[] | undefined;
   readonly globalFlagDefinitions: readonly GlobalFlagDefinition[];
@@ -151,7 +153,6 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
               ? ["stdin"]
               : options.command.conventions.acceptsStdin,
           idempotent: options.command.conventions.idempotent,
-          supportsDryRun: options.command.conventions.supportsDryRun,
           supportsApply: options.command.conventions.supportsApply,
           supportsYes: options.command.conventions.supportsYes,
         }
@@ -162,6 +163,7 @@ export function buildCommandHelpDocument<TOptions extends CommandOptionsRecord>(
     helpText: options.command.help?.text,
     interactive: options.command.interactive ?? "never",
     programName: options.programName,
+    safety: options.command.safety,
     scope: "command",
     scopeLabel: "Subcommands",
     subcommands: toSubcommandItems(options.availableSubcommands),

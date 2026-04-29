@@ -44,7 +44,7 @@ These are framework-reserved and must stay distinct from final-command flags.
 ## Command Conventions
 
 - Prefer idempotent behavior where practical.
-- Support `--dry-run` for commands with side effects.
+- Side-effecting commands should preview by default.
 - Support `--apply` when a command should switch from preview to real execution.
 - Prefer clear flags such as `--overwrite` when the behavior is specifically about replacing existing outputs rather than applying a previewed plan.
 - Default commands to `interactive: "never"` unless there is a strong reason to guide a human through a flow.
@@ -59,4 +59,4 @@ These are framework-reserved and must stay distinct from final-command flags.
 - stderr is for diagnostics and failures.
 - JSON-mode errors should expose a stable `kind`, `code`, `message`, and optional `issues`, `hint`, and `usage`.
 - JSON-mode success should prefer `ctx.output.result(...)` so callers receive a stable result envelope.
-- Dry runs should return a machine-followable preview of planned actions rather than prose alone.
+- Previews should return a machine-followable plan of actions rather than prose alone.

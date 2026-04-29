@@ -2,29 +2,27 @@ import type {
   CommandContext,
   CommandPromptAPI,
   CommandRuntimeInfo,
+  CommandSafetyAPI,
 } from "../api/define-command";
 import type { CommandOptionsOutput, CommandOptionsRecord } from "../options/types";
+import type { CommandTreeReport } from "./command-diagnostics";
 import { RemptsExitSignal } from "./errors";
 import type { CommandInputAPI } from "./input";
 import type { InteractionPolicy } from "./noninteractive";
-import type {
-  ConfirmationMode,
-  ParsedGlobalFlags,
-  RuntimeOutput,
-  StdinMode,
-} from "./types";
-import type { CommandTreeReport } from "./command-diagnostics";
 import type { PluginDiscoveryReport } from "./plugin-discovery";
+import type { ConfirmationMode, ParsedGlobalFlags, RuntimeOutput, StdinMode } from "./types";
 
 export interface CreateCommandContextOptions<
   TOptions extends CommandOptionsRecord = CommandOptionsRecord,
 > {
   readonly args: readonly string[];
-  readonly cli?: {
-    readonly commandTree?: CommandTreeReport | undefined;
-    readonly name: string;
-    readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
-  } | undefined;
+  readonly cli?:
+    | {
+        readonly commandTree?: CommandTreeReport | undefined;
+        readonly name: string;
+        readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
+      }
+    | undefined;
   readonly cliPluginNames?: readonly string[] | undefined;
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
@@ -39,6 +37,7 @@ export interface CreateCommandContextOptions<
   readonly input: CommandInputAPI;
   readonly interaction: InteractionPolicy;
   readonly output: RuntimeOutput;
+  readonly safety?: CommandSafetyAPI | undefined;
   readonly confirmationMode: ConfirmationMode;
   readonly stdinMode: StdinMode;
   readonly prompt: CommandPromptAPI;
@@ -70,6 +69,15 @@ export function createCommandContext<TOptions extends CommandOptionsRecord>(
     nonInteractive: options.interaction.isNonInteractive,
     options: options.options,
     output: options.output,
+    safety: options.safety ?? {
+      apply: false,
+      effects: [],
+      preview: false,
+      requiresApply: false,
+      assertApplied() {
+        return;
+      },
+    },
     out(...values: readonly unknown[]) {
       options.output.text(...values);
     },

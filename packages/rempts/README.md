@@ -38,7 +38,7 @@ await createCLI({
     name: "my-cli",
   },
   help: {
-    examples: ["my-cli sync --dry-run"],
+    examples: ["my-cli sync", "my-cli sync --apply"],
     format: "auto",
   },
 });
@@ -60,13 +60,12 @@ export default defineCommand({
   conventions: {
     acceptsStdin: ["flag", "stdin"],
     idempotent: true,
-    supportsDryRun: true,
     supportsApply: true,
   },
   options: {
-    dryRun: {
+    apply: {
       type: "boolean",
-      description: "Preview changes without writing",
+      description: "Apply changes. Default is preview-only.",
       inputSources: ["flag"],
     },
     text: {
@@ -283,7 +282,7 @@ my-cli dler pack
 ## Command author guidance
 
 - Prefer idempotent commands when reasonable
-- Add `--dry-run` for side-effecting commands
+- Make side-effecting commands preview-only by default
 - Use `--apply` when a command should switch from preview to real execution
 - Prefer clearer flags such as `--overwrite` when the behavior is specifically about replacing existing outputs
 - Default to `interactive: "never"` and opt into `tty` or `tui` only when a command truly benefits from guided human input

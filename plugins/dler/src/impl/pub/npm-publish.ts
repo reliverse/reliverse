@@ -1,6 +1,6 @@
 export interface RunNpmPublishOptions {
   readonly cwd: string;
-  readonly dryRun: boolean;
+  readonly preview: boolean;
   readonly env: NodeJS.ProcessEnv;
   readonly tag?: string | undefined;
 }
@@ -20,12 +20,12 @@ async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Pro
 }
 
 /**
- * Runs `npm publish` from `cwd` (staging directory). Caller must be logged into npm for non–dry-run.
+ * Runs `npm publish` from `cwd` (staging directory). Caller must be logged into npm for real publishes.
  * Workspace protocol / catalog deps are not rewritten in v1 — real publishes may fail until versions are resolved.
  */
 export async function runNpmPublish(options: RunNpmPublishOptions): Promise<RunNpmPublishResult> {
   const args = ["publish", "--access", "public"];
-  if (options.dryRun) {
+  if (options.preview) {
     args.push("--dry-run");
   }
 

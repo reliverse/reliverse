@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import command from "./cmd";
 
@@ -24,6 +24,16 @@ function createJsonCtx(cwd: string, options: Record<string, unknown>) {
         throw new Error(`EXIT ${code}: ${message}`);
       },
       options,
+      safety: {
+        apply: options.apply === true,
+        effects: [],
+        preview: options.apply !== true,
+        requiresApply: true,
+        assertApplied(effect?: string) {
+          if (options.apply === true) return;
+          throw new Error(`requires --apply${effect ? ` for ${effect}` : ""}`);
+        },
+      },
       out: (...values: unknown[]) => textLines.push(values.join(" ")),
       output: {
         mode: "json" as const,
@@ -55,6 +65,16 @@ function createTextCtx(cwd: string, options: Record<string, unknown>) {
         throw new Error(`EXIT ${code}: ${message}`);
       },
       options,
+      safety: {
+        apply: options.apply === true,
+        effects: [],
+        preview: options.apply !== true,
+        requiresApply: true,
+        assertApplied(effect?: string) {
+          if (options.apply === true) return;
+          throw new Error(`requires --apply${effect ? ` for ${effect}` : ""}`);
+        },
+      },
       out: (...values: unknown[]) => textLines.push(values.join(" ")),
       output: {
         mode: "text" as const,
@@ -79,7 +99,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
       targets: "packages/private-pkg",
@@ -90,7 +109,6 @@ describe("dler pub command", () => {
     expect(resultCalls).toHaveLength(1);
     expect(resultCalls[0]?.command).toBe("dler pub");
     expect(resultCalls[0]?.value).toMatchObject({
-      dryRun: true,
       executedTargets: [],
       ok: false,
       plannedTargets: [],
@@ -122,7 +140,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
       targets: "packages/workspace-pkg",
@@ -136,7 +153,9 @@ describe("dler pub command", () => {
       skippedTargets: [
         {
           label: "packages/workspace-pkg",
-          reason: expect.stringContaining("unsafe dependency specifiers for publish: foo@workspace:*") ,
+          reason: expect.stringContaining(
+            "unsafe dependency specifiers for publish: foo@workspace:*",
+          ),
         },
       ],
       summary: { failed: 0, planned: 1, published: 0, skipped: 1 },
@@ -147,7 +166,11 @@ describe("dler pub command", () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "broken");
     await mkdir(join(pkgDir, "src"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
     await writeFile(
       join(pkgDir, "package.json"),
       `${JSON.stringify({ name: "broken", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
@@ -156,7 +179,7 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "src", "index.ts"), "export const broken = ;\n", "utf8");
 
     const { ctx, errorLines } = createTextCtx(root, {
-      dryRun: true,
+      apply: true,
       prebuild: true,
       targets: "packages/broken",
     });
@@ -180,7 +203,6 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
 
     const { ctx, textLines } = createTextCtx(root, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
       targets: "packages/ok",
@@ -191,14 +213,20 @@ describe("dler pub command", () => {
     expect(textLines.some((line) => line.includes("Publish from: dist"))).toBe(true);
     expect(textLines.some((line) => line.includes("Prepared: packages/ok (ok-pkg) in"))).toBe(true);
     expect(textLines.some((line) => line.includes("Total duration:"))).toBe(true);
-    expect(textLines.some((line) => line.includes("Summary: 1 prepared, 0 failed, 0 skipped."))).toBe(true);
+    expect(
+      textLines.some((line) => line.includes("Summary: 1 prepared, 0 failed, 0 skipped.")),
+    ).toBe(true);
   });
 
   test("when --targets is omitted at package cwd, pub auto-targets only that package", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "solo");
     await mkdir(join(pkgDir, "dist"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
     await writeFile(
       join(pkgDir, "package.json"),
       `${JSON.stringify({ name: "solo-pkg", type: "module", publishConfig: { access: "public" }, dependencies: { foo: "workspace:*" } }, null, 2)}\n`,
@@ -206,7 +234,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(pkgDir, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
     });
@@ -222,12 +249,16 @@ describe("dler pub command", () => {
     });
   });
 
-  test("build/pub dry-run stay aligned on the same package target boundary", async () => {
+  test("build/pub previews stay aligned on the same package target boundary", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "aligned");
     await mkdir(join(pkgDir, "src"), { recursive: true });
     await mkdir(join(pkgDir, "dist"), { recursive: true });
-    await writeFile(join(root, "package.json"), JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }), "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
     await writeFile(
       join(pkgDir, "package.json"),
       `${JSON.stringify({ name: "aligned", type: "module", publishConfig: { access: "public" }, dependencies: { foo: "workspace:*" } }, null, 2)}\n`,
@@ -236,7 +267,6 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "src", "index.ts"), "export const aligned = 1;\n", "utf8");
 
     const { ctx, resultCalls } = createJsonCtx(pkgDir, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
     });
@@ -249,7 +279,7 @@ describe("dler pub command", () => {
     });
   });
 
-  test("json dry-run keeps a stable machine-readable shape when nothing is publishable", async () => {
+  test("json preview keeps a stable machine-readable shape when nothing is publishable", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "private-pkg");
     await mkdir(pkgDir, { recursive: true });
@@ -260,7 +290,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      dryRun: true,
       prebuild: false,
       publishFrom: "dist",
       targets: "packages/private-pkg",
@@ -269,7 +298,8 @@ describe("dler pub command", () => {
     await command.handler(ctx as never);
 
     expect(resultCalls[0]?.value).toStrictEqual({
-      dryRun: true,
+      apply: false,
+      preview: true,
       executedTargets: [],
       ok: false,
       plannedTargets: [],

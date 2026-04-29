@@ -1,15 +1,17 @@
 import type { RelicoInstance } from "@reliverse/relico";
+
 import type {
   CommandOptionsOutput,
   CommandOptionsRecord,
   EmptyCommandOptions,
   OptionInputSource,
 } from "../options/types";
+import type { CommandTreeReport } from "../runtime/command-diagnostics";
 import type { RemptsExitSignal } from "../runtime/errors";
+import type { RemptsReservedOptionName } from "../runtime/global-flags";
 import type { CommandInputAPI } from "../runtime/input";
 import type { InteractionPolicy } from "../runtime/noninteractive";
 import type { PluginDiscoveryReport } from "../runtime/plugin-discovery";
-import type { CommandTreeReport } from "../runtime/command-diagnostics";
 import type {
   ConfirmationMode,
   ParsedGlobalFlags,
@@ -57,17 +59,42 @@ export interface CommandAgentMetadata {
   readonly notes?: string | undefined;
 }
 
+export type CommandEffect =
+  | "fs.delete"
+  | "fs.write"
+  | "network.publish"
+  | "package.install"
+  | "process.exec"
+  | (string & {});
+
+export interface CommandSafety {
+  /**
+   * Preview means handlers should plan/report by default and execute mutations only when apply is true.
+   */
+  readonly defaultMode?: "preview" | "execute" | undefined;
+  /**
+   * Require an explicit --apply before handlers may execute declared side effects.
+   */
+  readonly requiresApply?: boolean | undefined;
+  readonly effects?: ReadonlyArray<CommandEffect> | undefined;
+}
+
+export interface CommandSafetyAPI {
+  readonly apply: boolean;
+  readonly effects: readonly CommandEffect[];
+  readonly preview: boolean;
+  readonly requiresApply: boolean;
+  assertApplied(effect?: CommandEffect | undefined, message?: string | undefined): void;
+}
+
 export interface CommandConventions {
   readonly acceptsStdin?: boolean | readonly OptionInputSource[] | undefined;
   readonly idempotent?: boolean | undefined;
-  readonly supportsDryRun?: boolean | undefined;
   readonly supportsApply?: boolean | undefined;
   readonly supportsYes?: boolean | undefined;
 }
 
-export interface CommandRuntimeInfo<
-  TOptions extends CommandOptionsRecord = EmptyCommandOptions,
-> {
+export interface CommandRuntimeInfo<TOptions extends CommandOptionsRecord = EmptyCommandOptions> {
   readonly agent?: CommandAgentMetadata | undefined;
   readonly name: string;
   readonly path: readonly string[];
@@ -82,6 +109,7 @@ export interface CommandRuntimeInfo<
   readonly noTTY: boolean;
   readonly noTUI: boolean;
   readonly options?: TOptions | undefined;
+  readonly safety?: CommandSafety | undefined;
   readonly filePath?: string | undefined;
   readonly directoryPath?: string | undefined;
 }
@@ -90,11 +118,13 @@ export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCom
   readonly args: readonly string[];
   /** Plugin names discovered for `createCLI({ plugins })`, in precedence order. */
   readonly cliPluginNames: readonly string[];
-  readonly cli?: {
-    readonly commandTree?: CommandTreeReport | undefined;
-    readonly name: string;
-    readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
-  } | undefined;
+  readonly cli?:
+    | {
+        readonly commandTree?: CommandTreeReport | undefined;
+        readonly name: string;
+        readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
+      }
+    | undefined;
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
   readonly cwd: string;
@@ -109,6 +139,7 @@ export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCom
   readonly interaction: InteractionPolicy;
   readonly nonInteractive: boolean;
   readonly output: RuntimeOutput;
+  readonly safety: CommandSafetyAPI;
   readonly colors: {
     readonly stderr: RelicoInstance;
     readonly stdout: RelicoInstance;
@@ -123,16 +154,21 @@ export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCom
 
 export interface CommandConfig<TOptions extends CommandOptionsRecord = EmptyCommandOptions> {
   readonly agent?: CommandAgentMetadata | undefined;
-  readonly meta?: {
-    readonly name?: string | undefined;
-    readonly description?: string | undefined;
-    readonly aliases?: ReadonlyArray<string> | undefined;
-  } | undefined;
+  readonly meta?:
+    | {
+        readonly name?: string | undefined;
+        readonly description?: string | undefined;
+        readonly aliases?: ReadonlyArray<string> | undefined;
+      }
+    | undefined;
   readonly conventions?: CommandConventions | undefined;
-  readonly help?: {
-    readonly text?: string | undefined;
-    readonly examples?: ReadonlyArray<string> | undefined;
-  } | undefined;
+  readonly safety?: CommandSafety | undefined;
+  readonly help?:
+    | {
+        readonly text?: string | undefined;
+        readonly examples?: ReadonlyArray<string> | undefined;
+      }
+    | undefined;
   readonly interactive?: RemptsInteractionMode | undefined;
   readonly noTTY?: boolean | undefined;
   readonly noTUI?: boolean | undefined;
@@ -148,8 +184,15 @@ export interface CommandDefinition<
   readonly kind: typeof COMMAND_DEFINITION_KIND;
 }
 
+type RejectReservedOptionKeys<TOptions extends CommandOptionsRecord> =
+  Extract<keyof TOptions, RemptsReservedOptionName> extends never
+    ? unknown
+    : {
+        readonly __remptsReservedOptionNames__: Extract<keyof TOptions, RemptsReservedOptionName>;
+      };
+
 export function defineCommand<TOptions extends CommandOptionsRecord = EmptyCommandOptions>(
-  config: CommandConfig<TOptions>,
+  config: CommandConfig<TOptions> & RejectReservedOptionKeys<TOptions>,
 ): CommandDefinition<TOptions> {
   const aliases = config.meta?.aliases ? [...config.meta.aliases] : [];
   const examples = config.help?.examples ? [...config.help.examples] : [];
@@ -193,14 +236,16 @@ export function isCommandDefinition(
 
   if (
     value.meta !== undefined &&
-    (!isRecord(value.meta) || (value.meta.aliases !== undefined && !isStringArray(value.meta.aliases)))
+    (!isRecord(value.meta) ||
+      (value.meta.aliases !== undefined && !isStringArray(value.meta.aliases)))
   ) {
     return false;
   }
 
   if (
     value.help !== undefined &&
-    (!isRecord(value.help) || (value.help.examples !== undefined && !isStringArray(value.help.examples)))
+    (!isRecord(value.help) ||
+      (value.help.examples !== undefined && !isStringArray(value.help.examples)))
   ) {
     return false;
   }

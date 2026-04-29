@@ -1,6 +1,6 @@
-import { resolveEntry } from "../runtime/resolve-entry";
-import { RemptsUsageError } from "../runtime/errors";
 import type { CommandOptionsRecord } from "../options/types";
+import { RemptsUsageError } from "../runtime/errors";
+import { resolveEntry } from "../runtime/resolve-entry";
 
 export const REMPTS_PLUGIN_API_VERSION = 1;
 

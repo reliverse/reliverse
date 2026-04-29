@@ -21,26 +21,26 @@ export default defineCommand({
   },
   agent: {
     notes:
-      "Use --dry-run first when you need a preview. When --targets is omitted, dler derives targets from cwd: the current workspace package or all workspace packages from the monorepo root.",
+      "Default execution is preview-only. Pass --apply to execute generated build commands. When --targets is omitted, dler derives targets from cwd: the current workspace package or all workspace packages from the monorepo root.",
   },
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["process.exec", "fs.write"],
   },
   help: {
     examples: [
-      "rse dler build --dry-run",
-      "rse dler build --targets plugins/pm,plugins/dler,apps/rse",
-      "rse dler build --targets plugins/dler --provider bun --json",
+      "rse dler build",
+      "rse dler build --targets plugins/pm,plugins/dler,apps/rse --apply",
+      "rse dler build --targets plugins/dler --provider bun --apply --json",
     ],
-    text: "dler plans a generated build command for each eligible workspace target, then executes those commands in order through the selected provider. Dry-run shows the commands that would be executed for the resolved target scope.",
+    text: "dler plans a generated build command for each eligible workspace target. Default mode previews the commands for the resolved target scope; pass --apply to execute them through the selected provider.",
   },
   options: {
-    dryRun: {
-      type: "boolean",
-      description: "Preview resolved targets and generated build commands without executing them",
-      inputSources: ["flag"],
-    },
     provider: {
       type: "string",
       defaultValue: "bun",
@@ -106,7 +106,8 @@ export default defineCommand({
       if (ctx.output.mode === "json") {
         ctx.output.result(
           {
-            dryRun: Boolean(ctx.options.dryRun),
+            apply: ctx.safety.apply,
+            preview: !ctx.safety.apply,
             executedTargets: targetSets.executedTargets,
             ok: false,
             plannedTargets: targetSets.plannedTargets,
@@ -128,14 +129,15 @@ export default defineCommand({
       ctx.exit(1, "No buildable workspace targets remain after validation.");
     }
 
-    if (ctx.options.dryRun) {
+    if (!ctx.safety.apply) {
       const summary = createBuildSummary({
         planned: targets.length,
         skipped: skippedTargets,
         targets: [],
       });
       const preview = {
-        dryRun: true,
+        apply: false,
+        preview: true,
         executedTargets: targetSets.executedTargets,
         ok: true,
         plannedTargets: targetSets.plannedTargets,
@@ -167,11 +169,13 @@ export default defineCommand({
       }
 
       for (const step of preview.steps) {
-        ctx.out(`Dry run: would run ${step.command} in ${step.label}`);
+        ctx.out(`Preview: would run ${step.command} in ${step.label}`);
       }
 
       return;
     }
+
+    ctx.safety.assertApplied("process.exec");
 
     const runtime = createBuilderRuntime({
       defaultProvider: providerRegistry.defaultProvider,
@@ -202,7 +206,8 @@ export default defineCommand({
         ctx.output.result(
           {
             ...report,
-            dryRun: false,
+            apply: true,
+            preview: false,
             executedTargets: executedTargetSets.executedTargets,
             skipped: skippedTargets,
             plannedTargets: executedTargetSets.plannedTargets,
@@ -216,7 +221,8 @@ export default defineCommand({
 
       ctx.output.data({
         ...report,
-        dryRun: false,
+        apply: true,
+        preview: false,
         executedTargets: executedTargetSets.executedTargets,
         ok: false,
         plannedTargets: executedTargetSets.plannedTargets,

@@ -6,27 +6,41 @@ import { runPrebuildForPackage } from "../../impl/pub/prebuild";
 import { createPublishStaging } from "../../impl/pub/staging";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
 import { findUnsafeDependencySpecifiers } from "../../impl/pub/workspace-deps";
-import { createPublishExecutedTargets, createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
-import { createPublishSummary, createPublishSummaryFromResults, formatPublishSummary } from "../../impl/result-contract";
+import {
+  createPublishExecutedTargets,
+  createTargetSets,
+  formatSkippedMessages,
+} from "../../impl/report-helpers";
+import {
+  createPublishSummary,
+  createPublishSummaryFromResults,
+  formatPublishSummary,
+} from "../../impl/result-contract";
 import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
 
 const BUILDER_PLUGIN_NAME = "dler";
 const DEFAULT_PUBLISH_FROM = "dist";
 
 function formatPublishResultLine(options: {
-  readonly dryRun: boolean;
+  readonly apply: boolean;
   readonly durationMs: number;
   readonly label: string;
   readonly packageName: string;
 }): string {
-  return `${options.dryRun ? "Prepared" : "Published"}: ${options.label} (${options.packageName}) in ${options.durationMs}ms`;
+  return `${options.apply ? "Published" : "Prepared"}: ${options.label} (${options.packageName}) in ${options.durationMs}ms`;
 }
 
-function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+function okLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
 }
 
-function warnLabel(ctx: { colors: { stderr: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+function warnLabel(
+  ctx: { colors: { stderr: { bold(text: string): string; yellow(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stderr.yellow(ctx.colors.stderr.bold(text));
 }
 
@@ -38,32 +52,31 @@ export default defineCommand({
   },
   agent: {
     notes:
-      "Eligible packages: not private, type module, publishConfig.access public. With default prebuild enabled, dler first runs the generated build flow for each target. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
+      "Eligible packages: not private, type module, publishConfig.access public. Default execution prepares an npm publish preview. Pass --apply for real npm publish. With default prebuild enabled, dler first runs the generated build flow for each target. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
   },
   interactive: "never",
   conventions: {
     idempotent: false,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["network.publish", "process.exec", "fs.write", "fs.delete"],
   },
   help: {
     examples: [
-      "rse dler pub --targets packages/foo --dry-run",
-      "rse dler pub --targets packages/foo --no-prebuild --publish-from dist --dry-run",
-      "rse dler pub --targets packages/foo --publish-from dist --tag next --dry-run",
+      "rse dler pub --targets packages/foo",
+      "rse dler pub --targets packages/foo --no-prebuild --publish-from dist",
+      "rse dler pub --targets packages/foo --publish-from dist --tag next --apply",
     ],
     text: "Targets come from --targets or from cwd scope when omitted. With default prebuild, dler runs the generated build flow first and then stages package.json plus the chosen artifact directory before npm publish. With --no-prebuild, the caller is responsible for ensuring artifacts already exist.",
   },
   options: {
-    dryRun: {
-      type: "boolean",
-      description: "Run npm publish --dry-run (no upload)",
-      inputSources: ["flag"],
-    },
     prebuild: {
       type: "boolean",
       defaultValue: true,
-      description:
-        "Run dler's generated prebuild flow before publish (use --no-prebuild to skip)",
+      description: "Run dler's generated prebuild flow before publish (use --no-prebuild to skip)",
       inputSources: ["flag", "default"],
     },
     publishFrom: {
@@ -79,7 +92,8 @@ export default defineCommand({
     },
     targets: {
       type: "string",
-      description: "Comma-separated workspace paths (relative to --cwd) to publish in order (defaults to cwd-derived scope when omitted)",
+      description:
+        "Comma-separated workspace paths (relative to --cwd) to publish in order (defaults to cwd-derived scope when omitted)",
       hint: "Example: packages/rempts,plugins/pub",
       inputSources: ["flag"],
     },
@@ -95,7 +109,10 @@ export default defineCommand({
     const targetLabels = requestedTargets.labels;
 
     if (targetLabels.length === 0) {
-      ctx.exit(1, 'No publish targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.');
+      ctx.exit(
+        1,
+        "No publish targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.",
+      );
     }
 
     const prebuild = ctx.options.prebuild ?? true;
@@ -111,7 +128,10 @@ export default defineCommand({
     let publishFrom = ctx.options.publishFrom?.trim() ?? "";
     if (!prebuild) {
       if (publishFrom.length === 0) {
-        ctx.exit(1, "With --no-prebuild you must pass --publish-from (e.g. dist) relative to each package.");
+        ctx.exit(
+          1,
+          "With --no-prebuild you must pass --publish-from (e.g. dist) relative to each package.",
+        );
       }
     } else {
       publishFrom = publishFrom.length > 0 ? publishFrom : DEFAULT_PUBLISH_FROM;
@@ -121,14 +141,18 @@ export default defineCommand({
       ctx.exit(1, "Invalid --publish-from: use a relative path without .. segments.");
     }
 
-    const dryRun = Boolean(ctx.options.dryRun);
+    const apply = ctx.safety.apply;
+    const preview = !apply;
     const startedAt = performance.now();
     const validation = await resolvePublishableTargets({
       requireArtifactDir: !prebuild,
       publishFrom,
       targets: requestedTargets.resolution.resolved,
     });
-    const skipped: { label: string; reason: string }[] = [...requestedTargets.resolution.skipped, ...validation.skipped];
+    const skipped: { label: string; reason: string }[] = [
+      ...requestedTargets.resolution.skipped,
+      ...validation.skipped,
+    ];
     const results: {
       cwd: string;
       durationMs: number;
@@ -151,7 +175,8 @@ export default defineCommand({
         continue;
       }
 
-      if (prebuild) {
+      if (prebuild && apply) {
+        ctx.safety.assertApplied("process.exec");
         const report = await runPrebuildForPackage(packageRoot, label);
         if (!report.ok) {
           const failed = report.targets.find((t) => !t.ok);
@@ -177,12 +202,18 @@ export default defineCommand({
         continue;
       }
 
+      if (apply) {
+        ctx.safety.assertApplied("fs.write");
+      }
       const staging = await createPublishStaging(packageRoot, publishFrom);
       try {
         const publishStartedAt = performance.now();
+        if (apply) {
+          ctx.safety.assertApplied("network.publish");
+        }
         const npmResult = await runNpmPublish({
           cwd: staging.stagingDir,
-          dryRun,
+          preview,
           env: ctx.env,
           tag: ctx.options.tag,
         });
@@ -200,7 +231,10 @@ export default defineCommand({
             if (npmResult.stderr.trim()) ctx.err(npmResult.stderr.trim());
           }
 
-          ctx.exit(1, `npm publish failed for ${label} during staging publish (exit ${npmResult.exitCode}).`);
+          ctx.exit(
+            1,
+            `npm publish failed for ${label} during staging publish (exit ${npmResult.exitCode}).`,
+          );
         }
       } finally {
         await staging.cleanup();
@@ -221,7 +255,8 @@ export default defineCommand({
       if (ctx.output.mode === "json") {
         ctx.output.result(
           {
-            dryRun,
+            apply,
+            preview,
             executedTargets: targetSets.executedTargets,
             ok: false,
             plannedTargets: targetSets.plannedTargets,
@@ -257,7 +292,8 @@ export default defineCommand({
 
       ctx.output.result(
         {
-          dryRun,
+          apply,
+          preview,
           executedTargets: targetSets.executedTargets,
           ok: true,
           plannedTargets: targetSets.plannedTargets,
@@ -287,15 +323,29 @@ export default defineCommand({
     }
 
     for (const r of results) {
-      ctx.out(okLabel(ctx, formatPublishResultLine({
-        dryRun,
-        durationMs: r.durationMs,
-        label: r.label,
-        packageName: r.packageName,
-      })));
+      ctx.out(
+        okLabel(
+          ctx,
+          formatPublishResultLine({
+            apply,
+            durationMs: r.durationMs,
+            label: r.label,
+            packageName: r.packageName,
+          }),
+        ),
+      );
     }
 
     ctx.out(`Total duration: ${Math.round(performance.now() - startedAt)}ms`);
-    ctx.out(formatPublishSummary(createPublishSummaryFromResults({ planned: requestedTargets.resolution.resolved.length, resultsCount: results.length, skipped }), dryRun));
+    ctx.out(
+      formatPublishSummary(
+        createPublishSummaryFromResults({
+          planned: requestedTargets.resolution.resolved.length,
+          resultsCount: results.length,
+          skipped,
+        }),
+        !apply,
+      ),
+    );
   },
 });

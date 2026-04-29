@@ -247,11 +247,7 @@ function getOutputPath(inputPath: string, filePath: string, isDirectory: boolean
   return `${inputPath}.ts`;
 }
 
-function getUnescapeOutputPath(
-  inputPath: string,
-  filePath: string,
-  isDirectory: boolean,
-): string {
+function getUnescapeOutputPath(inputPath: string, filePath: string, isDirectory: boolean): string {
   if (isDirectory) {
     const inputName = basename(inputPath);
     const inputDir = dirname(inputPath);
@@ -340,25 +336,25 @@ export default defineCommand({
   interactive: "never",
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["fs.write"],
   },
   help: {
     examples: [
       'rse escape --input "path/to/file.md"',
-      'rse escape --input "path/to/dir" --dry-run',
-      'rse escape --input "path/to/dir" --overwrite',
+      'rse escape --input "path/to/dir"',
+      'rse escape --input "path/to/dir" --apply --overwrite',
       'rse escape --input "path/to/dir" --map "md:.rules,path/to/file json:*.markdown"',
       'rse escape --input "path/to/dir-escaped" --unescape',
       'rse escape --input "path/to/dir" --json',
     ],
-    text: "Input resolution is explicit: provide --input, optionally preview with --dry-run, and use --overwrite only when overwriting differing outputs is intentional.",
+    text: "Input resolution is explicit: provide --input to preview, then pass --apply to write files. Use --overwrite only when replacing existing outputs is intentional.",
   },
   options: {
-    dryRun: {
-      type: "boolean",
-      description: "Preview writes without modifying files",
-      inputSources: ["flag"],
-    },
     overwrite: {
       type: "boolean",
       description: "Overwrite existing output files when the generated content differs",
@@ -394,7 +390,8 @@ export default defineCommand({
     const warnLabel = (text: string) => ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
 
     const inputPath = resolve(ctx.options.input);
-    const dryRun = ctx.options.dryRun === true;
+    const apply = ctx.safety.apply;
+    const preview = !apply;
     const overwrite = ctx.options.overwrite === true;
     const kind: EscapeAction["kind"] = ctx.options.unescape ? "unescape" : "convert";
 
@@ -416,9 +413,7 @@ export default defineCommand({
     if (files.length === 0) {
       ctx.exit(
         1,
-        ctx.options.unescape
-          ? "No escaped files found to process."
-          : "No files found to process.",
+        ctx.options.unescape ? "No escaped files found to process." : "No files found to process.",
       );
     }
 
@@ -465,7 +460,7 @@ export default defineCommand({
           };
         }
 
-        if (dryRun) {
+        if (preview) {
           return {
             action: {
               action: "planned" as const,
@@ -481,12 +476,13 @@ export default defineCommand({
               ? []
               : [
                   existingOutput === undefined
-                    ? `Dry run: would write ${outputPath}`
-                    : `Dry run: would overwrite ${outputPath}`,
+                    ? `Preview: would write ${outputPath}`
+                    : `Preview: would overwrite ${outputPath}`,
                 ],
           };
         }
 
+        ctx.safety.assertApplied("fs.write");
         await writeOutputFile(outputPath, nextContent);
         return {
           action: {
@@ -495,7 +491,9 @@ export default defineCommand({
             kind,
             outputPath,
             reason:
-              existingOutput === undefined ? "created output file" : "overwrote existing output file",
+              existingOutput === undefined
+                ? "created output file"
+                : "overwrote existing output file",
           },
           messages: isJsonOutput
             ? []
@@ -523,7 +521,8 @@ export default defineCommand({
       actions,
       blocked: summary.blocked,
       command: "escape",
-      dryRun,
+      apply,
+      preview,
       overwrite,
       kind,
       noop: summary.noop,
@@ -537,7 +536,11 @@ export default defineCommand({
         `${infoLabel("Summary:")} ${summary.written} written, ${summary.planned} planned, ${summary.noop} no-op, ${summary.blocked} blocked.`,
       );
       ctx.out(
-        dryRun ? okLabel("Dry run complete!") : kind === "unescape" ? okLabel("Unescape complete!") : okLabel("Conversion complete!"),
+        preview
+          ? okLabel("Preview complete!")
+          : kind === "unescape"
+            ? okLabel("Unescape complete!")
+            : okLabel("Conversion complete!"),
       );
     }
 

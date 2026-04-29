@@ -29,7 +29,7 @@
         "@reliverse/os-rse-plugin": "workspace:*",
         "@reliverse/pm-rse-plugin": "workspace:*",
         "@reliverse/rempts-rse-plugin": "workspace:*",
-        "@reliverse/tools-rse-plugin": "workspace:*",
+        "@reliverse/toolkit-rse-plugin": "workspace:*",
         "@repo/tsconfig": "workspace:*",
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
@@ -335,7 +335,7 @@
       },
     },
     "plugins/toolkit": {
-      "name": "@reliverse/tools-rse-plugin",
+      "name": "@reliverse/toolkit-rse-plugin",
       "version": "0.1.0",
       "dependencies": {
         "@reliverse/rempts": "workspace:*",
@@ -1101,7 +1101,7 @@
 
     "@reliverse/rse": ["@reliverse/rse@workspace:apps/rse"],
 
-    "@reliverse/tools-rse-plugin": ["@reliverse/tools-rse-plugin@workspace:plugins/toolkit"],
+    "@reliverse/toolkit-rse-plugin": ["@reliverse/toolkit-rse-plugin@workspace:plugins/toolkit"],
 
     "@remixicon/react": ["@remixicon/react@4.9.0", "", { "peerDependencies": { "react": ">=18.2.0" } }, "sha512-5/jLDD4DtKxH2B4QVXTobvV1C2uL8ab9D5yAYNtFt+w80O0Ys1xFOrspqROL3fjrZi+7ElFUWE37hBfaAl6U+Q=="],
 
@@ -1861,7 +1861,7 @@
 
     "graceful-fs": ["graceful-fs@4.2.11", "", {}, "sha512-RbJ5/jmFcNNCcDV5o9eTnBLJ/HszWV0P73bc+Ff4nS/rJj+YaS6IGyiOL0VoBYX+l1Wrl3k63h/KrH+nhJ0XvQ=="],
 
-    "h3": ["h3@2.0.1-rc.20", "", { "dependencies": { "rou3": "^0.8.1", "srvx": "^0.11.13" }, "peerDependencies": { "crossws": "^0.4.1" }, "optionalPeers": ["crossws"], "bin": { "h3": "bin/h3.mjs" } }, "sha512-28ljodXuUp0fZovdiSRq4G9OgrxCztrJe5VdYzXAB7ueRvI7pIUqLU14Xi3XqdYJ/khXjfpUOOD2EQa6CmBgsg=="],
+    "h3": ["h3@2.0.1-rc.21", "", { "dependencies": { "rou3": "^0.8.1", "srvx": "^0.11.15" }, "peerDependencies": { "crossws": "^0.4.1" }, "optionalPeers": ["crossws"], "bin": { "h3": "bin/h3.mjs" } }, "sha512-lDeqAgCQXWT7C+5Zs3ler2phZPeX5yTk9KqQuL8taSSngIhcPR0r83TZyYwTO/cLogm6a4+9slZcngrfdyZtrQ=="],
 
     "h3-v2": ["h3@2.0.1-rc.20", "", { "dependencies": { "rou3": "^0.8.1", "srvx": "^0.11.13" }, "peerDependencies": { "crossws": "^0.4.1" }, "optionalPeers": ["crossws"], "bin": { "h3": "bin/h3.mjs" } }, "sha512-28ljodXuUp0fZovdiSRq4G9OgrxCztrJe5VdYzXAB7ueRvI7pIUqLU14Xi3XqdYJ/khXjfpUOOD2EQa6CmBgsg=="],
 

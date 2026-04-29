@@ -30,22 +30,41 @@ interface AddAction {
   readonly usesCatalog: boolean;
 }
 
-function infoLabel(ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string; green(text: string): string; yellow(text: string): string } } }, text: string): string {
+function infoLabel(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        cyan(text: string): string;
+        green(text: string): string;
+        yellow(text: string): string;
+      };
+    };
+  },
+  text: string,
+): string {
   return ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
 }
 
-function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+function okLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
 }
 
-function warnLabel(ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+function warnLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
 }
 
 export default defineCommand({
   meta: {
     name: "add",
-    description: "Add new dependencies to a repo or workspace package using Bun-first package management flows",
+    description:
+      "Add new dependencies to a repo or workspace package using Bun-first package management flows",
   },
   agent: {
     notes:
@@ -54,7 +73,12 @@ export default defineCommand({
   interactive: "never",
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["fs.write", "package.install"],
   },
   help: {
     examples: [
@@ -62,8 +86,8 @@ export default defineCommand({
       "rse pm add typescript @types/bun --dev --cwd .",
       "rse pm add react --target apps/web",
       "rse pm add zod --target packages/rempts --json",
-      "rse pm add valibot --target packages/rempts --dry-run --json",
-      "rse pm add jest --target apps/web --catalog testing --dry-run --json",
+      "rse pm add valibot --target packages/rempts --apply --json",
+      "rse pm add jest --target apps/web --catalog testing --apply --json",
     ],
     text: "For workspace packages, the command prefers the default Bun catalog when available. Use --catalog <name> to target a named Bun catalog and write catalog:<name> references.",
   },
@@ -82,11 +106,6 @@ export default defineCommand({
     dev: {
       type: "boolean",
       description: "Add packages to devDependencies",
-      inputSources: ["flag"],
-    },
-    dryRun: {
-      type: "boolean",
-      description: "Preview the planned package.json changes without writing files",
       inputSources: ["flag"],
     },
     exact: {
@@ -114,10 +133,7 @@ export default defineCommand({
     const packageInputs: PackageInput[] = (ctx.args as string[]).map(parsePackageInput);
 
     if (packageInputs.length === 0) {
-      ctx.exit(
-        1,
-        "Missing package names. Example: rse pm add zod --target packages/rempts",
-      );
+      ctx.exit(1, "Missing package names. Example: rse pm add zod --target packages/rempts");
     }
 
     const dependencySection = getRequestedSection({
@@ -131,7 +147,10 @@ export default defineCommand({
     });
     const requestedCatalogName = ctx.options.catalog?.trim() || undefined;
 
-    if (requestedCatalogName && (!context.usesWorkspaces || context.targetDir === context.repoRootDir)) {
+    if (
+      requestedCatalogName &&
+      (!context.usesWorkspaces || context.targetDir === context.repoRootDir)
+    ) {
       ctx.exit(
         1,
         "Named catalogs can only be used when targeting a workspace package inside a Bun monorepo.",
@@ -149,7 +168,10 @@ export default defineCommand({
           .filter(
             (input) =>
               !input.requestedSpecifier &&
-              !(shouldUseCatalog && Boolean(findCatalogEntry(nextRootManifest, input.name, requestedCatalogName))),
+              !(
+                shouldUseCatalog &&
+                Boolean(findCatalogEntry(nextRootManifest, input.name, requestedCatalogName))
+              ),
           )
           .map((input) => input.name),
       ),
@@ -172,11 +194,7 @@ export default defineCommand({
 
     for (const input of packageInputs) {
       const existing = findDependencyLocation(nextTargetManifest, input.name);
-      const catalogEntry = findCatalogEntry(
-        nextRootManifest,
-        input.name,
-        requestedCatalogName,
-      );
+      const catalogEntry = findCatalogEntry(nextRootManifest, input.name, requestedCatalogName);
       const resolvedVersion =
         catalogEntry && shouldUseCatalog && !input.requestedSpecifier
           ? catalogEntry.specifier
@@ -184,8 +202,7 @@ export default defineCommand({
               exact: ctx.options.exact,
               requestedSpecifier: input.requestedSpecifier,
               version:
-                latestVersionByName.get(input.name) ??
-                (await fetchLatestVersion(input.name)),
+                latestVersionByName.get(input.name) ?? (await fetchLatestVersion(input.name)),
             });
       const desiredSpecifier = shouldUseCatalog
         ? getCatalogProtocol(requestedCatalogName)
@@ -262,7 +279,8 @@ export default defineCommand({
       JSON.stringify(nextRootManifest) !== JSON.stringify(context.repoRootManifest);
     const resultPayload = {
       actions,
-      dryRun: ctx.options.dryRun === true,
+      apply: ctx.safety.apply,
+      preview: !ctx.safety.apply,
       install: {
         command: "bun install",
         cwd: context.installCwd,
@@ -295,13 +313,13 @@ export default defineCommand({
       return;
     }
 
-    if (ctx.options.dryRun) {
+    if (!ctx.safety.apply) {
       if (ctx.output.mode === "json") {
         ctx.output.result(resultPayload, "pm add");
         return;
       }
 
-      ctx.out(`${infoLabel(ctx, "Dry run:")} ${context.targetLabel}`);
+      ctx.out(`${infoLabel(ctx, "Preview:")} ${context.targetLabel}`);
 
       for (const action of actions.filter((action) => action.action === "added")) {
         ctx.out(
@@ -311,6 +329,8 @@ export default defineCommand({
 
       return;
     }
+
+    ctx.safety.assertApplied("fs.write");
 
     const snapshotPaths = [
       context.targetManifestPath,
@@ -324,6 +344,7 @@ export default defineCommand({
       await writeManifest(context.repoRootManifestPath, nextRootManifest);
     }
 
+    ctx.safety.assertApplied("package.install");
     const installResult = await runBunInstall(context.installCwd);
 
     if (!installResult.ok) {

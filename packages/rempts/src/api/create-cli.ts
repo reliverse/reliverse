@@ -1,47 +1,46 @@
 import { basename, extname } from "node:path";
-import { detectTerminalSupport } from "@reliverse/myenv";
 
-import type { RemptsPlugin } from "./define-plugin";
-import type { CommandConventions, CommandRuntimeInfo } from "./define-command";
-import type { CommandOptionsRecord } from "../options/types";
-import { createPromptRuntime } from "../prompts/adapter";
+import { detectTerminalSupport } from "@reliverse/myenv";
 import { createRelico } from "@reliverse/relico";
+
+import type { CommandOptionDefinition, CommandOptionsRecord } from "../options/types";
+import { createPromptRuntime } from "../prompts/adapter";
+import { inspectCommandTree } from "../runtime/command-diagnostics";
 import type { CommandNode } from "../runtime/command-source";
 import { createCommandContext } from "../runtime/context";
 import { discoverCommandPath } from "../runtime/discover-command";
-import { executeCommand } from "../runtime/execute";
-import { createFileCommandSource } from "../runtime/file-source";
-import {
-  assertNoGlobalFlagCollisions,
-  getGlobalFlagDefinitions,
-  parseGlobalFlags,
-  type GlobalFlagConfig,
-} from "../runtime/global-flags";
-import {
-  buildCommandHelpDocument,
-  buildLauncherHelpDocument,
-} from "../runtime/help-model";
-import { serializeHelpDocument } from "../runtime/help-json";
-import { renderHelpDocument } from "../runtime/help-render";
-import { createCommandInput } from "../runtime/input";
-import { createRuntimeOutput } from "../runtime/output";
-import { parseArgvTail, type ParseArgvResult } from "../runtime/parse-argv";
-import { inspectCommandTree } from "../runtime/command-diagnostics";
-import { inspectPluginDiscovery, resolvePluginsFromReport } from "../runtime/plugin-discovery";
-import { createPluginCommandSource } from "../runtime/plugin-source";
-import { resolveEntry } from "../runtime/resolve-entry";
-import type {
-  OutputMode,
-  ParsedGlobalFlags,
-  RemptsHostInteractionMode,
-  RemptsInteractionMode,
-} from "../runtime/types";
 import {
   PromptUnavailableError,
   RemptsUsageError,
   RemptsValidationError,
   toStructuredRemptsError,
 } from "../runtime/errors";
+import { executeCommand } from "../runtime/execute";
+import { createFileCommandSource } from "../runtime/file-source";
+import {
+  assertNoReservedOptionCollisions,
+  getGlobalFlagDefinitions,
+  parseGlobalFlags,
+  type GlobalFlagConfig,
+} from "../runtime/global-flags";
+import { serializeHelpDocument } from "../runtime/help-json";
+import { buildCommandHelpDocument, buildLauncherHelpDocument } from "../runtime/help-model";
+import { renderHelpDocument } from "../runtime/help-render";
+import { createCommandInput } from "../runtime/input";
+import { createRuntimeOutput } from "../runtime/output";
+import { parseArgvTail, type ParseArgvResult } from "../runtime/parse-argv";
+import { inspectPluginDiscovery, resolvePluginsFromReport } from "../runtime/plugin-discovery";
+import { createPluginCommandSource } from "../runtime/plugin-source";
+import { resolveEntry } from "../runtime/resolve-entry";
+import { createCommandSafety } from "../runtime/safety";
+import type {
+  OutputMode,
+  ParsedGlobalFlags,
+  RemptsHostInteractionMode,
+  RemptsInteractionMode,
+} from "../runtime/types";
+import type { CommandConventions, CommandRuntimeInfo, CommandSafety } from "./define-command";
+import type { RemptsPlugin } from "./define-plugin";
 
 type OutputStream = Pick<typeof process.stdout, "write">;
 
@@ -68,14 +67,18 @@ export interface CreateCLIOptions {
   readonly onError?: ((error: unknown) => Promise<void> | void) | undefined;
   readonly onExit?: ((result: CLIExecutionResult) => Promise<void> | void) | undefined;
   readonly outputMode?: OutputMode | undefined;
-  readonly meta?: {
-    readonly name?: string | undefined;
-    readonly description?: string | undefined;
-  } | undefined;
-  readonly help?: {
-    readonly examples?: readonly string[] | undefined;
-    readonly format?: "auto" | "json" | "text" | undefined;
-  } | undefined;
+  readonly meta?:
+    | {
+        readonly name?: string | undefined;
+        readonly description?: string | undefined;
+      }
+    | undefined;
+  readonly help?:
+    | {
+        readonly examples?: readonly string[] | undefined;
+        readonly format?: "auto" | "json" | "text" | undefined;
+      }
+    | undefined;
   /**
    * Inherited option definitions applied to every command in this CLI, including plugin commands.
    * Command-level options override plugin-level options, which override these CLI-level options.
@@ -93,11 +96,13 @@ export interface CreateCLIOptions {
    *   First matching rule wins; exact package names can be mixed with broader glob patterns.
    * - `cwd`: directory to start searching upward for the host package.json (defaults to CreateCLIOptions.cwd).
    */
-  readonly plugins?: {
-    readonly allowedPatterns?: readonly string[] | undefined;
-    readonly conflictPriority?: readonly string[] | undefined;
-    readonly cwd?: string | undefined;
-  } | undefined;
+  readonly plugins?:
+    | {
+        readonly allowedPatterns?: readonly string[] | undefined;
+        readonly conflictPriority?: readonly string[] | undefined;
+        readonly cwd?: string | undefined;
+      }
+    | undefined;
   readonly stderr?: typeof process.stderr | undefined;
   readonly stdin?: typeof process.stdin | undefined;
   readonly stdout?: typeof process.stdout | undefined;
@@ -157,9 +162,7 @@ function shouldRenderJsonHelp(
   return outputMode === "json";
 }
 
-function getResult(
-  result: Omit<CLIExecutionResult, "ok">,
-): CLIExecutionResult {
+function getResult(result: Omit<CLIExecutionResult, "ok">): CLIExecutionResult {
   return {
     ...result,
     ok: result.exitCode === 0,
@@ -224,15 +227,53 @@ async function finalizeResult(
   return result;
 }
 
+const APPLY_OPTION_DEFINITION: CommandOptionDefinition = {
+  type: "boolean",
+  description: "Execute side effects. Default is preview-only for commands that require apply.",
+  inputSources: ["flag"],
+};
+
+function withSafetyApplyOption(
+  commandOptions: CommandOptionsRecord | undefined,
+  definition: {
+    readonly conventions?: CommandConventions | undefined;
+    readonly safety?: CommandSafety | undefined;
+  },
+): CommandOptionsRecord | undefined {
+  const requiresApply =
+    definition.safety?.requiresApply === true || definition.conventions?.supportsApply === true;
+
+  if (!requiresApply) {
+    return commandOptions;
+  }
+
+  if (commandOptions?.apply) {
+    return commandOptions;
+  }
+
+  return {
+    ...(commandOptions ?? {}),
+    apply: APPLY_OPTION_DEFINITION,
+  };
+}
+
 function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
   commandName: string,
   commandNode: Pick<CommandNode, "directoryPath" | "filePath" | "sourceId" | "sourceKind">,
   commandPath: readonly string[],
   definition: {
     readonly agent?: { readonly notes?: string | undefined } | undefined;
-    readonly meta?: { readonly aliases?: readonly string[] | undefined; readonly description?: string | undefined } | undefined;
+    readonly meta?:
+      | {
+          readonly aliases?: readonly string[] | undefined;
+          readonly description?: string | undefined;
+        }
+      | undefined;
     readonly conventions?: CommandConventions | undefined;
-    readonly help?: { readonly examples?: readonly string[] | undefined; readonly text?: string | undefined } | undefined;
+    readonly safety?: CommandSafety | undefined;
+    readonly help?:
+      | { readonly examples?: readonly string[] | undefined; readonly text?: string | undefined }
+      | undefined;
     readonly interactive?: RemptsInteractionMode | undefined;
     readonly noTTY?: boolean | undefined;
     readonly noTUI?: boolean | undefined;
@@ -254,6 +295,7 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
     noTUI: definition.noTUI ?? false,
     options: definition.options,
     path: commandPath,
+    safety: definition.safety,
     sourceId: commandNode.sourceId,
     sourceKind: commandNode.sourceKind,
   };
@@ -297,11 +339,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
   try {
     const resolvedEntry = resolveEntry(options.entry);
     const globalFlagDefinitions = getGlobalFlagDefinitions(options.globalFlags);
-    const cliName = getCLIName(
-      resolvedEntry.entryFileName,
-      options.meta?.name,
-      process.argv,
-    );
+    const cliName = getCLIName(resolvedEntry.entryFileName, options.meta?.name, process.argv);
 
     const allowedPatterns = options.plugins?.allowedPatterns ?? [];
     const conflictPriority = options.plugins?.conflictPriority ?? [];
@@ -346,13 +384,13 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
         commandPath: discovered.matchedPath,
         description:
           discovered.matchedPath.length > 0
-            ? discovered.commandNode?.description ??
-              `Available subcommands for ${discovered.matchedPath.join(" ")}.`
-                : options.meta?.description,
+            ? (discovered.commandNode?.description ??
+              `Available subcommands for ${discovered.matchedPath.join(" ")}.`)
+            : options.meta?.description,
         examples:
           discovered.matchedPath.length > 0
             ? discovered.commandNode?.examples
-                : options.help?.examples,
+            : options.help?.examples,
         conventions: discovered.commandNode?.conventions,
         globalFlagDefinitions,
         helpText: discovered.commandNode?.help ?? emptyCliHelpText,
@@ -419,21 +457,24 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       resolvedCommandNode.sourceKind === "plugin"
         ? effectivePlugins.find((plugin) => plugin.name === resolvedCommandNode.sourceId)
         : undefined;
-    const effectiveCommandOptions = mergeInheritedOptions(
+    assertNoReservedOptionCollisions(options.options, { owner: "CLI inherited" });
+    assertNoReservedOptionCollisions(owningPlugin?.options, {
+      owner: owningPlugin ? `Plugin "${owningPlugin.name}"` : "Plugin",
+    });
+    assertNoReservedOptionCollisions(command.options, { owner: "Command" });
+
+    const mergedCommandOptions = mergeInheritedOptions(
       options.options,
       owningPlugin?.options,
       command.options,
     );
+    const effectiveCommandOptions = withSafetyApplyOption(mergedCommandOptions, command);
     const effectiveCommand = {
       ...command,
       options: effectiveCommandOptions,
     };
 
-    assertNoGlobalFlagCollisions(effectiveCommand.options, options.globalFlags);
-    const commandName =
-      effectiveCommand.meta?.name ??
-      discovered.matchedPath.at(-1) ??
-      cliName;
+    const commandName = effectiveCommand.meta?.name ?? discovered.matchedPath.at(-1) ?? cliName;
     const commandHelp = buildCommandHelpDocument({
       availableSubcommands: discovered.availableSubcommands,
       command: effectiveCommand,
@@ -507,6 +548,12 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       tui: parsedGlobals.flags.tui,
     });
 
+    const safety = createCommandSafety({
+      commandName,
+      commandOptions: parsed.options,
+      safety: effectiveCommand.safety,
+    });
+
     const context = createCommandContext({
       args: parsed.args,
       cli: {
@@ -534,6 +581,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       isTUI: promptRuntime.isTUI,
       options: parsed.options,
       output,
+      safety,
       stdinMode: promptRuntime.stdinMode,
       prompt: promptRuntime.prompt,
       stderr,

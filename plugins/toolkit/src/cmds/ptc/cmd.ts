@@ -12,7 +12,12 @@ export default defineCommand({
   },
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["fs.write"],
   },
   help: {
     examples: [
@@ -31,11 +36,6 @@ export default defineCommand({
       defaultValue: "packed-context.txt",
       description: "Output file path",
       inputSources: ["flag", "default"],
-    },
-    apply: {
-      type: "boolean",
-      description: "Write the packed context file instead of printing a summary only",
-      inputSources: ["flag"],
     },
     ext: {
       type: "string",
@@ -66,10 +66,14 @@ export default defineCommand({
   },
   async handler(ctx) {
     try {
+      if (ctx.safety.apply) {
+        ctx.safety.assertApplied("fs.write");
+      }
+
       const run = await runPtc({
         inputPaths: ctx.args as string[],
         outputPath: ctx.options.output,
-        apply: ctx.options.apply === true,
+        apply: ctx.safety.apply,
         ext: ctx.options.ext,
         extMerge: ctx.options.extMerge,
         ignore: ctx.options.ignore,

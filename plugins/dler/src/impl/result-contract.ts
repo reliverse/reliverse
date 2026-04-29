@@ -46,8 +46,8 @@ export function formatBuildSummary(summary: DlerBuildSummary): string {
   return `Summary: ${summary.succeeded} built, ${summary.failed} failed, ${summary.skipped} skipped.`;
 }
 
-export function formatPublishSummary(summary: DlerPublishSummary, dryRun: boolean): string {
-  return `Summary: ${summary.published} ${dryRun ? "prepared" : "published"}, ${summary.failed} failed, ${summary.skipped} skipped.`;
+export function formatPublishSummary(summary: DlerPublishSummary, preview: boolean): string {
+  return `Summary: ${summary.published} ${preview ? "prepared" : "published"}, ${summary.failed} failed, ${summary.skipped} skipped.`;
 }
 
 export function createPublishSummaryFromResults(options: {

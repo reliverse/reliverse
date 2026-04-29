@@ -142,25 +142,6 @@ function groupUpdatedActions(actions: readonly UpdateAction[], fallbackLabel: st
   return grouped;
 }
 
-function resolveDryRunMode(options: {
-  readonly apply?: boolean | undefined;
-  readonly dryRun?: boolean | undefined;
-}): boolean {
-  if (options.dryRun === true) {
-    return true;
-  }
-
-  if (options.dryRun === false) {
-    return false;
-  }
-
-  if (options.apply === true) {
-    return false;
-  }
-
-  return true;
-}
-
 function infoLabel(
   ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string } } },
   text: string,
@@ -195,24 +176,28 @@ export default defineCommand({
   interactive: "never",
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
     supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["fs.write", "package.install"],
   },
   help: {
     examples: [
       "rse pm update --cwd .",
       "rse pm update typescript @types/bun --target packages/rempts",
       "rse pm update --target apps/rse --json",
-      "rse pm update zod --target packages/rempts --dry-run --json",
-      "rse pm update --target . --dry-run --json",
-      "rse pm update --target . --no-recursive --dry-run --json",
-      "rse pm update typescript --dry-run --json",
-      "rse pm update typescript --no-latest --dry-run --json",
-      "rse pm update vite --no-smart --dry-run --json",
-      "rse pm update --cwd /path/to/project --target /path/to/project --apply --dry-run --json",
+      "rse pm update zod --target packages/rempts --apply --json",
+      "rse pm update --target . --apply --json",
+      "rse pm update --target . --no-recursive --json",
+      "rse pm update typescript --json",
+      "rse pm update typescript --no-latest --json",
+      "rse pm update vite --no-smart --json",
+      "rse pm update --cwd /path/to/project --target /path/to/project --apply --json",
       "rse pm update --apply",
     ],
-    text: "By default this command updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Dry-run is enabled by default. Pass `--apply` to execute real writes and the final Bun step, or pass `--dry-run --apply` to keep preview mode explicit. Dry-run output shows grouped specifier diffs and the final Bun command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to execute real writes and the final Bun step. Preview output shows grouped specifier diffs and the final Bun command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
   },
   options: {
     cwd: {
@@ -220,17 +205,6 @@ export default defineCommand({
       defaultValue: ".",
       description: "Base directory used to resolve the repo and target package",
       inputSources: ["flag", "default"],
-    },
-    dryRun: {
-      type: "boolean",
-      description:
-        "Enabled by default; preview package.json changes without writing files. Pass --apply to execute unless --dry-run is also set",
-      inputSources: ["flag"],
-    },
-    apply: {
-      type: "boolean",
-      description: "Execute real writes and the final Bun step unless --dry-run is also set",
-      inputSources: ["flag"],
     },
     latest: {
       type: "boolean",
@@ -275,11 +249,9 @@ export default defineCommand({
     });
     const smartByDefault = ctx.options.smart !== false;
     const latestByDefault = ctx.options.latest !== false;
-    const executionRequested = ctx.options.apply === true;
-    const dryRun = resolveDryRunMode({
-      apply: ctx.options.apply,
-      dryRun: ctx.options.dryRun,
-    });
+    const executionRequested = ctx.safety.apply;
+    const apply = executionRequested;
+    const preview = !apply;
     const strategy = describeStrategy({
       latest: latestByDefault,
       smart: smartByDefault,
@@ -312,7 +284,8 @@ export default defineCommand({
         ctx.output.result(
           {
             actions: [],
-            dryRun,
+            apply,
+            preview,
             install: {
               command: installCommand,
               cwd: context.installCwd,
@@ -585,7 +558,8 @@ export default defineCommand({
     const summary = createActionSummary(actions);
     const resultPayload = {
       actions,
-      dryRun,
+      apply,
+      preview,
       install: {
         command: installCommand,
         cwd: context.installCwd,
@@ -623,13 +597,13 @@ export default defineCommand({
       return;
     }
 
-    if (dryRun) {
+    if (preview) {
       if (ctx.output.mode === "json") {
         ctx.output.result(resultPayload, "pm update");
         return;
       }
 
-      ctx.out(`${infoLabel(ctx, "Dry run:")} ${context.targetLabel}.`);
+      ctx.out(`${infoLabel(ctx, "Preview:")} ${context.targetLabel}.`);
       ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
       ctx.out(
         `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
@@ -668,6 +642,8 @@ export default defineCommand({
       return;
     }
 
+    ctx.safety.assertApplied("fs.write");
+
     const snapshotPaths = [
       ...new Set([
         ...changedManifestTargets.map((target) => target.manifestPath),
@@ -690,6 +666,7 @@ export default defineCommand({
       await writeManifest(context.repoRootManifestPath, nextRootManifest);
     }
 
+    ctx.safety.assertApplied("package.install");
     const installResult = shouldRunNativeUpdate
       ? await runBunUpdate(context.installCwd, {
           useBunForce: executionRequested,

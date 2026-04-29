@@ -7,8 +7,7 @@ import pMap from "p-map";
 export default defineCommand({
   meta: {
     name: "bootstrap",
-    description:
-      "Bootstrap Reliverse OS",
+    description: "Bootstrap Reliverse OS",
   },
   agent: {
     notes:
@@ -17,25 +16,23 @@ export default defineCommand({
   interactive: "never",
   conventions: {
     idempotent: true,
-    supportsDryRun: true,
+    supportsApply: true,
+  },
+  safety: {
+    defaultMode: "preview",
+    requiresApply: true,
+    effects: ["process.exec", "fs.write"],
   },
   help: {
-    examples: [
-      'rse os bootstrap',
-    ],
+    examples: ["rse os bootstrap"],
     text: "Bootstrap a Reliverse OS host.",
   },
   options: {
-    dryRun: {
-      type: "boolean",
-      description: "Preview writes without modifying files",
-      inputSources: ["flag"],
-    },
     overwrite: {
       type: "boolean",
       description: "Overwrite existing output files when the generated content differs",
       inputSources: ["flag"],
-    }
+    },
   },
   async handler(ctx) {},
 });

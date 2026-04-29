@@ -51,8 +51,8 @@ Examples:
 ```bash
 bun apps/rse/src/cli.ts --help
 bun apps/rse/src/cli.ts dler --help
-bun apps/rse/src/cli.ts pm add zod --target packages/rempts --dry-run --json
-bun apps/rse/src/cli.ts escape --input README.md --dry-run
+bun apps/rse/src/cli.ts pm add zod --target packages/rempts --json
+bun apps/rse/src/cli.ts escape --input README.md
 ```
 
 ## Quick start
@@ -108,10 +108,10 @@ The host plugin search is anchored to the CLI package (`apps/rse`) rather than t
 ```bash
 bun apps/rse/src/cli.ts --help
 bun apps/rse/src/cli.ts dler --help
-bun apps/rse/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/rse --dry-run
-bun apps/rse/src/cli.ts pm add zod --target packages/rempts --dry-run --json
-bun apps/rse/src/cli.ts pm update typescript --dry-run --json
-bun apps/rse/src/cli.ts escape --input README.md --dry-run
+bun apps/rse/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/rse 
+bun apps/rse/src/cli.ts pm add zod --target packages/rempts --json
+bun apps/rse/src/cli.ts pm update typescript --json
+bun apps/rse/src/cli.ts escape --input README.md
 ```
 
 If you prefer package scripts:

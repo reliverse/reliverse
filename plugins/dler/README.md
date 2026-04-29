@@ -14,7 +14,7 @@ Typical command families include build and publishing flows such as:
 Current command policy:
 
 - use `pub` as the stable user-facing publish command name
-- prefer dry-run / preview-first behavior when operating release flows
+- prefer preview-first behavior when operating release flows
 - keep help and result output automation-friendly and symmetric across `build` and `pub`
 
 ## Plugin model
