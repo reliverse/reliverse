@@ -6,5 +6,5 @@ export default definePlugin({
   entry: import.meta.url,
   name: "toolkit-rse-plugin",
   description: "Useful tools Rse plugin for the Reliverse developer ecosystem",
-  provides: ["escape"],
+  provides: ["toolkit"],
 });
