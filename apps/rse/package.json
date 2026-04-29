@@ -19,6 +19,11 @@
     "@reliverse/rempts": "workspace:*"
   },
   "devDependencies": {
+    "@reliverse/dler-rse-plugin": "workspace:*",
+    "@reliverse/os-rse-plugin": "workspace:*",
+    "@reliverse/pm-rse-plugin": "workspace:*",
+    "@reliverse/rempts-rse-plugin": "workspace:*",
+    "@reliverse/tools-rse-plugin": "workspace:*",
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"

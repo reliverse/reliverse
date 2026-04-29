@@ -4,6 +4,7 @@
   "private": true,
   "workspaces": {
     "catalog": {
+      "@typescript/native-preview": "beta",
       "@ai-sdk/devtools": "^0.0.14",
       "@ai-sdk/google": "^3.0.29",
       "@ai-sdk/react": "^3.0.88",
@@ -79,7 +80,6 @@
       "@types/react": "^19.2.14",
       "@types/react-dom": "^19.2.3",
       "@types/ws": "^8.18.1",
-      "@typescript/native-preview": "^7.0.0-dev.20260325.1",
       "@vercel/kv": "^3.0.0",
       "@vitejs/plugin-react": "^5.1.4",
       "ai": "^6.0.86",
@@ -183,7 +183,7 @@
     "dev": "bun dev:web",
     "build": "bun build:web",
     "start": "bun start:web",
-    "dev:docs": "bun -F=@repo/reliverse-docs dev",
+    "dev:docs": "bun -F=@repo/reliverse-wiki dev",
     "dev:web": "bun -F=@repo/reliverse-web dev",
     "dev:cli": "bun -F=@reliverse/rse dev",
     "fresh": "bun scripts/clean.ts && bun install",

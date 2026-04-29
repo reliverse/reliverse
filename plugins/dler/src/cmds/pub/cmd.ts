@@ -104,7 +104,7 @@ export default defineCommand({
     if (prebuild && !hasBuilder) {
       ctx.exit(
         1,
-        "Prebuild is on by default but dler is not registered on this CLI. Install it and ensure it matches plugins.allowedPatterns (or pass it via createCLI({ plugins: { explicit: [...] } })). Alternatively use --no-prebuild with --publish-from after building manually.",
+        "Prebuild is on by default but dler is not registered on this CLI. Install the dler plugin package and ensure it matches the host CLI's plugins.allowedPatterns. Alternatively use --no-prebuild with --publish-from after building manually.",
       );
     }
 

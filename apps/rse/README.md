@@ -79,19 +79,29 @@ bun run test
 
 ```ts
 plugins: {
-  supportPlugins: true,
   allowedPatterns: ["@reliverse/*-rse-plugin"],
 }
 ```
 
 That means installed workspace packages matching that pattern can contribute commands.
 
+Optional global fallback plugins can also be configured in:
+
+```txt
+~/.reliverse/rempts/config.json
+```
+
+using the `clis.rse.plugins` list.
+
 Current plugin packages include:
 
 - `@reliverse/dler-rse-plugin`
 - `@reliverse/pm-rse-plugin`
+- `@reliverse/rempts-rse-plugin`
 - `@reliverse/tools-rse-plugin`
 - `@reliverse/os-rse-plugin`
+
+The host plugin search is anchored to the CLI package (`apps/cli`) rather than the caller's shell cwd, so `bun rse` from the repo root still resolves the CLI's declared plugin dependencies predictably.
 
 ## Examples
 

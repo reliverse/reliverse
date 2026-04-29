@@ -114,4 +114,32 @@ describe("renderHelpDocument colors", () => {
     expect(text).toContain("keeping the command flag column visually stable for humans reading help");
     expect(text).toContain("output in a terminal.");
   });
+
+  test("preserves multiline help prose and bullet structure", () => {
+    const text = renderHelpDocument({
+      aliases: [],
+      commandFlags: [],
+      commandPath: [],
+      examples: [],
+      globalFlags: [],
+      helpText: [
+        "No commands are currently available in this CLI.",
+        "",
+        "End user tips:",
+        "- run this CLI inside the intended project/workspace",
+        "- install or enable the plugin packages expected by this CLI",
+      ].join("\n"),
+      interactive: "never",
+      programName: "demo",
+      scope: "launcher",
+      scopeLabel: "Commands",
+      subcommands: [],
+      usage: ["demo <command>"],
+    });
+
+    expect(text).toContain("No commands are currently available in this CLI.");
+    expect(text).toContain("End user tips:");
+    expect(text).toContain("- run this CLI inside the intended project/workspace");
+    expect(text).toContain("- install or enable the plugin packages expected by this CLI");
+  });
 });

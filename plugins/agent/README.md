@@ -1,1 +1,0 @@
-# `@reliverse/agent-rse-plugin`

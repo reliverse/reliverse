@@ -5,6 +5,7 @@
 import { createCLI } from "@reliverse/rempts";
 
 const result = await createCLI({
+  cwd: import.meta.dir,
   entry: import.meta.url,
   meta: {
     description: "Reliverse developer CLI that aggregates Rempts plugins.",
@@ -16,6 +17,7 @@ const result = await createCLI({
       "rse pm add zod --target packages/rempts --dry-run --json",
       "rse dler build --targets plugins/pm,plugins/dler,apps/cli --dry-run",
       "rse dler --help",
+      "rse rempts plugins doctor --json",
       "rse pm update typescript --dry-run --json",
       "rse dler build --targets plugins/dler --provider bun --json",
     ],
@@ -23,8 +25,8 @@ const result = await createCLI({
   },
   interactionMode: "never",
   plugins: {
-    supportPlugins: true,
-    allowedPatterns: ["@reliverse/*-rse-plugin"],
+    allowedPatterns: ["@reliverse/*-rse-plugin", "@bleverse/*-rse-plugin"],
+    conflictPriority: ["@reliverse/*-rse-plugin", "@bleverse/*-rse-plugin"],
   },
 });
 

@@ -26,18 +26,9 @@ import { renderHelpDocument } from "../runtime/help-render";
 import { createCommandInput } from "../runtime/input";
 import { createRuntimeOutput } from "../runtime/output";
 import { parseArgvTail, type ParseArgvResult } from "../runtime/parse-argv";
+import { inspectCommandTree } from "../runtime/command-diagnostics";
+import { inspectPluginDiscovery, resolvePluginsFromReport } from "../runtime/plugin-discovery";
 import { createPluginCommandSource } from "../runtime/plugin-source";
-import {
-  getBunGlobalNodeModulesDirectory,
-  isBunGlobalEntryPath,
-  loadPluginsFromHostManifest,
-  resolveHostPluginsFromDirectory,
-} from "../runtime/host-plugins";
-import {
-  getDefaultRemptsGlobalConfigPath,
-  readGlobalRemptsConfig,
-  readGlobalHostPluginSpecifiers,
-} from "../runtime/global-plugin-config";
 import { resolveEntry } from "../runtime/resolve-entry";
 import type {
   OutputMode,
@@ -53,21 +44,6 @@ import {
 } from "../runtime/errors";
 
 type OutputStream = Pick<typeof process.stdout, "write">;
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function globToRegExp(glob: string): RegExp {
-  // Minimal glob: supports "*" only (no "**", no braces). Good enough for allowlists.
-  const pattern = `^${glob.split("*").map(escapeRegExp).join(".*")}$`;
-  return new RegExp(pattern);
-}
-
-function matchesAnyGlob(value: string, patterns: readonly string[]): boolean {
-  if (patterns.length === 0) return true;
-  return patterns.some((pattern) => globToRegExp(pattern).test(value));
-}
 
 export interface CLIExecutionResult {
   readonly commandName?: string | undefined;
@@ -101,18 +77,25 @@ export interface CreateCLIOptions {
     readonly format?: "auto" | "json" | "text" | undefined;
   } | undefined;
   /**
-   * Plugin loading configuration.
+   * Inherited option definitions applied to every command in this CLI, including plugin commands.
+   * Command-level options override plugin-level options, which override these CLI-level options.
+   */
+  readonly options?: CommandOptionsRecord | undefined;
+  /**
+   * Plugin discovery configuration.
    *
-   * - `supportPlugins`: enable auto-discovery from the host package environment.
-   * - `allowedPatterns`: optional allowlist of package name globs applied to auto-discovery candidates.
+   * When present, Rempts resolves plugins from the host package environment and optional
+   * global CLI config. The end user controls which plugin packages are installed/configured;
+   * the CLI controls which package names are allowed to participate.
+   *
+   * - `allowedPatterns`: required allowlist of plugin package name globs.
+   * - `conflictPriority`: optional precedence rules for exact-node plugin conflicts.
+   *   First matching rule wins; exact package names can be mixed with broader glob patterns.
    * - `cwd`: directory to start searching upward for the host package.json (defaults to CreateCLIOptions.cwd).
-   *
-   * Note: explicit plugins should be passed via `explicit`.
    */
   readonly plugins?: {
-    readonly explicit?: readonly RemptsPlugin[] | undefined;
-    readonly supportPlugins?: boolean | undefined;
     readonly allowedPatterns?: readonly string[] | undefined;
+    readonly conflictPriority?: readonly string[] | undefined;
     readonly cwd?: string | undefined;
   } | undefined;
   readonly stderr?: typeof process.stderr | undefined;
@@ -203,6 +186,33 @@ function assertNoPluginNameCollisions(plugins: readonly RemptsPlugin[]): void {
   }
 }
 
+function buildEmptyLauncherHelpText(options: {
+  readonly commandRoot: string;
+  readonly pluginDiscoveryEnabled: boolean;
+}): string {
+  const lines = [
+    "No commands are currently available in this CLI.",
+    "",
+    "End user tips:",
+    "- run this CLI inside the intended project/workspace",
+    options.pluginDiscoveryEnabled
+      ? "- install or enable the plugin packages expected by this CLI"
+      : "- check whether this CLI exposes commands in your current install",
+    "",
+    "CLI developer tips:",
+    `- add local command files under ${options.commandRoot}`,
+  ];
+
+  if (options.pluginDiscoveryEnabled) {
+    lines.push(
+      "- configure plugin discovery via createCLI({ plugins: { allowedPatterns: [...] } })",
+      "- keep plugin discovery as an extension point, not as a hard requirement",
+    );
+  }
+
+  return lines.join("\n");
+}
+
 async function finalizeResult(
   result: CLIExecutionResult,
   onExit: CreateCLIOptions["onExit"],
@@ -249,6 +259,20 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
   };
 }
 
+function mergeInheritedOptions(
+  cliOptions: CommandOptionsRecord | undefined,
+  pluginOptions: CommandOptionsRecord | undefined,
+  commandOptions: CommandOptionsRecord | undefined,
+): CommandOptionsRecord | undefined {
+  const merged = {
+    ...(cliOptions ?? {}),
+    ...(pluginOptions ?? {}),
+    ...(commandOptions ?? {}),
+  };
+
+  return Object.keys(merged).length > 0 ? merged : undefined;
+}
+
 export async function createCLI(options: CreateCLIOptions): Promise<CLIExecutionResult> {
   const argv = options.argv ?? process.argv.slice(2);
   const cwd = options.cwd ?? process.cwd();
@@ -279,116 +303,24 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       process.argv,
     );
 
-    const explicitPlugins = options.plugins?.explicit ?? [];
-    const supportPlugins = options.plugins?.supportPlugins ?? false;
     const allowedPatterns = options.plugins?.allowedPatterns ?? [];
+    const conflictPriority = options.plugins?.conflictPriority ?? [];
     const pluginsCwd = options.plugins?.cwd ?? cwd;
+    const pluginDiscoveryEnabled = options.plugins !== undefined;
 
-    let effectivePlugins: readonly RemptsPlugin[] = explicitPlugins;
+    let effectivePlugins: readonly RemptsPlugin[] = [];
+    let pluginDiscoveryReport = undefined;
 
-    if (supportPlugins) {
-      if (allowedPatterns.length === 0) {
-        throw new RemptsUsageError(
-          [
-            "supportPlugins is enabled, but plugins.allowedPatterns is empty.",
-            "",
-            "Rempts runs supportPlugins in strict mode. Scanning all dependencies/devDependencies is not supported",
-            "because most dependencies are not plugins and would fail strict validation.",
-            "",
-            "Fix: provide an allowlist of plugin package globs, e.g.:",
-            '  plugins: { supportPlugins: true, allowedPatterns: ["@reliverse/*-rse-plugin"] }',
-            "",
-            "Alternatively, configure global host plugins:",
-            `  ${getDefaultRemptsGlobalConfigPath()}`,
-          ].join("\n"),
-          1,
-        );
-      }
-
-      const globalConfig = await readGlobalRemptsConfig();
-      const bunInstallRoot = globalConfig?.bunInstallRoot;
-      const bunGlobalNodeModules = getBunGlobalNodeModulesDirectory(bunInstallRoot);
-      const globalEntry = isBunGlobalEntryPath(resolvedEntry.entryFilePath, bunInstallRoot);
-      const hostSearchRoot = globalEntry ? resolvedEntry.entryDirectory : pluginsCwd;
-
-      try {
-        const { hostRoot, pluginSpecifiers } = await resolveHostPluginsFromDirectory(hostSearchRoot);
-        const hostCandidates = hostRoot
-          ? pluginSpecifiers.filter((name) => matchesAnyGlob(name, allowedPatterns))
-          : [];
-        const loadedHostPlugins =
-          hostRoot && hostCandidates.length > 0
-            ? await loadPluginsFromHostManifest(hostRoot, hostCandidates, {
-                resolvePaths: globalEntry ? [bunGlobalNodeModules] : undefined,
-              })
-            : [];
-
-        const globalConfigSpecifiers =
-          loadedHostPlugins.length > 0 ? [] : await readGlobalHostPluginSpecifiers(cliName);
-        const globalRejectedByPattern =
-          allowedPatterns.length > 0
-            ? globalConfigSpecifiers.filter((name) => !matchesAnyGlob(name, allowedPatterns))
-            : [];
-        if (globalRejectedByPattern.length > 0) {
-          throw new RemptsUsageError(
-            [
-              "Global plugin config contains entries that are not allowed by this CLI's allowedPatterns.",
-              "",
-              `Config: ${getDefaultRemptsGlobalConfigPath()}`,
-              `CLI: ${cliName}`,
-              "",
-              "Not allowed:",
-              ...globalRejectedByPattern.map((name) => `- ${name}`),
-              "",
-              "Fix: remove these entries or adjust plugins.allowedPatterns in the CLI.",
-            ].join("\n"),
-            1,
-          );
-        }
-        const allowedGlobalSpecifiers =
-          allowedPatterns.length > 0
-            ? globalConfigSpecifiers.filter((name) => matchesAnyGlob(name, allowedPatterns))
-            : globalConfigSpecifiers;
-
-        const loadedGlobalPlugins =
-          allowedGlobalSpecifiers.length > 0
-            ? await loadPluginsFromHostManifest(hostRoot ?? hostSearchRoot, allowedGlobalSpecifiers, {
-                // Global config is meant for global installs too, so always allow Bun global resolution.
-                resolvePaths: [bunGlobalNodeModules],
-              })
-            : [];
-
-        if (loadedHostPlugins.length > 0 || loadedGlobalPlugins.length > 0) {
-          effectivePlugins = [...loadedHostPlugins, ...explicitPlugins];
-          if (loadedGlobalPlugins.length > 0) {
-            effectivePlugins = [...loadedGlobalPlugins, ...effectivePlugins];
-          }
-        } else if (explicitPlugins.length === 0) {
-          throw new RemptsUsageError(
-            [
-              "No Rempts host plugins found.",
-              "",
-              "For local development, install plugins as dependencies/devDependencies in the nearest package.json.",
-              "",
-              "For global usage, configure global host plugins:",
-              "",
-              `  ${getDefaultRemptsGlobalConfigPath()}`,
-              `Search started from: ${hostSearchRoot}`,
-            ].join("\n"),
-            1,
-            {
-              hint: "Install plugin packages in your project (deps/devDeps), or configure global host plugins, or pass explicit plugins to createCLI({ plugins: { explicit: [...] } }).",
-            },
-          );
-        }
-      } catch (error) {
-        if (error instanceof RemptsUsageError) {
-          throw error;
-        }
-
-        const message = error instanceof Error ? error.message : String(error);
-        throw new RemptsUsageError(`Failed to load Rempts host plugins: ${message}`, 1);
-      }
+    if (pluginDiscoveryEnabled) {
+      pluginDiscoveryReport = await inspectPluginDiscovery({
+        allowedPatterns,
+        cliName,
+        conflictPriority,
+        cwd: pluginsCwd,
+        entryDirectory: resolvedEntry.entryDirectory,
+        entryFilePath: resolvedEntry.entryFilePath,
+      });
+      effectivePlugins = resolvePluginsFromReport(pluginDiscoveryReport);
     }
 
     assertNoPluginNameCollisions(effectivePlugins);
@@ -397,9 +329,17 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       createFileCommandSource(resolvedEntry),
       ...effectivePlugins.map((plugin) => createPluginCommandSource(plugin)),
     ];
+    const commandDiagnostics = await inspectCommandTree(sources);
     const discovered = await discoverCommandPath(sources, parsedGlobals.argv);
 
     if (!discovered.commandNode?.loadCommand) {
+      const emptyCliHelpText =
+        discovered.matchedPath.length === 0 && discovered.availableSubcommands.length === 0
+          ? buildEmptyLauncherHelpText({
+              commandRoot: resolvedEntry.commandRoot,
+              pluginDiscoveryEnabled,
+            })
+          : undefined;
       const launcherHelp = buildLauncherHelpDocument({
         agentNotes: discovered.commandNode?.agent?.notes,
         availableSubcommands: discovered.availableSubcommands,
@@ -415,7 +355,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
                 : options.help?.examples,
         conventions: discovered.commandNode?.conventions,
         globalFlagDefinitions,
-        helpText: discovered.commandNode?.help,
+        helpText: discovered.commandNode?.help ?? emptyCliHelpText,
         interactive: discovered.commandNode?.interactive ?? "never",
         programName: cliName,
       });
@@ -467,15 +407,36 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       );
     }
 
-    const command = await discovered.commandNode.loadCommand();
-    assertNoGlobalFlagCollisions(command.options, options.globalFlags);
+    const resolvedCommandNode = discovered.commandNode;
+    const loadCommand = resolvedCommandNode.loadCommand;
+
+    if (!loadCommand) {
+      throw new RemptsUsageError("Resolved command node is missing a command loader.", 1);
+    }
+
+    const command = await loadCommand();
+    const owningPlugin =
+      resolvedCommandNode.sourceKind === "plugin"
+        ? effectivePlugins.find((plugin) => plugin.name === resolvedCommandNode.sourceId)
+        : undefined;
+    const effectiveCommandOptions = mergeInheritedOptions(
+      options.options,
+      owningPlugin?.options,
+      command.options,
+    );
+    const effectiveCommand = {
+      ...command,
+      options: effectiveCommandOptions,
+    };
+
+    assertNoGlobalFlagCollisions(effectiveCommand.options, options.globalFlags);
     const commandName =
-      command.meta?.name ??
+      effectiveCommand.meta?.name ??
       discovered.matchedPath.at(-1) ??
       cliName;
     const commandHelp = buildCommandHelpDocument({
       availableSubcommands: discovered.availableSubcommands,
-      command,
+      command: effectiveCommand,
       commandPath: discovered.matchedPath,
       globalFlagDefinitions,
       programName: cliName,
@@ -505,7 +466,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     let parsed: ParseArgvResult<CommandOptionsRecord>;
 
     try {
-      parsed = await parseArgvTail(discovered.remainingArgv, command.options);
+      parsed = await parseArgvTail(discovered.remainingArgv, effectiveCommand.options);
     } catch (error) {
       if (error instanceof RemptsUsageError || error instanceof RemptsValidationError) {
         output.problem({
@@ -533,13 +494,13 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     }
 
     const promptRuntime = await createPromptRuntime({
-      commandMode: command.interactive,
+      commandMode: effectiveCommand.interactive,
       env,
       hostMode: options.interactionMode ?? "never",
       interactive: parsedGlobals.flags.interactive,
       noInput: parsedGlobals.flags.noInput,
-      noTTY: options.noTTY || command.noTTY,
-      noTUI: options.noTTY || command.noTTY || options.noTUI || command.noTUI,
+      noTTY: options.noTTY || effectiveCommand.noTTY,
+      noTUI: options.noTTY || effectiveCommand.noTTY || options.noTUI || effectiveCommand.noTUI,
       stderr,
       stdin,
       stdout,
@@ -548,12 +509,17 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
 
     const context = createCommandContext({
       args: parsed.args,
+      cli: {
+        commandTree: commandDiagnostics,
+        name: cliName,
+        pluginDiscovery: pluginDiscoveryReport,
+      },
       cliPluginNames: effectivePlugins.map((plugin) => plugin.name),
       command: toCommandRuntimeInfo(
         commandName,
-        discovered.commandNode,
+        resolvedCommandNode,
         discovered.matchedPath,
-        command,
+        effectiveCommand,
       ),
       confirmationMode: promptRuntime.confirmationMode,
       cwd,
@@ -574,7 +540,7 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       stdin,
       stdout,
     });
-    const execution = await executeCommand(command, context);
+    const execution = await executeCommand(effectiveCommand, context);
 
     if (execution.unexpectedError && options.onError) {
       await options.onError(execution.unexpectedError);

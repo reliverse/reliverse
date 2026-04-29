@@ -8,6 +8,8 @@ import type {
 import type { RemptsExitSignal } from "../runtime/errors";
 import type { CommandInputAPI } from "../runtime/input";
 import type { InteractionPolicy } from "../runtime/noninteractive";
+import type { PluginDiscoveryReport } from "../runtime/plugin-discovery";
+import type { CommandTreeReport } from "../runtime/command-diagnostics";
 import type {
   ConfirmationMode,
   ParsedGlobalFlags,
@@ -86,8 +88,13 @@ export interface CommandRuntimeInfo<
 
 export interface CommandContext<TOptions extends CommandOptionsRecord = EmptyCommandOptions> {
   readonly args: readonly string[];
-  /** Plugin names passed to `createCLI({ plugins })`, in registration order. */
+  /** Plugin names discovered for `createCLI({ plugins })`, in precedence order. */
   readonly cliPluginNames: readonly string[];
+  readonly cli?: {
+    readonly commandTree?: CommandTreeReport | undefined;
+    readonly name: string;
+    readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
+  } | undefined;
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
   readonly cwd: string;

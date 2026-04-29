@@ -14,7 +14,24 @@ function isRemptsPlugin(value: unknown): value is RemptsPlugin {
   }
 
   const record = value as Record<string, unknown>;
-  return typeof record.name === "string" && typeof record.entry === "string";
+  return record.apiVersion === 1 && typeof record.name === "string" && typeof record.entry === "string";
+}
+
+export interface HostPluginLoadIssue {
+  readonly packageName: string;
+  readonly reason: string;
+  readonly specifier: string;
+}
+
+export interface HostPluginLoadSuccess {
+  readonly packageName: string;
+  readonly plugin: RemptsPlugin;
+  readonly specifier: string;
+}
+
+export interface InspectPluginsFromHostManifestResult {
+  readonly loaded: readonly HostPluginLoadSuccess[];
+  readonly rejected: readonly HostPluginLoadIssue[];
 }
 
 function readDependencyCandidateListFromManifest(manifest: unknown): readonly string[] {
@@ -208,6 +225,20 @@ export async function loadPluginsFromHostManifest(
   specifiers: readonly string[],
   options?: LoadPluginsFromHostManifestOptions,
 ): Promise<readonly RemptsPlugin[]> {
+  const inspected = await inspectPluginsFromHostManifest(hostRoot, specifiers, options);
+  if (inspected.rejected.length > 0) {
+    const first = inspected.rejected[0];
+    throw new Error(first?.reason ?? "Failed to load Rempts plugin package.");
+  }
+
+  return inspected.loaded.map((entry) => entry.plugin);
+}
+
+export async function inspectPluginsFromHostManifest(
+  hostRoot: string,
+  specifiers: readonly string[],
+  options?: LoadPluginsFromHostManifestOptions,
+): Promise<InspectPluginsFromHostManifestResult> {
   const hostPackageJson = join(hostRoot, "package.json");
   if (!(await fileExists(hostPackageJson))) {
     throw new Error(`Missing package.json at host root: ${hostRoot}`);
@@ -215,7 +246,7 @@ export async function loadPluginsFromHostManifest(
 
   const hostRequire = createRequire(hostPackageJson);
 
-  return pMap(
+  const inspected = await pMap(
     specifiers,
     async (entry) => {
       const { exportName, packageName } = parseHostPluginSpecifier(entry);
@@ -255,16 +286,32 @@ export async function loadPluginsFromHostManifest(
 
       try {
         const mod = (await import(pathToFileURL(resolved).href)) as Record<string, unknown>;
-        return pickPluginExport(mod, exportName);
+        const plugin = pickPluginExport(mod, exportName);
+        return {
+          ok: true as const,
+          packageName,
+          plugin,
+          specifier: entry,
+        };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        throw new Error(`Failed to load Rempts plugin package "${packageName}": ${message}`);
+        return {
+          ok: false as const,
+          packageName,
+          reason: `Failed to load Rempts plugin package "${packageName}": ${message}`,
+          specifier: entry,
+        };
       }
     },
     {
       concurrency: 8,
     },
   );
+
+  return {
+    loaded: inspected.filter((entry): entry is HostPluginLoadSuccess & { ok: true } => entry.ok),
+    rejected: inspected.filter((entry): entry is HostPluginLoadIssue & { ok: false } => !entry.ok),
+  };
 }
 
 export interface ResolveHostPluginsResult {

@@ -1,5 +1,5 @@
 {
-  "name": "@repo/reliverse-docs",
+  "name": "@repo/reliverse-wiki",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -23,14 +23,14 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.1.18",
+    "@types/bun": "catalog:",
     "@types/mdx": "^2.0.13",
     "@types/node": "^25.3.3",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "postcss": "^8.5.6",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3",
-    "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "typescript": "^5.9.3"
   }
 }

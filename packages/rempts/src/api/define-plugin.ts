@@ -1,10 +1,17 @@
 import { resolveEntry } from "../runtime/resolve-entry";
 import { RemptsUsageError } from "../runtime/errors";
+import type { CommandOptionsRecord } from "../options/types";
+
+export const REMPTS_PLUGIN_API_VERSION = 1;
 
 export interface RemptsPlugin {
+  readonly apiVersion: typeof REMPTS_PLUGIN_API_VERSION;
+  readonly capabilities?: readonly string[] | undefined;
   readonly description?: string | undefined;
   readonly entry: string;
   readonly name: string;
+  readonly options?: CommandOptionsRecord | undefined;
+  readonly provides?: readonly string[] | undefined;
 }
 
 function assertValidSegment(segment: string, path: readonly string[]): void {
@@ -23,11 +30,20 @@ function assertValidSegment(segment: string, path: readonly string[]): void {
 
 export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
   assertValidSegment(plugin.name, [plugin.name]);
+  if (plugin.apiVersion !== REMPTS_PLUGIN_API_VERSION) {
+    throw new RemptsUsageError(
+      `Unsupported Rempts plugin apiVersion "${String(plugin.apiVersion)}" for plugin "${plugin.name}". Expected ${REMPTS_PLUGIN_API_VERSION}.`,
+    );
+  }
   resolveEntry(plugin.entry);
 
   return {
+    apiVersion: plugin.apiVersion,
+    capabilities: plugin.capabilities ? [...plugin.capabilities] : undefined,
     description: plugin.description,
     entry: plugin.entry,
     name: plugin.name,
+    options: plugin.options ? { ...plugin.options } : undefined,
+    provides: plugin.provides ? [...plugin.provides] : undefined,
   };
 }

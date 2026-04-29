@@ -13,11 +13,18 @@ import type {
   RuntimeOutput,
   StdinMode,
 } from "./types";
+import type { CommandTreeReport } from "./command-diagnostics";
+import type { PluginDiscoveryReport } from "./plugin-discovery";
 
 export interface CreateCommandContextOptions<
   TOptions extends CommandOptionsRecord = CommandOptionsRecord,
 > {
   readonly args: readonly string[];
+  readonly cli?: {
+    readonly commandTree?: CommandTreeReport | undefined;
+    readonly name: string;
+    readonly pluginDiscovery?: PluginDiscoveryReport | undefined;
+  } | undefined;
   readonly cliPluginNames?: readonly string[] | undefined;
   readonly options: CommandOptionsOutput<TOptions>;
   readonly command: CommandRuntimeInfo<TOptions>;
@@ -42,6 +49,7 @@ export function createCommandContext<TOptions extends CommandOptionsRecord>(
 ): CommandContext<TOptions> {
   return {
     args: options.args,
+    cli: options.cli,
     cliPluginNames: options.cliPluginNames ?? [],
     command: options.command,
     confirmationMode: options.confirmationMode,

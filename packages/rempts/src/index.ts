@@ -5,16 +5,40 @@ export {
 } from "./api/create-cli";
 export {
   findHostPluginPackageRoot,
+  inspectPluginsFromHostManifest,
   loadPluginsFromHostManifest,
   parseHostPluginSpecifier,
   readHostPluginSpecifiers,
   resolveHostPluginsFromDirectory,
+  type HostPluginLoadIssue,
+  type HostPluginLoadSuccess,
+  type InspectPluginsFromHostManifestResult,
   type ResolveHostPluginsResult,
 } from "./runtime/host-plugins";
 export {
+  REMPTS_PLUGIN_API_VERSION,
   definePlugin,
   type RemptsPlugin,
 } from "./api/define-plugin";
+export {
+  inspectCommandTree,
+  type CommandCandidate,
+  type CommandSubcommandDiagnostic,
+  type CommandTreeNodeDiagnostic,
+  type CommandTreeReport,
+} from "./runtime/command-diagnostics";
+export {
+  inspectPluginDiscovery,
+  matchConflictPriorityRule,
+  matchesAnyGlob,
+  resolveDiscoveredPlugins,
+  resolvePluginsFromReport,
+  type PluginDiscoveryLoadedPlugin,
+  type PluginDiscoveryIgnoredSpecifier,
+  type PluginDiscoveryRejectedPlugin,
+  type PluginDiscoveryReport,
+  type ResolveDiscoveredPluginsOptions,
+} from "./runtime/plugin-discovery";
 export {
   COMMAND_DEFINITION_KIND,
   defineCommand,

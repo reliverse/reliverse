@@ -11,6 +11,8 @@ export interface RemptsGlobalHostConfigV1 {
    * Example: "/home/me/.bun"
    */
   readonly bunInstallRoot?: string | undefined;
+  readonly clis?: Record<string, { readonly plugins?: readonly string[] | undefined } | undefined> | undefined;
+  /** @deprecated Backward-compat alias for older configs. Prefer `clis`. */
   readonly CLIs?: Record<string, { readonly plugins?: readonly string[] | undefined } | undefined> | undefined;
 }
 
@@ -66,11 +68,10 @@ export async function readGlobalHostPluginSpecifiers(
       return [];
     }
 
-    const cli = config.CLIs?.[cliName];
+    const cli = config.clis?.[cliName] ?? config.CLIs?.[cliName];
     const plugins = cli?.plugins;
     return isStringArray(plugins) && plugins.length > 0 ? plugins : [];
   } catch {
     return [];
   }
 }
-

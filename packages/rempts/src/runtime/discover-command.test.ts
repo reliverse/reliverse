@@ -3,7 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { definePlugin } from "../api/define-plugin";
+import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "../api/define-plugin";
 import { createFileCommandSource } from "./file-source";
 import { discoverCommandPath } from "./discover-command";
 import { RemptsUsageError } from "./errors";
@@ -85,6 +85,7 @@ async function createPluginSource(
 
   return createPluginCommandSource(
     definePlugin({
+      apiVersion: REMPTS_PLUGIN_API_VERSION,
       entry: entryPath,
       name: pluginName,
     }),

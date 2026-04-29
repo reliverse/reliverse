@@ -13,6 +13,8 @@ It is designed for CLIs that should stay:
 
 Rempts treats command trees as filesystem structure.
 
+Plugin activation stays user-controlled: the CLI declares which plugin package names are allowed, and the host project or global CLI config decides which matching plugins are actually present.
+
 Local commands live under a CLI's own `cmds/` tree.
 Plugin commands also live under their own `cmds/` tree.
 
@@ -98,9 +100,10 @@ export default defineCommand({
 ### File-based plugin
 
 ```ts
-import { definePlugin } from "@reliverse/rempts";
+import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "@reliverse/rempts";
 
 export default definePlugin({
+  apiVersion: REMPTS_PLUGIN_API_VERSION,
   entry: import.meta.url,
   name: "builder-plugin",
   description: "Builder plugin for my CLI",
@@ -181,12 +184,33 @@ cmds/
 
 Even if `cmds/dler/pub/cmd.ts` does not exist.
 
+## Plugin discovery model
+
+Host CLIs enable plugin discovery by configuring `createCLI({ plugins })` with an allowlist of package-name patterns.
+
+```ts
+await createCLI({
+  entry: import.meta.url,
+  plugins: {
+    allowedPatterns: ["@reliverse/*-rse-plugin"],
+  },
+});
+```
+
+That means:
+
+- the CLI controls which package names are allowed to participate
+- the end user / host environment controls which matching plugin packages are installed locally
+- optional global CLI config (`~/.reliverse/rempts/config.json`, under `clis.<name>.plugins`) can provide fallback plugins when no local project plugins are found
+- there is no direct plugin injection API in `createCLI(...)`
+
 ## Plugin model
 
 `definePlugin(...)` is intentionally small.
 
 ```ts
 export default definePlugin({
+  apiVersion: REMPTS_PLUGIN_API_VERSION,
   entry: import.meta.url,
   name: "my-plugin",
   description: "Optional human-facing description",
@@ -195,6 +219,7 @@ export default definePlugin({
 
 ### Plugin fields
 
+- `apiVersion` - required Rempts plugin contract version
 - `entry` - path or file URL to the plugin entry module
 - `name` - internal plugin identifier
 - `description` - optional help text used when the plugin contributes a top-level scope without its own `cmd.ts`

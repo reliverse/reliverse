@@ -50,6 +50,38 @@ function wrapText(value: string, width: number): string[] {
   return lines;
 }
 
+function renderProse(value: string, width: number, indent = "  "): string[] {
+  const rawLines = value.split("\n");
+  const rendered: string[] = [];
+
+  for (const rawLine of rawLines) {
+    const line = rawLine.trimEnd();
+
+    if (line.trim().length === 0) {
+      rendered.push("");
+      continue;
+    }
+
+    const bulletMatch = /^(-)\s+(.*)$/.exec(line.trimStart());
+    if (bulletMatch) {
+      const [, marker, body] = bulletMatch;
+      const wrapped = wrapText(body ?? "", Math.max(1, width - `${indent}${marker} `.length));
+      const [first = "", ...rest] = wrapped;
+      rendered.push(`${indent}${marker} ${first}`);
+      rendered.push(...rest.map((part) => `${indent}  ${part}`));
+      continue;
+    }
+
+    rendered.push(...wrapText(line.trim(), width).map((part) => `${indent}${part}`));
+  }
+
+  while (rendered.at(-1) === "") {
+    rendered.pop();
+  }
+
+  return rendered;
+}
+
 function formatKeyValueRows(
   rows: ReadonlyArray<{ description: string; name: string; note?: string | undefined }>,
   colors?: HelpRenderColors,
@@ -119,7 +151,7 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
 
   if (document.description) {
     sectionSpacing(lines, "Description", colors);
-    lines.push(...wrapText(document.description, PROSE_WIDTH).map((line) => `  ${line}`));
+    lines.push(...renderProse(document.description, PROSE_WIDTH));
   }
 
   if (document.aliases.length > 0) {
@@ -195,12 +227,12 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
 
   if (document.agentNotes) {
     sectionSpacing(lines, "Agent Notes", colors);
-    lines.push(...wrapText(document.agentNotes, PROSE_WIDTH).map((line) => `  ${line}`));
+    lines.push(...renderProse(document.agentNotes, PROSE_WIDTH));
   }
 
   if (document.helpText) {
     sectionSpacing(lines, "Help", colors);
-    lines.push(...wrapText(document.helpText, PROSE_WIDTH).map((line) => `  ${line}`));
+    lines.push(...renderProse(document.helpText, PROSE_WIDTH));
   }
 
   return lines.join("\n");
