@@ -38,7 +38,7 @@ A file-based CLI foundation.
 
 ### `@reliverse/rse`
 
-The host developer CLI in `apps/cli`.
+The host developer CLI in `apps/rse`.
 
 It auto-loads workspace plugins matching:
 
@@ -49,10 +49,10 @@ It auto-loads workspace plugins matching:
 Examples:
 
 ```bash
-bun apps/cli/src/cli.ts --help
-bun apps/cli/src/cli.ts dler --help
-bun apps/cli/src/cli.ts pm add zod --target packages/rempts --dry-run --json
-bun apps/cli/src/cli.ts escape --input README.md --dry-run
+bun apps/rse/src/cli.ts --help
+bun apps/rse/src/cli.ts dler --help
+bun apps/rse/src/cli.ts pm add zod --target packages/rempts --dry-run --json
+bun apps/rse/src/cli.ts escape --input README.md --dry-run
 ```
 
 ## Quick start
@@ -98,20 +98,20 @@ Current plugin packages include:
 - `@reliverse/dler-rse-plugin`
 - `@reliverse/pm-rse-plugin`
 - `@reliverse/rempts-rse-plugin`
-- `@reliverse/tools-rse-plugin`
+- `@reliverse/toolkit-rse-plugin`
 - `@reliverse/os-rse-plugin`
 
-The host plugin search is anchored to the CLI package (`apps/cli`) rather than the caller's shell cwd, so `bun rse` from the repo root still resolves the CLI's declared plugin dependencies predictably.
+The host plugin search is anchored to the CLI package (`apps/rse`) rather than the caller's shell cwd, so `bun rse` from the repo root still resolves the CLI's declared plugin dependencies predictably.
 
 ## Examples
 
 ```bash
-bun apps/cli/src/cli.ts --help
-bun apps/cli/src/cli.ts dler --help
-bun apps/cli/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/cli --dry-run
-bun apps/cli/src/cli.ts pm add zod --target packages/rempts --dry-run --json
-bun apps/cli/src/cli.ts pm update typescript --dry-run --json
-bun apps/cli/src/cli.ts escape --input README.md --dry-run
+bun apps/rse/src/cli.ts --help
+bun apps/rse/src/cli.ts dler --help
+bun apps/rse/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/rse --dry-run
+bun apps/rse/src/cli.ts pm add zod --target packages/rempts --dry-run --json
+bun apps/rse/src/cli.ts pm update typescript --dry-run --json
+bun apps/rse/src/cli.ts escape --input README.md --dry-run
 ```
 
 If you prefer package scripts:
@@ -146,7 +146,7 @@ This lets `rse` combine local command scopes with plugin-provided deeper trees i
 Main entry file:
 
 ```txt
-apps/cli/src/cli.ts
+apps/rse/src/cli.ts
 ```
 
 The current CLI metadata is:

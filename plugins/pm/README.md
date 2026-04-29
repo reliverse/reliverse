@@ -23,4 +23,4 @@ Current command families include:
 
 - Roadmap: [`./ROADMAP.md`](./ROADMAP.md)
 - Rempts docs: [`../../packages/rempts/README.md`](../../packages/rempts/README.md)
-- Rse CLI docs: [`../../apps/cli/README.md`](../../apps/cli/README.md)
+- Rse CLI docs: [`../../apps/rse/README.md`](../../apps/rse/README.md)

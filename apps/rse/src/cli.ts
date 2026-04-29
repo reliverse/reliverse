@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-// 👉 bun apps/cli/src/cli.ts <cmd> <args>
+// 👉 bun apps/rse/src/cli.ts <cmd> <args>
 
 import { createCLI } from "@reliverse/rempts";
 
@@ -15,7 +15,7 @@ const result = await createCLI({
     examples: [
       "rse escape --input README.md --dry-run",
       "rse pm add zod --target packages/rempts --dry-run --json",
-      "rse dler build --targets plugins/pm,plugins/dler,apps/cli --dry-run",
+      "rse dler build --targets plugins/pm,plugins/dler,apps/rse --dry-run",
       "rse dler --help",
       "rse rempts plugins doctor --json",
       "rse pm update typescript --dry-run --json",
@@ -25,8 +25,8 @@ const result = await createCLI({
   },
   interactionMode: "never",
   plugins: {
-    allowedPatterns: ["@reliverse/*-rse-plugin", "@bleverse/*-rse-plugin"],
-    conflictPriority: ["@reliverse/*-rse-plugin", "@bleverse/*-rse-plugin"],
+    allowedPatterns: ["@reliverse/*-rse-plugin"],
+    conflictPriority: ["@reliverse/*-rse-plugin"],
   },
 });
 

@@ -179,7 +179,7 @@
   },
   "type": "module",
   "scripts": {
-    "rse": "bun apps/cli/src/cli.ts",
+    "rse": "bun apps/rse/src/cli.ts",
     "dev": "bun dev:web",
     "build": "bun build:web",
     "start": "bun start:web",

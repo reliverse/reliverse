@@ -1,11 +1,11 @@
+import { defineCommand } from "@reliverse/rempts";
+
 import {
   createBuildPlan,
   createBuildProviderRegistry,
   createBuilderRuntime,
   createBunBuildProvider,
 } from "../../impl/build";
-import { defineCommand } from "@reliverse/rempts";
-
 import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
 import { createBuildSummary, formatBuildSummary } from "../../impl/result-contract";
 import { resolveRequestedTargets } from "../../impl/shared-targets";
@@ -30,7 +30,7 @@ export default defineCommand({
   help: {
     examples: [
       "rse dler build --dry-run",
-      "rse dler build --targets plugins/pm,plugins/dler,apps/cli",
+      "rse dler build --targets plugins/pm,plugins/dler,apps/rse",
       "rse dler build --targets plugins/dler --provider bun --json",
     ],
     text: "dler plans a generated build command for each eligible workspace target, then executes those commands in order through the selected provider. Dry-run shows the commands that would be executed for the resolved target scope.",
@@ -50,8 +50,9 @@ export default defineCommand({
     },
     targets: {
       type: "string",
-      description: "Comma-separated workspace paths to build in order (defaults to cwd-derived scope when omitted)",
-      hint: "Examples: plugins/pm,plugins/dler,apps/cli",
+      description:
+        "Comma-separated workspace paths to build in order (defaults to cwd-derived scope when omitted)",
+      hint: "Examples: plugins/pm,plugins/dler,apps/rse",
       inputSources: ["flag"],
     },
   },
@@ -71,7 +72,10 @@ export default defineCommand({
     const targetLabels = requestedTargets.labels;
 
     if (targetLabels.length === 0) {
-      ctx.exit(1, "No build targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.");
+      ctx.exit(
+        1,
+        "No build targets resolved. Pass --targets path1,path2 or run from a workspace root/package directory.",
+      );
     }
 
     if (!providerRegistry.get(provider)) {
@@ -142,7 +146,9 @@ export default defineCommand({
           command: target.displayCommand ?? target.command.join(" "),
           cwd: target.cwd,
           label: target.label,
-          packageCommand: plan.plannedTargets.find((plannedTarget) => plannedTarget.label === target.label)?.packageCommand.display,
+          packageCommand: plan.plannedTargets.find(
+            (plannedTarget) => plannedTarget.label === target.label,
+          )?.packageCommand.display,
         })),
         summary,
         targets: targetLabels,
@@ -171,13 +177,15 @@ export default defineCommand({
       defaultProvider: providerRegistry.defaultProvider,
       providers: [createBunBuildProvider()],
     });
-    const report = await runtime.run({
-      provider,
-      targets,
-    }).catch((error: unknown) => {
-      const message = error instanceof Error ? error.message : String(error);
-      return ctx.exit(1, `Build setup failed: ${message}`);
-    });
+    const report = await runtime
+      .run({
+        provider,
+        targets,
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.exit(1, `Build setup failed: ${message}`);
+      });
     const summary = createBuildSummary({
       planned: targets.length,
       skipped: skippedTargets,

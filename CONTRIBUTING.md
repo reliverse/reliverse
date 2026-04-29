@@ -3,6 +3,7 @@
 Thanks for contributing.
 
 Reliverse is now a focused monorepo for:
+
 - developer tooling
 - the `rse` CLI and its plugins
 - reusable UI packages
@@ -13,6 +14,7 @@ User-facing product flows, auth, API, billing, and social features were intentio
 ## Tooling
 
 Core tools:
+
 - Bun
 - TypeScript
 - Turborepo
@@ -33,6 +35,7 @@ scripts/    → automation helpers
 ```
 
 General direction:
+
 - apps can depend on packages
 - packages should not depend on apps
 - plugins should stay automation-friendly and dry-run-first when possible
@@ -53,6 +56,7 @@ bun test plugins/dler
 ```
 
 Before opening a PR:
+
 - ensure the relevant build works
 - ensure TypeScript compiles cleanly
 - ensure tests pass where applicable
@@ -60,11 +64,13 @@ Before opening a PR:
 ## Folder Structure
 
 ### Apps
-- `apps/cli` - `rse`, the Reliverse developer CLI
+
+- `apps/rse` - `rse`, the Reliverse developer CLI
 - `apps/web` - marketing site and tool landing pages
 - `apps/wiki` - docs and blog surface
 
 ### Packages
+
 - `packages/rempts` - Bun-first file-based CLI foundation
 - `packages/relico` - terminal color helpers
 - `packages/myenv` - env helpers
@@ -75,6 +81,7 @@ Before opening a PR:
 - `packages/blocks` - higher-level web blocks
 
 ### Plugins
+
 - `plugins/dler` - build and publish flows
 - `plugins/pm` - package-management helpers
 - `plugins/tools` - file conversion helpers such as `escape`
@@ -84,6 +91,7 @@ Before opening a PR:
 ## Reporting Issues
 
 Helpful issue reports include:
+
 - steps to reproduce
 - logs or screenshots
 - environment details

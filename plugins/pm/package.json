@@ -1,7 +1,7 @@
 {
   "name": "@reliverse/pm-rse-plugin",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "type": "module",
   "main": "./src/index.ts",
   "module": "./src/index.ts",

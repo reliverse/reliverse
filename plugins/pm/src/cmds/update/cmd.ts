@@ -50,10 +50,10 @@ interface PendingUpdate {
   readonly targetManifestPath?: string | undefined;
 }
 
-function describeStrategy(options: {
-  readonly latest: boolean;
-  readonly smart: boolean;
-}): { label: string; text: string } {
+function describeStrategy(options: { readonly latest: boolean; readonly smart: boolean }): {
+  label: string;
+  text: string;
+} {
   if (options.smart && options.latest) {
     return {
       label: "smart-latest-stable",
@@ -85,7 +85,9 @@ function formatActionTarget(action: UpdateAction, fallbackLabel: string): string
   const location = action.targetLabel ?? fallbackLabel;
 
   if (action.source === "catalog") {
-    return action.catalogName ? `${location} (catalog:${action.catalogName})` : `${location} (catalog)`;
+    return action.catalogName
+      ? `${location} (catalog:${action.catalogName})`
+      : `${location} (catalog)`;
   }
 
   return action.section ? `${location} (${action.section})` : location;
@@ -159,22 +161,32 @@ function resolveDryRunMode(options: {
   return true;
 }
 
-function infoLabel(ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string } } }, text: string): string {
+function infoLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
 }
 
-function okLabel(ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } }, text: string): string {
+function okLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
 }
 
-function warnLabel(ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } }, text: string): string {
+function warnLabel(
+  ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } },
+  text: string,
+): string {
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
 }
 
 export default defineCommand({
   meta: {
     name: "update",
-    description: "Update dependency versions in a repo or workspace package with Bun-aware package.json changes",
+    description:
+      "Update dependency versions in a repo or workspace package with Bun-aware package.json changes",
   },
   agent: {
     notes:
@@ -190,7 +202,7 @@ export default defineCommand({
     examples: [
       "rse pm update --cwd .",
       "rse pm update typescript @types/bun --target packages/rempts",
-      "rse pm update --target apps/cli --json",
+      "rse pm update --target apps/rse --json",
       "rse pm update zod --target packages/rempts --dry-run --json",
       "rse pm update --target . --dry-run --json",
       "rse pm update --target . --no-recursive --dry-run --json",
@@ -211,7 +223,8 @@ export default defineCommand({
     },
     dryRun: {
       type: "boolean",
-      description: "Enabled by default; preview package.json changes without writing files. Pass --apply to execute unless --dry-run is also set",
+      description:
+        "Enabled by default; preview package.json changes without writing files. Pass --apply to execute unless --dry-run is also set",
       inputSources: ["flag"],
     },
     apply: {
@@ -221,17 +234,20 @@ export default defineCommand({
     },
     latest: {
       type: "boolean",
-      description: "Enabled by default; pass --no-latest to stay within the current semver range instead of jumping to the newest published version",
+      description:
+        "Enabled by default; pass --no-latest to stay within the current semver range instead of jumping to the newest published version",
       inputSources: ["flag"],
     },
     recursive: {
       type: "boolean",
-      description: "Enabled by default for monorepo root targets; pass --no-recursive to limit the update to the root manifest only",
+      description:
+        "Enabled by default for monorepo root targets; pass --no-recursive to limit the update to the root manifest only",
       inputSources: ["flag"],
     },
     smart: {
       type: "boolean",
-      description: "Enabled by default; with latest=true pick newest stable overall, with latest=false prefer current prerelease branch and promote to matching stable",
+      description:
+        "Enabled by default; with latest=true pick newest stable overall, with latest=false prefer current prerelease branch and promote to matching stable",
       inputSources: ["flag"],
     },
     target: {
@@ -269,16 +285,12 @@ export default defineCommand({
       smart: smartByDefault,
     });
     const recursiveByDefault = context.usesWorkspaces && context.targetDir === context.repoRootDir;
-    const updateAllWorkspaceManifests =
-      recursiveByDefault && ctx.options.recursive !== false;
+    const updateAllWorkspaceManifests = recursiveByDefault && ctx.options.recursive !== false;
     const manifestTargets: readonly ManifestTarget[] = await listManifestTargets(context, {
       includeWorkspacePackages: updateAllWorkspaceManifests,
     });
     const nextManifests = new Map(
-      manifestTargets.map((target) => [
-        target.manifestPath,
-        cloneManifest(target.manifest),
-      ]),
+      manifestTargets.map((target) => [target.manifestPath, cloneManifest(target.manifest)]),
     );
     let nextRootManifest = cloneManifest(context.repoRootManifest);
     const processedCatalogKeys = new Set<string>();
@@ -619,7 +631,9 @@ export default defineCommand({
 
       ctx.out(`${infoLabel(ctx, "Dry run:")} ${context.targetLabel}.`);
       ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
-      ctx.out(`${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`);
+      ctx.out(
+        `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
+      );
 
       const grouped = groupUpdatedActions(actions, context.targetLabel);
 
@@ -643,7 +657,9 @@ export default defineCommand({
         for (const action of actions.filter(
           (action) => action.action === "skipped" || action.action === "missing",
         )) {
-          ctx.out(`${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`);
+          ctx.out(
+            `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
+          );
         }
       }
 
@@ -713,7 +729,9 @@ export default defineCommand({
 
     ctx.out(`${okLabel(ctx, "Updated dependency versions:")} ${context.targetLabel}.`);
     ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
-    ctx.out(`${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`);
+    ctx.out(
+      `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
+    );
 
     const grouped = groupUpdatedActions(actions, context.targetLabel);
 
@@ -733,10 +751,14 @@ export default defineCommand({
       for (const action of actions.filter(
         (action) => action.action === "skipped" || action.action === "missing",
       )) {
-        ctx.out(`${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`);
+        ctx.out(
+          `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
+        );
       }
     }
 
-    ctx.out(`${okLabel(ctx, "Ran:")} ${installResult.command} in ${ctx.colors.stdout.bold(context.installCwd)}`);
+    ctx.out(
+      `${okLabel(ctx, "Ran:")} ${installResult.command} in ${ctx.colors.stdout.bold(context.installCwd)}`,
+    );
   },
 });

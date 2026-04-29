@@ -328,7 +328,7 @@ When relevant, command help may include a note:
 
 ### 8.1 Default
 
-`apps/cli/src/cli.ts` must set:
+`apps/rse/src/cli.ts` must set:
 
 ```ts
 interactionMode: "never";
@@ -463,7 +463,7 @@ Update:
 
 - `packages/rempts/README.md`
 - `packages/rempts/docs/cli-contract.md`
-- `apps/cli/README.md`
+- `apps/rse/README.md`
 
 New docs must explicitly state:
 
