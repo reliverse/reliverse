@@ -36,9 +36,9 @@ export function getPageImage(page: PageWithUrl) {
   };
 }
 
-export async function getLLMText(
-  page: { data: { getText: (type: "processed" | "raw") => Promise<string>; title: string } },
-) {
+export async function getLLMText(page: {
+  data: { getText: (type: "processed" | "raw") => Promise<string>; title: string };
+}) {
   const processed = await page.data.getText("processed");
 
   return `# ${page.data.title}

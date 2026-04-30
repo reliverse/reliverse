@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { resolveWorkspaceTargetsFromCwd } from "./workspace-targets";
 
@@ -25,7 +25,10 @@ describe("workspace target discovery", () => {
     const result = await resolveWorkspaceTargetsFromCwd(root);
 
     expect(result.rootDir).toBe(root);
-    expect(result.targets.map((target) => target.label)).toEqual(["packages/alpha", "plugins/beta"]);
+    expect(result.targets.map((target) => target.label)).toEqual([
+      "packages/alpha",
+      "plugins/beta",
+    ]);
   });
 
   test("discovers only the current package when cwd is a workspace package", async () => {

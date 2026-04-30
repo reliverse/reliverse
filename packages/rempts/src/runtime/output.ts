@@ -47,9 +47,7 @@ function writeLine(stream: OutputStream, value: string): void {
 }
 
 function writeJsonLine(stream: OutputStream, value: unknown): void {
-  const encoded = JSON.stringify(value, (_key, currentValue) =>
-    normalizeValue(currentValue),
-  );
+  const encoded = JSON.stringify(value, (_key, currentValue) => normalizeValue(currentValue));
 
   writeLine(stream, encoded);
 }
@@ -91,22 +89,25 @@ export function createRuntimeOutput(options: OutputWriterOptions): RuntimeOutput
         return;
       }
 
-      writeLine(options.stderr, `${stderrColors.red(stderrColors.bold("Error:"))} ${error.message}`);
+      writeLine(
+        options.stderr,
+        `${stderrColors.red(stderrColors.bold("Error:"))} ${error.message}`,
+      );
 
       if (error.hint) {
         writeLine(options.stderr, `${stderrColors.cyan(stderrColors.bold("Hint:"))} ${error.hint}`);
       }
 
       if (error.usage) {
-        writeLine(options.stderr, `${stderrColors.yellow(stderrColors.bold("Usage:"))} ${error.usage}`);
+        writeLine(
+          options.stderr,
+          `${stderrColors.yellow(stderrColors.bold("Usage:"))} ${error.usage}`,
+        );
       }
 
       if (error.issues && error.issues.length > 0) {
         for (const issue of error.issues) {
-          writeLine(
-            options.stderr,
-            `  ${stderrColors.magenta(issue.flagName)}: ${issue.message}`,
-          );
+          writeLine(options.stderr, `  ${stderrColors.magenta(issue.flagName)}: ${issue.message}`);
         }
       }
     },

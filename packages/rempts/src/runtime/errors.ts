@@ -1,4 +1,9 @@
-import type { NormalizedOptionIssue } from "../options/types";
+import {
+  ParserUsageError,
+  ParserValidationError,
+  type NormalizedOptionIssue,
+} from "@reliverse/parser";
+
 import type { RemptsErrorKind, StructuredRemptsError } from "./types";
 
 export class RemptsExitSignal extends Error {
@@ -60,11 +65,7 @@ export class RemptsError extends Error {
 }
 
 export class RemptsUsageError extends RemptsError {
-  constructor(
-    message: string,
-    exitCode = 1,
-    metadata?: RemptsErrorMetadata | undefined,
-  ) {
+  constructor(message: string, exitCode = 1, metadata?: RemptsErrorMetadata | undefined) {
     super("usage", message, exitCode, metadata);
     this.name = "RemptsUsageError";
   }
@@ -99,6 +100,29 @@ export class PromptUnavailableError extends RemptsError {
 }
 
 export function toStructuredRemptsError(error: unknown): StructuredRemptsError {
+  if (error instanceof ParserValidationError) {
+    return {
+      code: "REMPTS_VALIDATION",
+      issues: error.issues,
+      kind: "validation",
+      message: error.message,
+      ok: false,
+      remptsError: 1,
+      schemaVersion: 1,
+    };
+  }
+
+  if (error instanceof ParserUsageError) {
+    return {
+      code: "REMPTS_USAGE",
+      kind: "usage",
+      message: error.message,
+      ok: false,
+      remptsError: 1,
+      schemaVersion: 1,
+    };
+  }
+
   if (error instanceof RemptsValidationError) {
     return error.toStructuredError();
   }

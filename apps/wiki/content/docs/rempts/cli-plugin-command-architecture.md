@@ -70,12 +70,9 @@ Supported plugin-discovery policy shape:
 createCLI({
   plugins: {
     allowedPatterns: ["@reliverse/*-rse-plugin"],
-    conflictPriority: [
-      "@reliverse/rempts-rse-plugin",
-      "@reliverse/*-rse-plugin",
-    ],
+    conflictPriority: ["@reliverse/rempts-rse-plugin", "@reliverse/*-rse-plugin"],
   },
-})
+});
 ```
 
 Breaking redesign decisions already baked in:
@@ -100,7 +97,7 @@ Current public fields include:
 Plugin API is versioned through:
 
 ```ts
-REMPTS_PLUGIN_API_VERSION
+REMPTS_PLUGIN_API_VERSION;
 ```
 
 Unsupported plugin versions must fail with `RemptsUsageError`.
@@ -315,7 +312,7 @@ This is important for explainability and tooling.
 Exact-node command conflicts between plugins are resolved through explicit policy:
 
 ```ts
-plugins.conflictPriority
+plugins.conflictPriority;
 ```
 
 Rules:
@@ -411,6 +408,7 @@ Wave 1 should implement the minimum clean version of inherited options.
 ## 11.1 Required API additions
 
 ### `createCLI(...)`
+
 Add optional inherited option definitions:
 
 ```ts
@@ -418,10 +416,11 @@ createCLI({
   options: {
     // inherited by all commands
   },
-})
+});
 ```
 
 ### `definePlugin(...)`
+
 Add optional inherited option definitions:
 
 ```ts
@@ -433,10 +432,11 @@ definePlugin({
     cli: { type: "string" },
     global: { type: "boolean" },
   },
-})
+});
 ```
 
 ### `defineCommand(...)`
+
 No conceptual change beyond command-local precedence over inherited scopes.
 
 ## 11.2 Required runtime behavior

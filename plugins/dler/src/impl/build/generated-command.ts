@@ -8,10 +8,12 @@ export interface BuildCommandInvocation {
   readonly display: string;
 }
 
-const INTERNAL_RUNNER_ENTRY = resolve(dirname(fileURLToPath(import.meta.url)), "internal-runner.ts");
+const INTERNAL_RUNNER_ENTRY = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "internal-runner.ts",
+);
 
 export function createGeneratedBuildCommand(target: RequestedTarget): BuildCommandInvocation {
-
   return {
     argv: ["bun", INTERNAL_RUNNER_ENTRY, "--cwd", target.cwd, "--label", target.label],
     display: `bun ${INTERNAL_RUNNER_ENTRY} --cwd ${target.cwd} --label ${target.label}`,

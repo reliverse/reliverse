@@ -5,6 +5,7 @@ A React reconciler for building terminal user interfaces with familiar React pat
 ## Overview
 
 OpenTUI React provides:
+
 - **Custom reconciler**: React components render to OpenTUI renderables
 - **JSX intrinsics**: `<text>`, `<box>`, `<input>`, etc.
 - **Hooks**: `useKeyboard`, `useRenderer`, `useTimeline`, etc.
@@ -13,6 +14,7 @@ OpenTUI React provides:
 ## When to Use React
 
 Use the React reconciler when:
+
 - You're familiar with React patterns
 - You want declarative UI composition
 - You need React's ecosystem (context, state management libraries)
@@ -21,12 +23,12 @@ Use the React reconciler when:
 
 ## When NOT to Use React
 
-| Scenario | Use Instead |
-|----------|-------------|
+| Scenario                     | Use Instead                  |
+| ---------------------------- | ---------------------------- |
 | Maximum performance critical | `@opentui/core` (imperative) |
-| Fine-grained reactivity | `@opentui/solid` |
-| Smallest bundle size | `@opentui/core` |
-| Building a framework/library | `@opentui/core` |
+| Fine-grained reactivity      | `@opentui/solid`             |
+| Smallest bundle size         | `@opentui/core`              |
+| Building a framework/library | `@opentui/core`              |
 
 ## Quick Start
 
@@ -49,28 +51,25 @@ bun install @opentui/react @opentui/core react
 ```
 
 ```tsx
-import { createCliRenderer } from "@opentui/core"
-import { createRoot } from "@opentui/react"
-import { useState } from "react"
+import { createCliRenderer } from "@opentui/core";
+import { createRoot } from "@opentui/react";
+import { useState } from "react";
 
 function App() {
-  const [count, setCount] = useState(0)
-  
+  const [count, setCount] = useState(0);
+
   return (
     <box border padding={2}>
       <text>Count: {count}</text>
-      <box
-        border
-        onMouseDown={() => setCount(c => c + 1)}
-      >
+      <box border onMouseDown={() => setCount((c) => c + 1)}>
         <text>Click me!</text>
       </box>
     </box>
-  )
+  );
 }
 
-const renderer = await createCliRenderer()
-createRoot(renderer).render(<App />)
+const renderer = await createCliRenderer();
+createRoot(renderer).render(<App />);
 ```
 
 ## Core Concepts
@@ -119,23 +118,27 @@ Two approaches to styling:
 ## Available Components
 
 ### Layout & Display
+
 - `<text>` - Styled text content
 - `<box>` - Container with borders and layout
 - `<scrollbox>` - Scrollable container
 - `<ascii-font>` - ASCII art text
 
 ### Input
+
 - `<input>` - Single-line text input
 - `<textarea>` - Multi-line text input
 - `<select>` - List selection
 - `<tab-select>` - Tab-based selection
 
 ### Code & Diff
+
 - `<code>` - Syntax-highlighted code
 - `<line-number>` - Code with line numbers
 - `<diff>` - Unified or split diff viewer
 
 ### Text Modifiers (inside `<text>`)
+
 - `<span>` - Inline styled text
 - `<strong>`, `<b>` - Bold
 - `<em>`, `<i>` - Italic
@@ -152,7 +155,7 @@ import {
   useOnResize,
   useTerminalDimensions,
   useTimeline,
-} from "@opentui/react"
+} from "@opentui/react";
 ```
 
 See [API Reference](./api.md) for detailed hook documentation.

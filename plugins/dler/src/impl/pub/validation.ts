@@ -1,7 +1,12 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { fileExists, pathIsDirectory, type RequestedTarget, type SkippedTarget } from "../shared-targets";
+import {
+  fileExists,
+  pathIsDirectory,
+  type RequestedTarget,
+  type SkippedTarget,
+} from "../shared-targets";
 import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
 import { getIneligibilityReason } from "./eligibility";
 
@@ -13,14 +18,19 @@ export interface PublishableTarget extends RequestedTarget {
 }
 
 function resolvePackageName(pkg: Record<string, unknown>, fallbackLabel: string): string {
-  return typeof pkg.name === "string" && pkg.name.trim().length > 0 ? pkg.name.trim() : fallbackLabel;
+  return typeof pkg.name === "string" && pkg.name.trim().length > 0
+    ? pkg.name.trim()
+    : fallbackLabel;
 }
 
 export async function resolvePublishableTargets(options: {
   readonly requireArtifactDir?: boolean | undefined;
   readonly publishFrom: string;
   readonly targets: readonly RequestedTarget[];
-}): Promise<{ readonly publishable: readonly PublishableTarget[]; readonly skipped: readonly SkippedTarget[] }> {
+}): Promise<{
+  readonly publishable: readonly PublishableTarget[];
+  readonly skipped: readonly SkippedTarget[];
+}> {
   const publishable: PublishableTarget[] = [];
   const skipped: SkippedTarget[] = [];
 

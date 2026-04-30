@@ -197,7 +197,8 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
 
     for (const flag of document.commandFlags) {
       const requiredHint = flag.required ? "required" : undefined;
-      const defaultHint = flag.defaultValue ? `default: ${flag.defaultValue}` : undefined;
+      const defaultHint =
+        flag.defaultValue !== undefined ? `default: ${flag.defaultValue}` : undefined;
       const envHint = flag.env ? `env: ${flag.env}` : undefined;
       const note = [requiredHint, defaultHint, envHint].filter(Boolean).join(" · ");
 

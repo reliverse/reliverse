@@ -11,9 +11,13 @@ export interface RemptsGlobalHostConfigV1 {
    * Example: "/home/me/.bun"
    */
   readonly bunInstallRoot?: string | undefined;
-  readonly clis?: Record<string, { readonly plugins?: readonly string[] | undefined } | undefined> | undefined;
+  readonly clis?:
+    | Record<string, { readonly plugins?: readonly string[] | undefined } | undefined>
+    | undefined;
   /** @deprecated Backward-compat alias for older configs. Prefer `clis`. */
-  readonly CLIs?: Record<string, { readonly plugins?: readonly string[] | undefined } | undefined> | undefined;
+  readonly CLIs?:
+    | Record<string, { readonly plugins?: readonly string[] | undefined } | undefined>
+    | undefined;
 }
 
 export function getDefaultRemptsGlobalConfigPath(): string {

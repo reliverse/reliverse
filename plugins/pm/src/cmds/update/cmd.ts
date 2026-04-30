@@ -21,7 +21,6 @@ import {
   resolveTargetContext,
   restoreSnapshots,
   runBunInstall,
-  runBunUpdate,
   setCatalogEntry,
   setDependency,
   writeManifest,
@@ -57,27 +56,27 @@ function describeStrategy(options: { readonly latest: boolean; readonly smart: b
   if (options.smart && options.latest) {
     return {
       label: "smart-latest-stable",
-      text: "smart strategy: pick the newest stable overall",
+      text: "newest stable overall (smart)",
     };
   }
 
   if (options.smart && !options.latest) {
     return {
       label: "smart-range",
-      text: "smart strategy: stay within the current semver line and prefer the current prerelease branch when relevant",
+      text: "current semver/prerelease line (smart)",
     };
   }
 
   if (!options.smart && options.latest) {
     return {
       label: "latest",
-      text: "latest strategy: jump to dist-tags.latest",
+      text: "dist-tags.latest",
     };
   }
 
   return {
     label: "range",
-    text: "range strategy: stay within the current semver range",
+    text: "current semver range",
   };
 }
 
@@ -93,22 +92,8 @@ function formatActionTarget(action: UpdateAction, fallbackLabel: string): string
   return action.section ? `${location} (${action.section})` : location;
 }
 
-function buildInstallCommand(options: {
-  readonly useBunForce?: boolean | undefined;
-  readonly installCwd: string;
-  readonly latest: boolean;
-  readonly recursive: boolean;
-  readonly targetDir: string;
-}): string {
-  if (options.recursive) {
-    return `bun update${options.useBunForce ? " --force" : ""}${options.latest ? " --latest" : ""} --recursive`;
-  }
-
-  if (options.installCwd === options.targetDir) {
-    return `bun update${options.useBunForce ? " --force" : ""}${options.latest ? " --latest" : ""}`;
-  }
-
-  return `bun install${options.useBunForce ? " --force" : ""}`;
+function buildInstallCommand(): string {
+  return "bun install";
 }
 
 function createActionSummary(actions: readonly UpdateAction[]) {
@@ -140,6 +125,74 @@ function groupUpdatedActions(actions: readonly UpdateAction[], fallbackLabel: st
   }
 
   return grouped;
+}
+
+function groupNoteActions(actions: readonly UpdateAction[]) {
+  const grouped = new Map<string, { count: number; action: UpdateAction["action"] }>();
+
+  for (const action of actions) {
+    if (action.action !== "skipped" && action.action !== "missing") {
+      continue;
+    }
+
+    const reason = action.reason ?? "no reason provided";
+    const key = `${action.action}:${reason}`;
+    const existing = grouped.get(key);
+
+    grouped.set(key, {
+      action: action.action,
+      count: (existing?.count ?? 0) + 1,
+    });
+  }
+
+  return [...grouped.entries()].map(([key, value]) => ({
+    ...value,
+    reason: key.slice(key.indexOf(":") + 1),
+  }));
+}
+
+function emitUpdateNotes(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        magenta(text: string): string;
+        yellow(text: string): string;
+      };
+    };
+    out(...values: unknown[]): void;
+  },
+  options: {
+    readonly actions: readonly UpdateAction[];
+    readonly fallbackLabel: string;
+    readonly verbose: boolean;
+  },
+): void {
+  const noteActions = options.actions.filter(
+    (action) => action.action === "skipped" || action.action === "missing",
+  );
+
+  if (noteActions.length === 0) {
+    return;
+  }
+
+  ctx.out(warnLabel(ctx, options.verbose ? "Notes:" : "Notes summary:"));
+
+  if (!options.verbose) {
+    for (const note of groupNoteActions(noteActions)) {
+      ctx.out(`${ctx.colors.stdout.magenta("-")} ${note.count} ${note.action}: ${note.reason}`);
+    }
+    ctx.out(
+      `  Use ${ctx.colors.stdout.bold("--verbose")} to show every skipped/missing dependency.`,
+    );
+    return;
+  }
+
+  for (const action of noteActions) {
+    ctx.out(
+      `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, options.fallbackLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
+    );
+  }
 }
 
 function infoLabel(
@@ -197,9 +250,16 @@ export default defineCommand({
       "rse update --cwd /path/to/project --target /path/to/project --apply --json",
       "rse update --apply",
     ],
-    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to execute real writes and the final Bun step. Preview output shows grouped specifier diffs and the final Bun command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to write pm-controlled manifest/catalog changes and then run `bun install`. Preview output shows grouped specifier diffs and the final install command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
   },
   options: {
+    autoinstall: {
+      type: "boolean",
+      defaultValue: true,
+      description:
+        "Run bun install after applying manifest/catalog changes; pass --no-autoinstall to skip",
+      inputSources: ["flag", "default"],
+    },
     cwd: {
       type: "string",
       defaultValue: ".",
@@ -222,6 +282,11 @@ export default defineCommand({
       type: "boolean",
       description:
         "Enabled by default; with latest=true pick newest stable overall, with latest=false prefer current prerelease branch and promote to matching stable",
+      inputSources: ["flag"],
+    },
+    verbose: {
+      type: "boolean",
+      description: "Show every skipped or missing dependency note",
       inputSources: ["flag"],
     },
     target: {
@@ -252,6 +317,8 @@ export default defineCommand({
     const executionRequested = ctx.safety.apply;
     const apply = executionRequested;
     const preview = !apply;
+    const autoinstall = ctx.options.autoinstall !== false;
+    const verbose = ctx.options.verbose === true;
     const strategy = describeStrategy({
       latest: latestByDefault,
       smart: smartByDefault,
@@ -271,13 +338,7 @@ export default defineCommand({
       requestedPackages.length > 0
         ? requestedPackages
         : manifestTargets.flatMap((target) => listTargetDependencies(target.manifest));
-    const installCommand = buildInstallCommand({
-      useBunForce: executionRequested,
-      installCwd: context.installCwd,
-      latest: latestByDefault,
-      recursive: updateAllWorkspaceManifests,
-      targetDir: context.targetDir,
-    });
+    const installCommand = buildInstallCommand();
 
     if (targetPackages.length === 0) {
       if (ctx.output.mode === "json") {
@@ -460,7 +521,7 @@ export default defineCommand({
             previousSpecifier: update.currentSpecifier,
             reason: canRewriteSpecifier(update.currentSpecifier)
               ? "catalog entry is already up to date"
-              : "catalog entry uses a non-rewritable specifier; Bun will refresh it during install/update",
+              : "catalog entry uses a non-rewritable specifier; Bun install will refresh lockfile metadata",
             resolutionStrategy: update.resolutionStrategy,
             section: update.section,
             source: "catalog",
@@ -506,7 +567,7 @@ export default defineCommand({
           previousSpecifier: update.currentSpecifier,
           reason: canRewriteSpecifier(update.currentSpecifier)
             ? "already up to date"
-            : "specifier is not rewritten; Bun will refresh it during install/update",
+            : "specifier is not rewritten; Bun install will refresh lockfile metadata",
           resolutionStrategy: update.resolutionStrategy,
           section: update.section,
           source: "target",
@@ -563,6 +624,7 @@ export default defineCommand({
       install: {
         command: installCommand,
         cwd: context.installCwd,
+        enabled: autoinstall,
         executed: false,
       },
       latest: latestByDefault,
@@ -582,10 +644,7 @@ export default defineCommand({
       },
     };
 
-    const shouldRunNativeUpdate =
-      context.installCwd === context.targetDir || updateAllWorkspaceManifests;
-
-    if (changedManifestTargets.length === 0 && !rootChanged && !shouldRunNativeUpdate) {
+    if (changedManifestTargets.length === 0 && !rootChanged) {
       if (ctx.output.mode === "json") {
         ctx.output.result(resultPayload, "pm update");
         return;
@@ -603,7 +662,8 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`${infoLabel(ctx, "Preview:")} ${context.targetLabel}.`);
+      ctx.out(infoLabel(ctx, "pm update preview"));
+      ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
       ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
       ctx.out(
         `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
@@ -625,20 +685,14 @@ export default defineCommand({
         }
       }
 
-      if (summary.skipped > 0 || summary.missing > 0) {
-        ctx.out(warnLabel(ctx, "Notes:"));
+      emitUpdateNotes(ctx, { actions, fallbackLabel: context.targetLabel, verbose });
 
-        for (const action of actions.filter(
-          (action) => action.action === "skipped" || action.action === "missing",
-        )) {
-          ctx.out(
-            `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
-          );
-        }
+      ctx.out(
+        `${infoLabel(ctx, "Install step:")} ${autoinstall ? `${installCommand} (after --apply)` : "disabled (--no-autoinstall)"}`,
+      );
+      if (autoinstall) {
+        ctx.out(`${infoLabel(ctx, "Install cwd:")} ${ctx.colors.stdout.bold(context.installCwd)}`);
       }
-
-      ctx.out(`${infoLabel(ctx, "Final Bun command:")} ${installCommand}`);
-      ctx.out(`${infoLabel(ctx, "Install cwd:")} ${ctx.colors.stdout.bold(context.installCwd)}`);
       return;
     }
 
@@ -666,19 +720,9 @@ export default defineCommand({
       await writeManifest(context.repoRootManifestPath, nextRootManifest);
     }
 
-    ctx.safety.assertApplied("package.install");
-    const installResult = shouldRunNativeUpdate
-      ? await runBunUpdate(context.installCwd, {
-          useBunForce: executionRequested,
-          latest: latestByDefault,
-          packages: requestedPackages,
-          recursive: updateAllWorkspaceManifests,
-        })
-      : await runBunInstall(context.installCwd, {
-          useBunForce: executionRequested,
-        });
+    const installResult = autoinstall ? await runBunInstall(context.installCwd) : null;
 
-    if (!installResult.ok) {
+    if (installResult && !installResult.ok) {
       await restoreSnapshots(snapshots);
 
       if (installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
@@ -693,10 +737,18 @@ export default defineCommand({
 
     const successPayload = {
       ...resultPayload,
-      install: {
-        ...installResult,
-        executed: true,
-      },
+      install: installResult
+        ? {
+            ...installResult,
+            enabled: true,
+            executed: true,
+          }
+        : {
+            command: installCommand,
+            cwd: context.installCwd,
+            enabled: false,
+            executed: false,
+          },
     };
 
     if (ctx.output.mode === "json") {
@@ -704,7 +756,8 @@ export default defineCommand({
       return;
     }
 
-    ctx.out(`${okLabel(ctx, "Updated dependency versions:")} ${context.targetLabel}.`);
+    ctx.out(okLabel(ctx, "pm update"));
+    ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
     ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
     ctx.out(
       `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
@@ -722,20 +775,14 @@ export default defineCommand({
       }
     }
 
-    if (summary.skipped > 0 || summary.missing > 0) {
-      ctx.out(warnLabel(ctx, "Notes:"));
+    emitUpdateNotes(ctx, { actions, fallbackLabel: context.targetLabel, verbose });
 
-      for (const action of actions.filter(
-        (action) => action.action === "skipped" || action.action === "missing",
-      )) {
-        ctx.out(
-          `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, context.targetLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
-        );
-      }
+    if (installResult) {
+      ctx.out(
+        `${okLabel(ctx, "Ran:")} ${installResult.command} (${ctx.colors.stdout.bold(context.installCwd)})`,
+      );
+    } else {
+      ctx.out(`${warnLabel(ctx, "Install skipped:")} --no-autoinstall`);
     }
-
-    ctx.out(
-      `${okLabel(ctx, "Ran:")} ${installResult.command} in ${ctx.colors.stdout.bold(context.installCwd)}`,
-    );
   },
 });

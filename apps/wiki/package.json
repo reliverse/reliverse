@@ -8,30 +8,29 @@
     "dev": "next dev",
     "start": "next start",
     "types:check": "fumadocs-mdx && next typegen && tsgo --noEmit",
-    "postinstall": "fumadocs-mdx",
-    "typecheck": "tsgo --noEmit"
+    "postinstall": "fumadocs-mdx"
   },
   "dependencies": {
     "@repo/ui": "workspace:*",
-    "fumadocs-core": "16.6.3",
-    "fumadocs-mdx": "14.2.7",
-    "fumadocs-ui": "16.6.3",
-    "lucide-react": "^0.570.0",
-    "next": "16.1.6",
+    "fumadocs-core": "17.0.0",
+    "fumadocs-mdx": "14.3.2",
+    "fumadocs-ui": "17.0.0",
+    "lucide-react": "^1.14.0",
+    "next": "16.2.4",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tailwind-merge": "^3.4.1"
+    "tailwind-merge": "^3.5.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.1.18",
+    "@tailwindcss/postcss": "^4.2.4",
     "@types/bun": "catalog:",
     "@types/mdx": "^2.0.13",
-    "@types/node": "^25.3.3",
+    "@types/node": "^25.6.0",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "postcss": "^8.5.6",
-    "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "postcss": "^8.5.12",
+    "tailwindcss": "^4.2.4",
+    "typescript": "catalog:"
   }
 }

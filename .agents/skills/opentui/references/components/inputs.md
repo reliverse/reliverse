@@ -57,12 +57,12 @@ input.focus()
   onChange={(value) => console.log("Changed:", value)}
   onFocus={() => console.log("Focused")}
   onBlur={() => console.log("Blurred")}
-/>
+/>;
 
 // Core
-input.on(InputRenderableEvents.CHANGE, (value) => {})
-input.on(InputRenderableEvents.FOCUS, () => {})
-input.on(InputRenderableEvents.BLUR, () => {})
+input.on(InputRenderableEvents.CHANGE, (value) => {});
+input.on(InputRenderableEvents.FOCUS, () => {});
+input.on(InputRenderableEvents.BLUR, () => {});
 ```
 
 ### Controlled Input
@@ -70,28 +70,16 @@ input.on(InputRenderableEvents.BLUR, () => {})
 ```tsx
 // React
 function ControlledInput() {
-  const [value, setValue] = useState("")
-  
-  return (
-    <input
-      value={value}
-      onChange={setValue}
-      focused
-    />
-  )
+  const [value, setValue] = useState("");
+
+  return <input value={value} onChange={setValue} focused />;
 }
 
 // Solid
 function ControlledInput() {
-  const [value, setValue] = createSignal("")
-  
-  return (
-    <input
-      value={value()}
-      onInput={setValue}
-      focused
-    />
-  )
+  const [value, setValue] = createSignal("");
+
+  return <input value={value()} onInput={setValue} focused />;
 }
 ```
 
@@ -135,21 +123,17 @@ const textarea = new TextareaRenderable(renderer, {
 
 ```tsx
 <textarea
-  showLineNumbers        // Display line numbers
-  wrapText              // Wrap long lines
-  readOnly              // Disable editing
-  tabSize={2}           // Tab character width
+  showLineNumbers // Display line numbers
+  wrapText // Wrap long lines
+  readOnly // Disable editing
+  tabSize={2} // Tab character width
 />
 ```
 
 ### Syntax Highlighting
 
 ```tsx
-<textarea
-  language="typescript"
-  value={code}
-  onChange={setCode}
-/>
+<textarea language="typescript" value={code} onChange={setCode} />
 ```
 
 ## Select Component
@@ -202,9 +186,9 @@ select.focus()
 
 ```typescript
 interface SelectOption {
-  name: string          // Display text
-  description?: string  // Optional description shown below
-  value?: any          // Associated value
+  name: string; // Display text
+  description?: string; // Optional description shown below
+  value?: any; // Associated value
 }
 ```
 
@@ -212,9 +196,9 @@ interface SelectOption {
 
 ```tsx
 <select
-  height={8}                    // Visible height
-  selectedIndex={0}             // Initially selected
-  showScrollIndicator           // Show scroll arrows
+  height={8} // Visible height
+  selectedIndex={0} // Initially selected
+  showScrollIndicator // Show scroll arrows
   selectedBackgroundColor="#333"
   selectedTextColor="#fff"
   highlightBackgroundColor="#444"
@@ -224,6 +208,7 @@ interface SelectOption {
 ### Navigation
 
 Default keybindings:
+
 - `Up` / `k` - Move up
 - `Down` / `j` - Move down
 - `Enter` - Select item
@@ -232,33 +217,33 @@ Default keybindings:
 
 **Important**: `onSelect` and `onChange` serve different purposes:
 
-| Event | Trigger | Use Case |
-|-------|---------|----------|
-| `onSelect` | **Enter key pressed** - user confirms selection | Perform action with selected item |
-| `onChange` | **Arrow keys** - user navigates list | Preview, update UI as user browses |
+| Event      | Trigger                                         | Use Case                           |
+| ---------- | ----------------------------------------------- | ---------------------------------- |
+| `onSelect` | **Enter key pressed** - user confirms selection | Perform action with selected item  |
+| `onChange` | **Arrow keys** - user navigates list            | Preview, update UI as user browses |
 
 ```tsx
 // React/Solid
 <select
   onSelect={(index, option) => {
     // Called when Enter is pressed - selection confirmed
-    console.log("User selected:", option.name)
-    performAction(option)
+    console.log("User selected:", option.name);
+    performAction(option);
   }}
   onChange={(index, option) => {
     // Called when navigating with arrow keys
-    console.log("Browsing:", option.name)
-    showPreview(option)
+    console.log("Browsing:", option.name);
+    showPreview(option);
   }}
-/>
+/>;
 
 // Core
 select.on(SelectRenderableEvents.ITEM_SELECTED, (index, option) => {
   // Called when Enter is pressed
-})
+});
 select.on(SelectRenderableEvents.SELECTION_CHANGED, (index, option) => {
   // Called when navigating with arrow keys
-})
+});
 ```
 
 ## Tab Select Component
@@ -313,11 +298,11 @@ Same pattern as Select - `onSelect` for Enter key, `onChange` for navigation:
 <tab-select
   onSelect={(index, option) => {
     // Called when Enter is pressed - switch to tab
-    setActiveTab(index)
+    setActiveTab(index);
   }}
   onChange={(index, option) => {
     // Called when navigating with arrow keys
-    showTabPreview(option)
+    showTabPreview(option);
   }}
 />
 ```
@@ -341,6 +326,7 @@ Same pattern as Select - `onSelect` for Enter key, `onChange` for navigation:
 ### Navigation
 
 Default keybindings:
+
 - `Left` / `[` - Previous tab
 - `Right` / `]` - Next tab
 - `Enter` - Select tab
@@ -351,7 +337,7 @@ Default keybindings:
 
 ```tsx
 function SingleInput() {
-  return <input placeholder="I'm focused" focused />
+  return <input placeholder="I'm focused" focused />;
 }
 ```
 
@@ -360,35 +346,31 @@ function SingleInput() {
 ```tsx
 // React
 function Form() {
-  const [focusIndex, setFocusIndex] = useState(0)
-  const fields = ["name", "email", "message"]
-  
+  const [focusIndex, setFocusIndex] = useState(0);
+  const fields = ["name", "email", "message"];
+
   useKeyboard((key) => {
     if (key.name === "tab") {
-      setFocusIndex(i => (i + 1) % fields.length)
+      setFocusIndex((i) => (i + 1) % fields.length);
     }
-  })
-  
+  });
+
   return (
     <box flexDirection="column" gap={1}>
       {fields.map((field, i) => (
-        <input
-          key={field}
-          placeholder={`Enter ${field}`}
-          focused={i === focusIndex}
-        />
+        <input key={field} placeholder={`Enter ${field}`} focused={i === focusIndex} />
       ))}
     </box>
-  )
+  );
 }
 ```
 
 ### Focus Methods (Core)
 
 ```typescript
-input.focus()      // Give focus
-input.blur()       // Remove focus
-input.isFocused()  // Check focus state
+input.focus(); // Give focus
+input.blur(); // Remove focus
+input.isFocused(); // Check focus state
 ```
 
 ## Form Patterns
@@ -397,19 +379,19 @@ input.isFocused()  // Check focus state
 
 ```tsx
 function LoginForm() {
-  const [username, setUsername] = useState("")
-  const [password, setPassword] = useState("")
-  const [focusField, setFocusField] = useState<"username" | "password">("username")
-  
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [focusField, setFocusField] = useState<"username" | "password">("username");
+
   useKeyboard((key) => {
     if (key.name === "tab") {
-      setFocusField(f => f === "username" ? "password" : "username")
+      setFocusField((f) => (f === "username" ? "password" : "username"));
     }
     if (key.name === "enter") {
-      handleLogin()
+      handleLogin();
     }
-  })
-  
+  });
+
   return (
     <box flexDirection="column" gap={1} border padding={2}>
       <box flexDirection="row" gap={1}>
@@ -431,7 +413,7 @@ function LoginForm() {
         />
       </box>
     </box>
-  )
+  );
 }
 ```
 
@@ -439,43 +421,36 @@ function LoginForm() {
 
 ```tsx
 function SearchableList({ items, onItemSelected }) {
-  const [query, setQuery] = useState("")
-  const [focusSearch, setFocusSearch] = useState(true)
-  const [preview, setPreview] = useState(null)
-  
-  const filtered = items.filter(item =>
-    item.toLowerCase().includes(query.toLowerCase())
-  )
-  
+  const [query, setQuery] = useState("");
+  const [focusSearch, setFocusSearch] = useState(true);
+  const [preview, setPreview] = useState(null);
+
+  const filtered = items.filter((item) => item.toLowerCase().includes(query.toLowerCase()));
+
   useKeyboard((key) => {
     if (key.name === "tab") {
-      setFocusSearch(f => !f)
+      setFocusSearch((f) => !f);
     }
-  })
-  
+  });
+
   return (
     <box flexDirection="column">
-      <input
-        value={query}
-        onChange={setQuery}
-        placeholder="Search..."
-        focused={focusSearch}
-      />
+      <input value={query} onChange={setQuery} placeholder="Search..." focused={focusSearch} />
       <select
-        options={filtered.map(item => ({ name: item }))}
+        options={filtered.map((item) => ({ name: item }))}
         focused={!focusSearch}
         height={10}
         onSelect={(index, option) => {
           // Enter pressed - confirm selection
-          onItemSelected(option)
+          onItemSelected(option);
         }}
         onChange={(index, option) => {
           // Navigating - show preview
-          setPreview(option)
+          setPreview(option);
         }}
       />
     </box>
-  )
+  );
 }
 ```
 

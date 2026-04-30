@@ -1,7 +1,6 @@
 import { readFile } from "node:fs/promises";
 
 import { fileExists, type RequestedTarget } from "../shared-targets";
-
 import type { BuildCommandInvocation } from "./generated-command";
 
 interface MinimalPackageJson {
@@ -28,10 +27,7 @@ const VITE_CONFIG_CANDIDATES = [
   "vite.config.mjs",
 ] as const;
 
-const ELECTROBUN_CONFIG_CANDIDATES = [
-  "electrobun.config.ts",
-  "electrobun.config.js",
-] as const;
+const ELECTROBUN_CONFIG_CANDIDATES = ["electrobun.config.ts", "electrobun.config.js"] as const;
 
 const PACKAGE_ROOT_INDEX_CANDIDATES = ["index.ts", "index.tsx", "index.js"] as const;
 
@@ -92,7 +88,14 @@ function normalizeEntrypoint(value: string): string | null {
     return null;
   }
 
-  if (!(value.endsWith(".ts") || value.endsWith(".tsx") || value.endsWith(".js") || value.endsWith(".jsx"))) {
+  if (
+    !(
+      value.endsWith(".ts") ||
+      value.endsWith(".tsx") ||
+      value.endsWith(".js") ||
+      value.endsWith(".jsx")
+    )
+  ) {
     return null;
   }
 
@@ -148,7 +151,10 @@ function inferManifestEntrypoints(pkg: MinimalPackageJson | null): string[] {
   return [...entrypoints].sort();
 }
 
-function createBunBuildInvocation(entrypoints: readonly string[], targetRuntime: "bun" | "node"): BuildCommandInvocation {
+function createBunBuildInvocation(
+  entrypoints: readonly string[],
+  targetRuntime: "bun" | "node",
+): BuildCommandInvocation {
   return {
     argv: ["bun", "build", ...entrypoints, "--outdir", "./dist", "--target", targetRuntime],
     display: `bun build ${entrypoints.join(" ")} --outdir ./dist --target ${targetRuntime}`,
@@ -182,7 +188,9 @@ async function collectBuildShapeFacts(target: RequestedTarget): Promise<BuildSha
   };
 }
 
-async function resolveConfigDrivenBuild(facts: BuildShapeFacts): Promise<BuildCommandInvocation | null> {
+async function resolveConfigDrivenBuild(
+  facts: BuildShapeFacts,
+): Promise<BuildCommandInvocation | null> {
   if (facts.tsdownConfigPath) {
     return {
       argv: ["bun", "x", "tsdown"],
@@ -221,7 +229,9 @@ async function resolveConfigDrivenBuild(facts: BuildShapeFacts): Promise<BuildCo
   return null;
 }
 
-async function resolvePluginOrCliBuild(facts: BuildShapeFacts): Promise<BuildCommandInvocation | null> {
+async function resolvePluginOrCliBuild(
+  facts: BuildShapeFacts,
+): Promise<BuildCommandInvocation | null> {
   if (facts.srcCliExists) {
     return createBunBuildInvocation(["./src/cli.ts"], "bun");
   }
@@ -247,7 +257,9 @@ function resolvePackageLibraryBuild(facts: BuildShapeFacts): BuildCommandInvocat
 
   if (facts.packageRootIndexPath) {
     return createBunBuildInvocation(
-      facts.manifestEntrypoints.length > 0 ? facts.manifestEntrypoints : [facts.packageRootIndexPath],
+      facts.manifestEntrypoints.length > 0
+        ? facts.manifestEntrypoints
+        : [facts.packageRootIndexPath],
       "node",
     );
   }
@@ -289,12 +301,14 @@ export async function explainMissingPackageBuildCommand(target: RequestedTarget)
   return "unsupported package shape: no generated package build command matched";
 }
 
-export async function resolvePackageBuildCommand(target: RequestedTarget): Promise<BuildCommandInvocation | null> {
+export async function resolvePackageBuildCommand(
+  target: RequestedTarget,
+): Promise<BuildCommandInvocation | null> {
   const facts = await collectBuildShapeFacts(target);
 
   return (
-    await resolveConfigDrivenBuild(facts) ??
-    await resolvePluginOrCliBuild(facts) ??
+    (await resolveConfigDrivenBuild(facts)) ??
+    (await resolvePluginOrCliBuild(facts)) ??
     resolvePackageLibraryBuild(facts) ??
     resolveGenericSourceBuild(facts)
   );

@@ -1,3 +1,4 @@
+import { DLER_BUILD_DEFAULTS } from "../../constants";
 import type { BuildProvider, BuildTarget, BuildTargetResult } from "./types";
 
 async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Promise<string> {
@@ -31,11 +32,11 @@ export function createBunBuildProvider(): BuildProvider {
         exitCode,
         label,
         ok: exitCode === 0,
-        provider: "bun",
+        provider: DLER_BUILD_DEFAULTS.provider,
         stderr,
         stdout,
       };
     },
-    id: "bun",
+    id: DLER_BUILD_DEFAULTS.provider,
   };
 }

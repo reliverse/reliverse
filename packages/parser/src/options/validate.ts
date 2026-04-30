@@ -1,4 +1,4 @@
-import { RemptsValidationError } from "../runtime/errors";
+import { ParserValidationError } from "../runtime/errors";
 import type { StandardSchemaV1 } from "../types/standard-schema";
 import { toFlagName } from "./flag-name";
 import type {
@@ -207,7 +207,7 @@ export async function validateParsedOptions<TOptions extends CommandOptionsRecor
   }
 
   if (issues.length > 0) {
-    throw new RemptsValidationError("Invalid command options.", issues);
+    throw new ParserValidationError("Invalid command options.", issues);
   }
 
   return normalizedValues as CommandOptionsOutput<TOptions>;

@@ -1,7 +1,8 @@
 import { pathToFileURL } from "node:url";
 
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import { isCommandDefinition, type CommandDefinition } from "../api/define-command";
-import type { CommandOptionsRecord } from "../options/types";
 import { RemptsUsageError } from "./errors";
 
 function isRecord(value: unknown): value is Record<string, unknown> {

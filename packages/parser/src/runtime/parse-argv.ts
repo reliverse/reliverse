@@ -6,7 +6,7 @@ import type {
   OptionInputSource,
 } from "../options/types";
 import { validateParsedOptions } from "../options/validate";
-import { RemptsUsageError } from "./errors";
+import { ParserUsageError } from "./errors";
 
 export interface ParseArgvResult<TOptions extends CommandOptionsRecord> {
   readonly args: readonly string[];
@@ -29,7 +29,7 @@ function assertInputSourceEnabled(
     return;
   }
 
-  throw new RemptsUsageError(`Option "${label}" does not accept ${source} input.`);
+  throw new ParserUsageError(`Option "${label}" does not accept ${source} input.`);
 }
 
 function isBooleanString(value: string): boolean {
@@ -41,7 +41,7 @@ function toBoolean(value: string, label: string): boolean {
   const normalized = value.toLowerCase();
 
   if (!isBooleanString(normalized)) {
-    throw new RemptsUsageError(`Expected a boolean value for "${label}", received "${value}".`);
+    throw new ParserUsageError(`Expected a boolean value for "${label}", received "${value}".`);
   }
 
   return normalized === "true" || normalized === "1" || normalized === "yes" || normalized === "on";
@@ -49,13 +49,13 @@ function toBoolean(value: string, label: string): boolean {
 
 function toNumber(value: string, label: string): number {
   if (value.trim().length === 0) {
-    throw new RemptsUsageError(`Expected a number value for "${label}", received an empty value.`);
+    throw new ParserUsageError(`Expected a number value for "${label}", received an empty value.`);
   }
 
   const parsed = Number(value);
 
   if (!Number.isFinite(parsed)) {
-    throw new RemptsUsageError(
+    throw new ParserUsageError(
       `Expected a finite number value for "${label}", received "${value}".`,
     );
   }
@@ -79,6 +79,23 @@ function coerceOptionValue(
   return rawValue;
 }
 
+function looksLikeOptionToken(value: string): boolean {
+  return value.startsWith("-") && value !== "-";
+}
+
+function setRawOptionValue(
+  rawOptionValues: Map<string, unknown>,
+  optionName: string,
+  value: unknown,
+  label: string,
+): void {
+  if (rawOptionValues.has(optionName)) {
+    throw new ParserUsageError(`Option "${label}" was provided more than once.`);
+  }
+
+  rawOptionValues.set(optionName, value);
+}
+
 function setLongOption(
   longOptions: Map<string, readonly [string, CommandOptionDefinition]>,
   flagName: string,
@@ -88,7 +105,7 @@ function setLongOption(
   const existing = longOptions.get(flagName);
 
   if (existing && existing[0] !== optionName) {
-    throw new RemptsUsageError(
+    throw new ParserUsageError(
       `Option flag "--${flagName}" is ambiguous between "${existing[0]}" and "${optionName}".`,
     );
   }
@@ -103,7 +120,7 @@ function setShortOption(
   definition: CommandOptionDefinition,
 ): void {
   if (shortName.length !== 1 || shortName === "-") {
-    throw new RemptsUsageError(
+    throw new ParserUsageError(
       `Option "${optionName}" has invalid short flag "${shortName}". Short flags must be one character.`,
     );
   }
@@ -111,7 +128,7 @@ function setShortOption(
   const existing = shortOptions.get(shortName);
 
   if (existing && existing[0] !== optionName) {
-    throw new RemptsUsageError(
+    throw new ParserUsageError(
       `Option short flag "-${shortName}" is ambiguous between "${existing[0]}" and "${optionName}".`,
     );
   }
@@ -207,7 +224,7 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
       const optionEntry = longOptions.get(normalizedKey);
 
       if (!optionEntry) {
-        throw new RemptsUsageError(`Unknown option "--${key}".`);
+        throw new ParserUsageError(`Unknown option "--${key}".`);
       }
 
       const [optionName, definition] = optionEntry;
@@ -217,37 +234,50 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
       if (definition.type === "boolean") {
         if (negated) {
           if (explicitValue !== undefined) {
-            throw new RemptsUsageError(`Option "${flagLabel}" does not accept a value.`);
+            throw new ParserUsageError(`Option "${flagLabel}" does not accept a value.`);
           }
 
-          rawOptionValues.set(optionName, false);
+          setRawOptionValue(rawOptionValues, optionName, false, flagLabel);
           cursor += 1;
           continue;
         }
 
         if (explicitValue !== undefined) {
-          rawOptionValues.set(optionName, toBoolean(explicitValue, flagLabel));
+          setRawOptionValue(
+            rawOptionValues,
+            optionName,
+            toBoolean(explicitValue, flagLabel),
+            flagLabel,
+          );
           cursor += 1;
           continue;
         }
 
-        rawOptionValues.set(optionName, true);
+        setRawOptionValue(rawOptionValues, optionName, true, flagLabel);
         cursor += 1;
         continue;
       }
 
       if (negated) {
-        throw new RemptsUsageError(`Option "--${normalizedKey}" does not support "--no-" form.`);
+        throw new ParserUsageError(`Option "--${normalizedKey}" does not support "--no-" form.`);
       }
 
       const nextToken = argv[cursor + 1];
       const rawValue = explicitValue ?? nextToken;
 
-      if (rawValue === undefined) {
-        throw new RemptsUsageError(`Option "${flagLabel}" expects a value.`);
+      if (
+        rawValue === undefined ||
+        (explicitValue === undefined && looksLikeOptionToken(rawValue))
+      ) {
+        throw new ParserUsageError(`Option "${flagLabel}" expects a value.`);
       }
 
-      rawOptionValues.set(optionName, coerceOptionValue(flagLabel, definition, rawValue));
+      setRawOptionValue(
+        rawOptionValues,
+        optionName,
+        coerceOptionValue(flagLabel, definition, rawValue),
+        flagLabel,
+      );
       cursor += explicitValue === undefined ? 2 : 1;
       continue;
     }
@@ -256,7 +286,7 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
     const optionEntry = shortOptions.get(shortKey);
 
     if (!optionEntry) {
-      throw new RemptsUsageError(`Unknown option "-${shortKey}".`);
+      throw new ParserUsageError(`Unknown option "-${shortKey}".`);
     }
 
     const [optionName, definition] = optionEntry;
@@ -264,18 +294,23 @@ export async function parseArgvTail<TOptions extends CommandOptionsRecord>(
     assertInputSourceEnabled(definition, "flag", flagLabel);
 
     if (definition.type === "boolean") {
-      rawOptionValues.set(optionName, true);
+      setRawOptionValue(rawOptionValues, optionName, true, flagLabel);
       cursor += 1;
       continue;
     }
 
     const nextToken = argv[cursor + 1];
 
-    if (nextToken === undefined) {
-      throw new RemptsUsageError(`Option "${flagLabel}" expects a value.`);
+    if (nextToken === undefined || looksLikeOptionToken(nextToken)) {
+      throw new ParserUsageError(`Option "${flagLabel}" expects a value.`);
     }
 
-    rawOptionValues.set(optionName, coerceOptionValue(flagLabel, definition, nextToken));
+    setRawOptionValue(
+      rawOptionValues,
+      optionName,
+      coerceOptionValue(flagLabel, definition, nextToken),
+      flagLabel,
+    );
     cursor += 2;
   }
 

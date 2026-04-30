@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { resolvePublishableTargets } from "./validation";
 
@@ -22,7 +22,12 @@ describe("publish validation", () => {
     );
     await writeFile(
       join(privateDir, "package.json"),
-      JSON.stringify({ name: "private", private: true, type: "module", publishConfig: { access: "public" } }),
+      JSON.stringify({
+        name: "private",
+        private: true,
+        type: "module",
+        publishConfig: { access: "public" },
+      }),
       "utf8",
     );
     await writeFile(
@@ -44,8 +49,14 @@ describe("publish validation", () => {
       expect.objectContaining({ label: "packages/ok", packageName: "ok" }),
     ]);
     expect(result.skipped).toEqual([
-      { label: "packages/private", reason: 'package.json has "private": true (npm publish is blocked)' },
-      { label: "packages/missing-dist", reason: expect.stringContaining("missing publish directory:") },
+      {
+        label: "packages/private",
+        reason: 'package.json has "private": true (npm publish is blocked)',
+      },
+      {
+        label: "packages/missing-dist",
+        reason: expect.stringContaining("missing publish directory:"),
+      },
     ]);
   });
 
@@ -66,7 +77,10 @@ describe("publish validation", () => {
 
     expect(result.publishable).toEqual([]);
     expect(result.skipped).toEqual([
-      { label: "packages/repo-only", reason: "package @repo/hidden is ignored by workspace policy" },
+      {
+        label: "packages/repo-only",
+        reason: "package @repo/hidden is ignored by workspace policy",
+      },
     ]);
   });
 });

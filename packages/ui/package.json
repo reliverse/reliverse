@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     "./*": "./src/*.tsx",
+    "./icons": "./src/icons/index.ts",
+    "./icons/*": "./src/icons/*.tsx",
     "./utils/*": "./src/utils/*.ts"
   },
   "dependencies": {
@@ -17,9 +19,10 @@
     "date-fns": "catalog:",
     "embla-carousel-react": "^8.6.0",
     "input-otp": "^1.4.2",
-    "lucide-react": "^0.564.0",
+    "lucide-react": "^1.14.0",
     "motion": "catalog:",
-    "react-day-picker": "^9.13.2",
+    "react-day-picker": "^9.14.0",
+    "simple-icons": "^16.18.0",
     "sonner": "catalog:",
     "tailwind-merge": "catalog:",
     "tw-animate-css": "catalog:",
@@ -28,17 +31,14 @@
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "tailwindcss": "catalog:",
-    "@types/bun": "catalog:"
+    "tailwindcss": "catalog:"
   },
   "peerDependencies": {
     "react": "catalog:",
     "react-dom": "catalog:"
-  },
-  "scripts": {
-    "typecheck": "tsgo --noEmit"
   }
 }

@@ -2,6 +2,8 @@
 
 `@reliverse/rempts` is a Bun-first, file-based CLI foundation for TypeScript projects.
 
+Rempts sits on top of `@reliverse/parser`: parser owns pure argv/options parsing, while Rempts owns command discovery, plugin loading, runtime context, prompts, safety, output, and execution.
+
 It is designed for CLIs that should stay:
 
 - explicit
@@ -35,10 +37,10 @@ await createCLI({
   interactionMode: "never",
   meta: {
     description: "My automation-friendly CLI",
-    name: "my-cli",
+    name: "mycli",
   },
   help: {
-    examples: ["my-cli sync", "my-cli sync --apply"],
+    examples: ["mycli sync", "mycli sync --apply"],
     format: "auto",
   },
 });
@@ -124,7 +126,7 @@ src/
 With this layout:
 
 ```bash
-my-cli hello
+mycli hello
 ```
 
 ### Plugin
@@ -143,14 +145,14 @@ src/
 With this layout, the host CLI can expose:
 
 ```bash
-my-cli dler build
-my-cli dler pub
+mycli dler build
+mycli dler pub
 ```
 
 If you want:
 
 ```bash
-my-cli dler
+mycli dler
 ```
 
 then add:
@@ -257,11 +259,11 @@ This lets you safely compose trees such as:
 Result:
 
 ```bash
-my-cli dler build
-my-cli dler build native-binary
-my-cli dler pub
-my-cli dler pub jsr
-my-cli dler pack
+mycli dler build
+mycli dler build native-binary
+mycli dler pub
+mycli dler pub jsr
+mycli dler pack
 ```
 
 ## Runtime behavior
@@ -293,3 +295,19 @@ my-cli dler pack
 - In JSON mode, return machine-followable data such as ids, paths, counts, and plans
 
 TTY prompts fall back to plain text automatically, and non-TTY environments stay non-interactive.
+
+## Roadmap
+
+- [ ] Generate stable command-tree manifests for agents, editors, docs, and integrations.
+- [ ] Generate Markdown docs from the same command definitions used for help output.
+- [ ] Add snapshot/golden tests for human help and structured error output.
+- [ ] Add plugin manifest validation with clear load/reject diagnostics.
+- [ ] Add shell completion generation from the resolved command tree.
+- [ ] Add command-level explain/plan output for previewing actions and safety effects before execution.
+- [ ] Tighten global config support around explicit, traceable plugin loading.
+
+## Non-goals
+
+- Arbitrary command abbreviations. They make future command names harder to add safely.
+- Runtime plugin injection through `createCLI(...)`. Discovery should stay allowlist-based and host-controlled.
+- Parser-owned command execution, prompting, output writing, or plugin loading. Those are Rempts runtime concerns, not parser concerns.

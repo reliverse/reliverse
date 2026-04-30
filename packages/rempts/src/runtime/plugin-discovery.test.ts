@@ -2,7 +2,11 @@ import { describe, expect, test } from "bun:test";
 
 import { RemptsUsageError } from "./errors";
 import { readGlobalRemptsConfig } from "./global-plugin-config";
-import { matchConflictPriorityRule, matchesAnyGlob, resolveDiscoveredPlugins } from "./plugin-discovery";
+import {
+  matchConflictPriorityRule,
+  matchesAnyGlob,
+  resolveDiscoveredPlugins,
+} from "./plugin-discovery";
 
 describe("plugin discovery helpers", () => {
   test("matches simple allowlist globs predictably", () => {

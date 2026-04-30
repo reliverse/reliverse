@@ -5,6 +5,7 @@ The foundational library for building terminal user interfaces. Provides an impe
 ## Overview
 
 OpenTUI Core runs on Bun with native Zig bindings for performance-critical operations:
+
 - **Renderer**: Manages terminal output, input events, and the rendering loop
 - **Renderables**: Hierarchical UI building blocks with Yoga layout
 - **Constructs**: Declarative wrappers for composing Renderables
@@ -13,6 +14,7 @@ OpenTUI Core runs on Bun with native Zig bindings for performance-critical opera
 ## When to Use Core
 
 Use the core imperative API when:
+
 - Building a library or framework on top of OpenTUI
 - Need maximum control over rendering and state
 - Want smallest possible bundle size (no React/Solid runtime)
@@ -21,12 +23,12 @@ Use the core imperative API when:
 
 ## When NOT to Use Core
 
-| Scenario | Use Instead |
-|----------|-------------|
-| Familiar with React patterns | `@opentui/react` |
-| Want fine-grained reactivity | `@opentui/solid` |
+| Scenario                      | Use Instead               |
+| ----------------------------- | ------------------------- |
+| Familiar with React patterns  | `@opentui/react`          |
+| Want fine-grained reactivity  | `@opentui/solid`          |
 | Building typical applications | React or Solid reconciler |
-| Rapid prototyping | React or Solid reconciler |
+| Rapid prototyping             | React or Solid reconciler |
 
 ## Quick Start
 
@@ -51,9 +53,9 @@ bun install @opentui/core
 ```
 
 ```typescript
-import { createCliRenderer, TextRenderable, BoxRenderable } from "@opentui/core"
+import { createCliRenderer, TextRenderable, BoxRenderable } from "@opentui/core";
 
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 // Create a box container
 const container = new BoxRenderable(renderer, {
@@ -63,18 +65,18 @@ const container = new BoxRenderable(renderer, {
   border: true,
   borderStyle: "rounded",
   padding: 1,
-})
+});
 
 // Create text inside the box
 const greeting = new TextRenderable(renderer, {
   id: "greeting",
   content: "Hello, OpenTUI!",
   fg: "#00FF00",
-})
+});
 
 // Compose the tree
-container.add(greeting)
-renderer.root.add(container)
+container.add(greeting);
+renderer.root.add(container);
 ```
 
 ## Core Concepts
@@ -82,6 +84,7 @@ renderer.root.add(container)
 ### Renderer
 
 The `CliRenderer` orchestrates everything:
+
 - Manages the terminal viewport and alternate screen
 - Handles input events (keyboard, mouse, paste)
 - Runs the rendering loop (configurable FPS)
@@ -89,16 +92,17 @@ The `CliRenderer` orchestrates everything:
 
 ### Renderables vs Constructs
 
-| Renderables (Imperative) | Constructs (Declarative) |
-|--------------------------|--------------------------|
-| `new TextRenderable(renderer, {...})` | `Text({...})` |
-| Requires renderer at creation | Creates VNode, instantiated later |
-| Direct mutation via methods | Chained calls recorded, replayed on instantiation |
-| Full control | Cleaner composition |
+| Renderables (Imperative)              | Constructs (Declarative)                          |
+| ------------------------------------- | ------------------------------------------------- |
+| `new TextRenderable(renderer, {...})` | `Text({...})`                                     |
+| Requires renderer at creation         | Creates VNode, instantiated later                 |
+| Direct mutation via methods           | Chained calls recorded, replayed on instantiation |
+| Full control                          | Cleaner composition                               |
 
 ### Storage Options
 
 Renderables can be composed in two ways:
+
 1. **Imperative**: Create instances, call `.add()` to compose
 2. **Declarative (Constructs)**: Create VNodes, pass children as arguments
 

@@ -1,5 +1,5 @@
-import { access, readFile, writeFile } from "node:fs/promises";
 import { constants } from "node:fs";
+import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
 export type DependencySection =
@@ -98,9 +98,7 @@ async function pathExists(path: string): Promise<boolean> {
   }
 }
 
-function isWorkspaceObject(
-  workspaces: PackageManifest["workspaces"],
-): workspaces is {
+function isWorkspaceObject(workspaces: PackageManifest["workspaces"]): workspaces is {
   readonly catalog?: Record<string, string> | undefined;
   readonly catalogs?: Record<string, Record<string, string>> | undefined;
   readonly packages?: readonly string[] | undefined;
@@ -114,9 +112,7 @@ interface CatalogContainer {
   readonly namedCatalogs: Record<string, Record<string, string>>;
 }
 
-function ensureObject(
-  value: Record<string, string> | undefined,
-): Record<string, string> {
+function ensureObject(value: Record<string, string> | undefined): Record<string, string> {
   return value ? { ...value } : {};
 }
 
@@ -146,9 +142,7 @@ export function getCatalogProtocol(name?: string | undefined): string {
   return normalizedName ? `catalog:${normalizedName}` : "catalog:";
 }
 
-export function parseCatalogProtocol(
-  specifier: string,
-): string | undefined | null {
+export function parseCatalogProtocol(specifier: string): string | undefined | null {
   if (!specifier.startsWith("catalog:")) {
     return null;
   }
@@ -181,18 +175,11 @@ async function readManifestSnapshot(path: string): Promise<ManifestSnapshot> {
   };
 }
 
-export async function restoreSnapshots(
-  snapshots: readonly ManifestSnapshot[],
-): Promise<void> {
-  await Promise.all(
-    snapshots.map((snapshot) => writeFile(snapshot.path, snapshot.text, "utf8")),
-  );
+export async function restoreSnapshots(snapshots: readonly ManifestSnapshot[]): Promise<void> {
+  await Promise.all(snapshots.map((snapshot) => writeFile(snapshot.path, snapshot.text, "utf8")));
 }
 
-export async function writeManifest(
-  path: string,
-  manifest: PackageManifest,
-): Promise<void> {
+export async function writeManifest(path: string, manifest: PackageManifest): Promise<void> {
   await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }
 
@@ -203,7 +190,7 @@ function getWorkspacePatterns(manifest: PackageManifest): readonly string[] {
     return workspaces;
   }
 
-  return isWorkspaceObject(workspaces) ? workspaces.packages ?? [] : [];
+  return isWorkspaceObject(workspaces) ? (workspaces.packages ?? []) : [];
 }
 
 function getCatalogContainer(manifest: PackageManifest): CatalogContainer {
@@ -211,10 +198,7 @@ function getCatalogContainer(manifest: PackageManifest): CatalogContainer {
   const topLevelCatalog = manifest.catalog ? { ...manifest.catalog } : {};
   const topLevelCatalogs = manifest.catalogs
     ? Object.fromEntries(
-        Object.entries(manifest.catalogs).map(([name, catalog]) => [
-          name,
-          { ...catalog },
-        ]),
+        Object.entries(manifest.catalogs).map(([name, catalog]) => [name, { ...catalog }]),
       )
     : {};
 
@@ -232,10 +216,7 @@ function getCatalogContainer(manifest: PackageManifest): CatalogContainer {
       location: "workspaces",
       namedCatalogs: workspaces.catalogs
         ? Object.fromEntries(
-            Object.entries(workspaces.catalogs).map(([name, catalog]) => [
-              name,
-              { ...catalog },
-            ]),
+            Object.entries(workspaces.catalogs).map(([name, catalog]) => [name, { ...catalog }]),
           )
         : {},
     };
@@ -325,7 +306,7 @@ function setCatalog(
       workspaces: {
         catalog: sortRecord(catalog),
         catalogs: sortNestedRecord(nextCatalogs),
-        packages: isWorkspaceObject(workspaces) ? workspaces.packages ?? [] : [],
+        packages: isWorkspaceObject(workspaces) ? (workspaces.packages ?? []) : [],
       },
     };
   }
@@ -404,9 +385,7 @@ async function listWorkspaceDirectories(
 
   for (const pattern of patterns) {
     const isNegative = pattern.startsWith("!");
-    const manifestPattern = toManifestGlobPattern(
-      isNegative ? pattern.slice(1) : pattern,
-    );
+    const manifestPattern = toManifestGlobPattern(isNegative ? pattern.slice(1) : pattern);
     const glob = new Bun.Glob(manifestPattern);
 
     for await (const match of glob.scan({
@@ -515,8 +494,7 @@ export async function resolveTargetContext(options: {
   }
 
   const targetManifest = await readManifest(targetManifestPath);
-  const targetLabel =
-    relative(repoRootDir, targetDir) || targetManifest.name || targetDir;
+  const targetLabel = relative(repoRootDir, targetDir) || targetManifest.name || targetDir;
 
   return {
     baseCwd,
@@ -571,9 +549,9 @@ export function findDependencyLocation(
 }
 
 export function listTargetDependencies(manifest: PackageManifest): readonly string[] {
-  return [...new Set(
-    SECTION_PRIORITY.flatMap((section) => Object.keys(manifest[section] ?? {})),
-  )].sort((left, right) => left.localeCompare(right));
+  return [
+    ...new Set(SECTION_PRIORITY.flatMap((section) => Object.keys(manifest[section] ?? {}))),
+  ].sort((left, right) => left.localeCompare(right));
 }
 
 export function getCatalogSpecifier(
@@ -602,9 +580,7 @@ async function fetchRegistryPackageMetadata(
   }
 
   const request = (async () => {
-    const response = await fetch(
-      `https://registry.npmjs.org/${encodeURIComponent(packageName)}`,
-    );
+    const response = await fetch(`https://registry.npmjs.org/${encodeURIComponent(packageName)}`);
 
     if (!response.ok) {
       throw new Error(
@@ -816,10 +792,7 @@ export function createDesiredSpecifier(options: {
   return options.exact ? options.version : `^${options.version}`;
 }
 
-async function runBunCommand(
-  cwd: string,
-  args: readonly string[],
-): Promise<InstallResult> {
+async function runBunCommand(cwd: string, args: readonly string[]): Promise<InstallResult> {
   const processHandle = Bun.spawn([process.execPath, ...args], {
     cwd,
     stderr: "pipe",
@@ -845,28 +818,7 @@ export async function runBunInstall(
   cwd: string,
   options?: { readonly useBunForce?: boolean | undefined },
 ): Promise<InstallResult> {
-  return runBunCommand(cwd, [
-    "install",
-    ...(options?.useBunForce ? ["--force"] : []),
-  ]);
-}
-
-export async function runBunUpdate(
-  cwd: string,
-  options?: {
-    readonly useBunForce?: boolean | undefined;
-    readonly latest?: boolean | undefined;
-    readonly packages?: readonly string[] | undefined;
-    readonly recursive?: boolean | undefined;
-  },
-): Promise<InstallResult> {
-  return runBunCommand(cwd, [
-    "update",
-    ...(options?.useBunForce ? ["--force"] : []),
-    ...(options?.latest ? ["--latest"] : []),
-    ...(options?.recursive ? ["--recursive"] : []),
-    ...(options?.packages ?? []),
-  ]);
+  return runBunCommand(cwd, ["install", ...(options?.useBunForce ? ["--force"] : [])]);
 }
 
 export function cloneManifest(manifest: PackageManifest): PackageManifest {
@@ -898,10 +850,7 @@ export function setCatalogEntry(
   const normalizedName = normalizeCatalogName(catalogName);
   const nextDefaultCatalog = { ...container.defaultCatalog };
   const nextNamedCatalogs = Object.fromEntries(
-    Object.entries(container.namedCatalogs).map(([name, catalog]) => [
-      name,
-      { ...catalog },
-    ]),
+    Object.entries(container.namedCatalogs).map(([name, catalog]) => [name, { ...catalog }]),
   ) as Record<string, Record<string, string>>;
 
   if (normalizedName) {

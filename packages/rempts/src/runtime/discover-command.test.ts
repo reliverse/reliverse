@@ -4,13 +4,14 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
 import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "../api/define-plugin";
-import { createFileCommandSource } from "./file-source";
 import { discoverCommandPath } from "./discover-command";
 import { RemptsUsageError } from "./errors";
+import { createFileCommandSource } from "./file-source";
 import { createPluginCommandSource } from "./plugin-source";
 import { resolveEntry } from "./resolve-entry";
 
-const defineCommandModulePath = "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/api/define-command.ts";
+const defineCommandModulePath =
+  "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/api/define-command.ts";
 const tempRoots: string[] = [];
 
 async function createTempRoot(): Promise<string> {
@@ -47,7 +48,11 @@ async function writeCommandFile(
 
 async function createLocalSource(
   root: string,
-  commands: ReadonlyArray<{ aliases?: readonly string[] | undefined; description: string; path: readonly string[] }>,
+  commands: ReadonlyArray<{
+    aliases?: readonly string[] | undefined;
+    description: string;
+    path: readonly string[];
+  }>,
 ) {
   const entryPath = join(root, "cli.ts");
   await mkdir(root, { recursive: true });
@@ -68,7 +73,11 @@ async function createLocalSource(
 async function createPluginSource(
   root: string,
   pluginName: string,
-  commands: ReadonlyArray<{ aliases?: readonly string[] | undefined; description: string; path: readonly string[] }>,
+  commands: ReadonlyArray<{
+    aliases?: readonly string[] | undefined;
+    description: string;
+    path: readonly string[];
+  }>,
 ) {
   const entryPath = join(root, "src", "index.ts");
   await mkdir(dirname(entryPath), { recursive: true });

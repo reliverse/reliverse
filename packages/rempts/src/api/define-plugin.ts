@@ -1,4 +1,5 @@
-import type { CommandOptionsRecord } from "../options/types";
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import { RemptsUsageError } from "../runtime/errors";
 import { resolveEntry } from "../runtime/resolve-entry";
 

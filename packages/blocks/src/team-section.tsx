@@ -1,6 +1,7 @@
 import { Badge } from "@repo/ui/badge";
 import { Card, CardContent } from "@repo/ui/card";
-import { Github, Globe, Twitter } from "lucide-react";
+import { GitHubIcon, XIcon } from "@repo/ui/icons";
+import { Globe } from "lucide-react";
 
 const team = [
   {
@@ -12,7 +13,7 @@ const team = [
     links: {
       website: "https://blefnk.reliverse.org",
       github: "https://github.com/blefnk",
-      twitter: "https://twitter.com/blefnk",
+      x: "https://x.com/blefnk",
     },
   },
   {
@@ -24,7 +25,7 @@ const team = [
     links: {
       website: "https://mfs.reliverse.org",
       github: "#",
-      twitter: "#",
+      x: "#",
     },
   },
 ];
@@ -77,16 +78,16 @@ export function TeamSection() {
                         rel="noopener noreferrer"
                         target="_blank"
                       >
-                        <Github className="size-4" />
+                        <GitHubIcon className="size-4" />
                       </a>
                       <a
-                        aria-label={`${member.name}'s Twitter`}
+                        aria-label={`${member.name}'s X (Twitter)`}
                         className="text-muted-foreground transition-colors hover:text-foreground"
-                        href={member.links.twitter}
+                        href={member.links.x}
                         rel="noopener noreferrer"
                         target="_blank"
                       >
-                        <Twitter className="size-4" />
+                        <XIcon className="size-4" />
                       </a>
                     </div>
                   </div>

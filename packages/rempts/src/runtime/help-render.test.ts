@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 
 import { createRelico } from "@reliverse/relico";
+
 import { renderHelpDocument } from "./help-render";
 
 describe("renderHelpDocument colors", () => {
@@ -74,6 +75,26 @@ describe("renderHelpDocument colors", () => {
     expect(text).toContain("-h, --help  Second flag");
   });
 
+  test("renders false default values instead of treating them as absent", () => {
+    const text = renderHelpDocument({
+      aliases: [],
+      commandFlags: [
+        { defaultValue: "false", description: "Do the careful thing", names: "--careful" },
+      ],
+      commandPath: [],
+      examples: [],
+      globalFlags: [],
+      interactive: "never",
+      programName: "demo",
+      scope: "launcher",
+      scopeLabel: "Commands",
+      subcommands: [],
+      usage: ["demo <command>"],
+    });
+
+    expect(text).toContain("default: false");
+  });
+
   test("adds section rules and prompt-like usage/examples without breaking plain output", () => {
     const text = renderHelpDocument({
       aliases: [],
@@ -97,7 +118,13 @@ describe("renderHelpDocument colors", () => {
   test("wraps long descriptions without destroying the aligned layout", () => {
     const text = renderHelpDocument({
       aliases: [],
-      commandFlags: [{ description: "This is a very long description that should wrap onto another line while keeping the command flag column visually stable for humans reading help output in a terminal.", names: "--alpha" }],
+      commandFlags: [
+        {
+          description:
+            "This is a very long description that should wrap onto another line while keeping the command flag column visually stable for humans reading help output in a terminal.",
+          names: "--alpha",
+        },
+      ],
       commandPath: [],
       examples: [],
       globalFlags: [],
@@ -110,8 +137,12 @@ describe("renderHelpDocument colors", () => {
     });
 
     expect(text).toContain("--alpha");
-    expect(text).toContain("This is a very long description that should wrap onto another line while");
-    expect(text).toContain("keeping the command flag column visually stable for humans reading help");
+    expect(text).toContain(
+      "This is a very long description that should wrap onto another line while",
+    );
+    expect(text).toContain(
+      "keeping the command flag column visually stable for humans reading help",
+    );
     expect(text).toContain("output in a terminal.");
   });
 

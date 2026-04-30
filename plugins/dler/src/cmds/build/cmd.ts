@@ -8,6 +8,12 @@ import {
   createBuilderRuntime,
   createBunBuildProvider,
 } from "../../impl/build";
+import { resolveConcurrency } from "../../impl/concurrency";
+import {
+  DLER_BUILD_DEFAULTS,
+  DLER_COMMAND_NAMES,
+  DLER_CONCURRENCY_DEFAULTS,
+} from "../../impl/constants";
 import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
 import { createBuildSummary, formatBuildSummary } from "../../impl/result-contract";
 import { resolveRequestedTargets } from "../../impl/shared-targets";
@@ -32,23 +38,49 @@ function normalizeSkippedReason(reason: string): string {
   return reason;
 }
 
+type PreviewStyle = (value: unknown) => string;
+
+interface PreviewColors {
+  readonly bold: PreviewStyle;
+  readonly cyan: PreviewStyle;
+  readonly dim: PreviewStyle;
+  readonly gray: PreviewStyle;
+  readonly green: PreviewStyle;
+  readonly magenta: PreviewStyle;
+  readonly yellow: PreviewStyle;
+}
+
+function formatCount(
+  colors: PreviewColors,
+  count: number,
+  label: string,
+  accent: "green" | "yellow",
+): string {
+  const value = count > 0 ? colors[accent](String(count)) : colors.dim(String(count));
+
+  return `${value} ${label}`;
+}
+
 function formatLabelRows(
   rows: ReadonlyArray<{ readonly label: string; readonly detail?: string | undefined }>,
+  colors: PreviewColors,
 ): string[] {
   if (rows.length === 0) {
-    return ["  none"];
+    return [`  ${colors.dim("none")}`];
   }
 
   const width = Math.max(...rows.map((row) => row.label.length));
 
   return rows.map((row) => {
-    const label = row.label.padEnd(width);
+    const label = colors.bold(row.label.padEnd(width));
 
-    return row.detail ? `  ${label}  ${row.detail}` : `  ${row.label}`;
+    return row.detail ? `  ${label}  ${colors.gray(row.detail)}` : `  ${colors.bold(row.label)}`;
   });
 }
 
 function formatBuildPreviewText(options: {
+  readonly colors: PreviewColors;
+  readonly concurrency: number;
   readonly commandDetails: readonly {
     readonly command: string;
     readonly cwd: string;
@@ -57,16 +89,17 @@ function formatBuildPreviewText(options: {
   readonly provider: string;
   readonly root: string;
   readonly skippedTargets: readonly { readonly label: string; readonly reason: string }[];
-  readonly showCommands: boolean;
+  readonly verbose: boolean;
   readonly targets: readonly { readonly cwd: string; readonly label?: string | undefined }[];
 }): string[] {
   const lines = [
-    "dler build preview",
+    options.colors.bold(options.colors.cyan(`${DLER_COMMAND_NAMES.build} preview`)),
     "",
-    `Provider: ${options.provider}`,
-    `Targets: ${options.targets.length} planned, ${options.skippedTargets.length} skipped`,
+    `${options.colors.bold("Provider:")} ${options.colors.magenta(options.provider)}`,
+    `${options.colors.bold("Concurrency:")} ${options.colors.magenta(options.concurrency)}`,
+    `${options.colors.bold("Targets:")} ${formatCount(options.colors, options.targets.length, "planned", "green")}, ${formatCount(options.colors, options.skippedTargets.length, "skipped", "yellow")}`,
     "",
-    "Planned",
+    options.colors.bold("Planned"),
     ...formatLabelRows(
       options.targets.map((target) => {
         const label = target.label ?? target.cwd;
@@ -77,39 +110,41 @@ function formatBuildPreviewText(options: {
           label,
         };
       }),
+      options.colors,
     ),
   ];
 
   if (options.skippedTargets.length > 0) {
     lines.push(
       "",
-      "Skipped",
+      options.colors.bold(options.colors.yellow("Skipped")),
       ...formatLabelRows(
         options.skippedTargets.map((target) => ({
           detail: normalizeSkippedReason(target.reason),
           label: target.label,
         })),
+        options.colors,
       ),
     );
   }
 
-  if (options.showCommands) {
-    lines.push("", "Generated commands");
+  if (options.verbose) {
+    lines.push("", options.colors.bold(options.colors.cyan("Generated commands")));
 
     for (const [index, step] of options.commandDetails.entries()) {
       lines.push(
-        `  ${index + 1}. ${step.label ?? step.cwd}`,
-        `     ${step.command.replaceAll(options.root, ".")}`,
+        `  ${options.colors.magenta(`${index + 1}.`)} ${options.colors.bold(step.label ?? step.cwd)}`,
+        `     ${options.colors.gray(step.command.replaceAll(options.root, "."))}`,
       );
     }
   }
 
   lines.push(
     "",
-    "No changes made. Pass --apply to run the planned builds.",
-    options.showCommands
-      ? "Use --json for the full machine-readable plan."
-      : "Use --show-commands or --json to inspect generated commands.",
+    `${options.colors.yellow("No changes made.")} Pass ${options.colors.bold("--apply")} to run the planned builds.`,
+    options.verbose
+      ? `Use ${options.colors.bold("--json")} for the full machine-readable plan.`
+      : `Use ${options.colors.bold("--verbose")} or ${options.colors.bold("--json")} to inspect generated commands.`,
   );
 
   return lines;
@@ -118,7 +153,7 @@ function formatBuildPreviewText(options: {
 export default defineCommand({
   meta: {
     name: "build",
-    description: "Build selected Reliverse workspaces through generated per-package build commands",
+    description: "Build selected Bun workspaces through generated per-package build commands",
   },
   agent: {
     notes:
@@ -138,16 +173,17 @@ export default defineCommand({
       "rse build",
       "rse build --targets plugins/pm,plugins/dler,apps/rse --apply",
       "rse build --targets plugins/dler --provider bun --apply --json",
-      "rse build --show-commands",
+      "rse build --verbose",
+      "rse build --concurrency 2 --apply",
     ],
     text: "dler plans a generated build command for each eligible workspace target. Default mode previews the commands for the resolved target scope; pass --apply to execute them through the selected provider.",
   },
   options: {
     provider: {
       type: "string",
-      defaultValue: "bun",
+      defaultValue: DLER_BUILD_DEFAULTS.provider,
       description: "Build provider to use for the selected targets",
-      hint: "Only the Bun provider ships in v1, but the runtime is provider-oriented.",
+      hint: "Only the Bun provider ships in v0, but the runtime is provider-oriented.",
       inputSources: ["flag", "default"],
     },
     targets: {
@@ -157,13 +193,23 @@ export default defineCommand({
       hint: "Examples: plugins/pm,plugins/dler,apps/rse",
       inputSources: ["flag"],
     },
-    showCommands: {
+    concurrency: {
+      type: "number",
+      defaultValue: DLER_CONCURRENCY_DEFAULTS.build,
+      description: "Maximum number of build targets to run at once",
+      inputSources: ["flag", "default"],
+    },
+    verbose: {
       type: "boolean",
-      description: "Show generated build commands in text preview output",
+      description: "Show verbose text preview details, including generated build commands",
       inputSources: ["flag"],
     },
   },
   async handler(ctx) {
+    const concurrency = resolveConcurrency(ctx.options.concurrency, {
+      defaultValue: DLER_CONCURRENCY_DEFAULTS.build,
+      label: "--concurrency",
+    });
     const providerRegistry = createBuildProviderRegistry({
       providers: [createBunBuildProvider()],
     });
@@ -224,7 +270,7 @@ export default defineCommand({
             summary,
             targets: [],
           },
-          "dler build",
+          DLER_COMMAND_NAMES.build,
         );
         return;
       }
@@ -244,6 +290,7 @@ export default defineCommand({
       });
       const preview = {
         apply: false,
+        concurrency,
         preview: true,
         executedTargets: targetSets.executedTargets,
         ok: true,
@@ -264,16 +311,18 @@ export default defineCommand({
       };
 
       if (ctx.output.mode === "json") {
-        ctx.output.result(preview, "dler build");
+        ctx.output.result(preview, DLER_COMMAND_NAMES.build);
         return;
       }
 
       for (const line of formatBuildPreviewText({
+        colors: ctx.colors.stdout,
+        concurrency,
         commandDetails: preview.steps,
         provider,
         root: ctx.cwd,
         skippedTargets,
-        showCommands: ctx.options.showCommands === true,
+        verbose: ctx.options.verbose === true,
         targets,
       })) {
         ctx.out(line);
@@ -290,6 +339,7 @@ export default defineCommand({
     });
     const report = await runtime
       .run({
+        concurrency,
         provider,
         targets,
       })
@@ -314,6 +364,7 @@ export default defineCommand({
           {
             ...report,
             apply: true,
+            concurrency,
             preview: false,
             executedTargets: executedTargetSets.executedTargets,
             skipped: skippedTargets,
@@ -321,7 +372,7 @@ export default defineCommand({
             skippedTargets: executedTargetSets.skippedTargets,
             summary,
           },
-          "dler build",
+          DLER_COMMAND_NAMES.build,
         );
         return;
       }
@@ -329,6 +380,7 @@ export default defineCommand({
       ctx.output.data({
         ...report,
         apply: true,
+        concurrency,
         preview: false,
         executedTargets: executedTargetSets.executedTargets,
         ok: false,

@@ -38,8 +38,6 @@ describe("runtime output colors", () => {
         examples: [],
         interactive: "never",
         name: "demo",
-        noTTY: false,
-        noTUI: false,
         path: ["demo"],
         sourceId: "local",
         sourceKind: "file",

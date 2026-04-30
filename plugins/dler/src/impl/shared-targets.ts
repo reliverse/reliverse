@@ -58,7 +58,10 @@ export async function fileExists(path: string): Promise<boolean> {
   }
 }
 
-export async function resolveDirectoryTargets(cwd: string, labels: readonly string[]): Promise<ResolvedTargetsResult> {
+export async function resolveDirectoryTargets(
+  cwd: string,
+  labels: readonly string[],
+): Promise<ResolvedTargetsResult> {
   const resolved: RequestedTarget[] = [];
   const skipped: SkippedTarget[] = [];
 

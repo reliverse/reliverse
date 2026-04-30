@@ -5,17 +5,27 @@ import {
   type PluginDiscoveryLoadedPlugin,
   type PluginDiscoveryReport,
 } from "@reliverse/rempts";
+
 import { getRemptsTargetOptions, runTargetRemptsCommand } from "../../../../lib/target-cli";
 
 function parsePath(args: readonly string[]): readonly string[] {
   return args.flatMap((arg) => arg.split("/").filter(Boolean));
 }
 
-function findNode(report: CommandTreeReport, path: readonly string[]): CommandTreeNodeDiagnostic | undefined {
-  return report.nodes.find((node) => node.path.length === path.length && node.path.every((segment, index) => segment === path[index]));
+function findNode(
+  report: CommandTreeReport,
+  path: readonly string[],
+): CommandTreeNodeDiagnostic | undefined {
+  return report.nodes.find(
+    (node) =>
+      node.path.length === path.length &&
+      node.path.every((segment, index) => segment === path[index]),
+  );
 }
 
-function buildPluginMap(report: PluginDiscoveryReport | undefined): Map<string, PluginDiscoveryLoadedPlugin> {
+function buildPluginMap(
+  report: PluginDiscoveryReport | undefined,
+): Map<string, PluginDiscoveryLoadedPlugin> {
   return new Map((report?.loaded ?? []).map((plugin) => [plugin.pluginName, plugin] as const));
 }
 
@@ -40,18 +50,23 @@ export default defineCommand({
 
     const targetOptions = getRemptsTargetOptions(ctx.options);
     const commandTree = targetOptions.cli
-      ? (await runTargetRemptsCommand<CommandTreeReport>({
-          commandPath: ["rempts", "commands", "tree"],
-          cwd: ctx.cwd,
-          rawTargetOptions: ctx.options,
-        })).data
-      : ctx.cli?.commandTree ?? ctx.exit(1, "Command-tree diagnostics are unavailable in this CLI session.");
+      ? (
+          await runTargetRemptsCommand<CommandTreeReport>({
+            commandPath: ["rempts", "commands", "tree"],
+            cwd: ctx.cwd,
+            rawTargetOptions: ctx.options,
+          })
+        ).data
+      : (ctx.cli?.commandTree ??
+        ctx.exit(1, "Command-tree diagnostics are unavailable in this CLI session."));
     const pluginDiscovery = targetOptions.cli
-      ? (await runTargetRemptsCommand<PluginDiscoveryReport>({
-          commandPath: ["rempts", "plugins", "doctor"],
-          cwd: ctx.cwd,
-          rawTargetOptions: ctx.options,
-        })).data
+      ? (
+          await runTargetRemptsCommand<PluginDiscoveryReport>({
+            commandPath: ["rempts", "plugins", "doctor"],
+            cwd: ctx.cwd,
+            rawTargetOptions: ctx.options,
+          })
+        ).data
       : ctx.cli?.pluginDiscovery;
 
     const node = findNode(commandTree, path);
@@ -61,9 +76,10 @@ export default defineCommand({
     const resolvedNode = node!;
 
     const pluginMap = buildPluginMap(pluginDiscovery);
-    const chosenPlugin = resolvedNode.chosenCommand?.sourceKind === "plugin"
-      ? pluginMap.get(resolvedNode.chosenCommand.sourceId)
-      : undefined;
+    const chosenPlugin =
+      resolvedNode.chosenCommand?.sourceKind === "plugin"
+        ? pluginMap.get(resolvedNode.chosenCommand.sourceId)
+        : undefined;
     const payload = {
       availableSubcommands: resolvedNode.availableSubcommands,
       chosenCommand: resolvedNode.chosenCommand,
@@ -85,10 +101,14 @@ export default defineCommand({
     }
 
     ctx.out(`Path: ${path.join(" ")}`);
-    ctx.out(`Chosen: ${resolvedNode.chosenCommand ? `${resolvedNode.chosenCommand.sourceId} (${resolvedNode.chosenCommand.sourceKind})` : "(container only)"}`);
+    ctx.out(
+      `Chosen: ${resolvedNode.chosenCommand ? `${resolvedNode.chosenCommand.sourceId} (${resolvedNode.chosenCommand.sourceKind})` : "(container only)"}`,
+    );
     ctx.out(`Precedence: ${payload.precedenceReason}`);
     if (resolvedNode.shadowedCommands.length > 0) {
-      ctx.out(`Shadowed: ${resolvedNode.shadowedCommands.map((entry) => `${entry.sourceId} (${entry.sourceKind})`).join(", ")}`);
+      ctx.out(
+        `Shadowed: ${resolvedNode.shadowedCommands.map((entry) => `${entry.sourceId} (${entry.sourceKind})`).join(", ")}`,
+      );
     }
     if (resolvedNode.availableSubcommands.length > 0) {
       ctx.out(`Available subcommands: ${resolvedNode.availableSubcommands.join(", ")}`);

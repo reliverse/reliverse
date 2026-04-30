@@ -1,19 +1,11 @@
 {
   "$schema": "https://turborepo.com/schema.json",
   "ui": "tui",
-  "globalPassThroughEnv": [
-    "NODE_ENV",
-    "PROD"
-  ],
+  "globalPassThroughEnv": ["NODE_ENV", "PROD"],
   "tasks": {
     "build": {
-      "dependsOn": [
-        "^build"
-      ],
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env*"
-      ],
+      "dependsOn": ["^build"],
+      "inputs": ["$TURBO_DEFAULT$", ".env*"],
       "outputs": [
         "dist/**",
         ".vercel/**",
@@ -24,22 +16,13 @@
         ".next/**",
         "!.next/cache/**"
       ],
-      "env": [
-        "SERVER_*",
-        "VITE_*"
-      ]
+      "env": ["SERVER_*", "VITE_*"]
     },
     "//#quality": {
-      "dependsOn": [
-        "//#lint",
-        "//#format"
-      ]
+      "dependsOn": ["//#lint", "//#format"]
     },
     "//#quality:fix": {
-      "dependsOn": [
-        "//#lint:fix",
-        "//#format"
-      ]
+      "dependsOn": ["//#lint:fix", "//#format"]
     },
     "//#lint": {},
     "//#lint:fix": {
@@ -50,17 +33,12 @@
     },
     "//#format:check": {},
     "dev": {
-      "inputs": [
-        "$TURBO_DEFAULT$",
-        ".env"
-      ],
+      "inputs": ["$TURBO_DEFAULT$", ".env"],
       "cache": false,
       "persistent": true
     },
     "preview": {
-      "inputs": [
-        "$TURBO_DEFAULT$"
-      ],
+      "inputs": ["$TURBO_DEFAULT$"],
       "cache": false,
       "persistent": true
     }

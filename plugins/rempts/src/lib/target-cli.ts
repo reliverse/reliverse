@@ -10,7 +10,10 @@ export interface RemptsTargetOptions {
 }
 
 interface PackageManifest {
-  readonly workspaces?: readonly string[] | { readonly packages?: readonly string[] | undefined } | undefined;
+  readonly workspaces?:
+    | readonly string[]
+    | { readonly packages?: readonly string[] | undefined }
+    | undefined;
   readonly name?: string | undefined;
   readonly bin?: string | Record<string, string> | undefined;
 }
@@ -26,7 +29,12 @@ interface ResolvedTargetCli {
 
 export interface TargetResolutionAttempt {
   readonly detail: string;
-  readonly kind: "global-bin" | "global-package" | "local-bin" | "local-package" | "local-workspace";
+  readonly kind:
+    | "global-bin"
+    | "global-package"
+    | "local-bin"
+    | "local-package"
+    | "local-workspace";
   readonly root?: string | undefined;
   readonly success: boolean;
 }
@@ -120,8 +128,13 @@ function getWorkspacePatterns(manifest: PackageManifest): readonly string[] {
     return manifest.workspaces.filter((entry): entry is string => typeof entry === "string");
   }
 
-  if (manifest.workspaces && typeof manifest.workspaces === "object" && !Array.isArray(manifest.workspaces)) {
-    const packages = (manifest.workspaces as { readonly packages?: readonly string[] | undefined }).packages;
+  if (
+    manifest.workspaces &&
+    typeof manifest.workspaces === "object" &&
+    !Array.isArray(manifest.workspaces)
+  ) {
+    const packages = (manifest.workspaces as { readonly packages?: readonly string[] | undefined })
+      .packages;
     if (Array.isArray(packages)) {
       return packages.filter((entry): entry is string => typeof entry === "string");
     }
@@ -156,7 +169,10 @@ function pickBinName(manifest: PackageManifest, requestedTarget: string): string
   return names[0] ?? null;
 }
 
-async function resolveLocalTargetByPackage(hostRoot: string, target: string): Promise<ResolvedTargetCli | null> {
+async function resolveLocalTargetByPackage(
+  hostRoot: string,
+  target: string,
+): Promise<ResolvedTargetCli | null> {
   const hostManifest = join(hostRoot, "package.json");
   const hostRequire = createRequire(hostManifest);
 
@@ -214,7 +230,10 @@ async function resolveGlobalTargetByPackage(target: string): Promise<ResolvedTar
   };
 }
 
-async function resolveLocalTargetByBin(hostRoot: string, target: string): Promise<ResolvedTargetCli | null> {
+async function resolveLocalTargetByBin(
+  hostRoot: string,
+  target: string,
+): Promise<ResolvedTargetCli | null> {
   const binPath = join(hostRoot, "node_modules", ".bin", target);
   if (!(await fileExists(binPath))) {
     return null;
@@ -244,7 +263,10 @@ async function resolveGlobalTargetByBin(target: string): Promise<ResolvedTargetC
   };
 }
 
-async function expandWorkspacePattern(hostRoot: string, pattern: string): Promise<readonly string[]> {
+async function expandWorkspacePattern(
+  hostRoot: string,
+  pattern: string,
+): Promise<readonly string[]> {
   if (!pattern.includes("*")) {
     const manifestPath = join(hostRoot, pattern, "package.json");
     return (await fileExists(manifestPath)) ? [manifestPath] : [];
@@ -275,11 +297,16 @@ async function expandWorkspacePattern(hostRoot: string, pattern: string): Promis
 async function getWorkspaceManifestPaths(hostRoot: string): Promise<readonly string[]> {
   const hostManifest = await readManifest(join(hostRoot, "package.json"));
   const patterns = getWorkspacePatterns(hostManifest);
-  const manifests = await Promise.all(patterns.map((pattern) => expandWorkspacePattern(hostRoot, pattern)));
+  const manifests = await Promise.all(
+    patterns.map((pattern) => expandWorkspacePattern(hostRoot, pattern)),
+  );
   return manifests.flat();
 }
 
-async function resolveLocalWorkspaceTarget(hostRoot: string, target: string): Promise<ResolvedTargetCli | null> {
+async function resolveLocalWorkspaceTarget(
+  hostRoot: string,
+  target: string,
+): Promise<ResolvedTargetCli | null> {
   const manifestPaths = await getWorkspaceManifestPaths(hostRoot);
 
   for (const manifestPath of manifestPaths) {
@@ -337,7 +364,9 @@ export function getRemptsTargetOptions(raw: unknown): RemptsTargetOptions {
   };
 }
 
-function getResolutionPolicy(target: RemptsTargetOptions): TargetResolutionReport["resolutionPolicy"] {
+function getResolutionPolicy(
+  target: RemptsTargetOptions,
+): TargetResolutionReport["resolutionPolicy"] {
   if (target.strictGlobal) {
     return "strict-global";
   }
@@ -578,5 +607,7 @@ export async function runTargetRemptsCommand<TData>(options: {
     throw new Error(message);
   }
 
-  throw new Error(`Target CLI \"${target.requestedTarget}\" did not return a valid JSON Rempts result.`);
+  throw new Error(
+    `Target CLI \"${target.requestedTarget}\" did not return a valid JSON Rempts result.`,
+  );
 }

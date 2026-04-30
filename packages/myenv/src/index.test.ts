@@ -24,7 +24,9 @@ describe("@reliverse/myenv", () => {
   });
 
   test("detects deno conservatively", () => {
-    expect(detectRuntime({ deno: { version: { deno: "2.0.0" } }, process: undefined })).toBe("deno");
+    expect(detectRuntime({ deno: { version: { deno: "2.0.0" } }, process: undefined })).toBe(
+      "deno",
+    );
   });
 
   test("detects browser main thread conservatively", () => {
@@ -98,7 +100,9 @@ describe("@reliverse/myenv", () => {
   });
 
   test("respects cli color flags before env", () => {
-    expect(detectColorSupport("stdout", { argv: ["--no-color"], env: { FORCE_COLOR: "3" } })).toBe(0);
+    expect(detectColorSupport("stdout", { argv: ["--no-color"], env: { FORCE_COLOR: "3" } })).toBe(
+      0,
+    );
     expect(detectColorSupport("stdout", { argv: ["--color=256"], env: { NO_COLOR: "1" } })).toBe(2);
     expect(detectColorSupport("stdout", { argv: ["--color=truecolor"] })).toBe(3);
     expect(detectColorSupport("stdout", { argv: ["--color"] })).toBe(1);
@@ -107,7 +111,9 @@ describe("@reliverse/myenv", () => {
   test("respects env color precedence before native fallback", () => {
     expect(detectColorSupport("stdout", { env: { FORCE_COLOR: "2", NO_COLOR: "1" } })).toBe(2);
     expect(detectColorSupport("stdout", { env: { NO_COLOR: "1" } })).toBe(0);
-    expect(detectColorSupport("stdout", { env: { NODE_DISABLE_COLORS: "1" }, stdout: { isTTY: true } })).toBe(0);
+    expect(
+      detectColorSupport("stdout", { env: { NODE_DISABLE_COLORS: "1" }, stdout: { isTTY: true } }),
+    ).toBe(0);
   });
 
   test("falls back conservatively to basic color in ci when nothing better is known", () => {
@@ -117,7 +123,13 @@ describe("@reliverse/myenv", () => {
   test("detects ci hints conservatively", () => {
     expect(isCI({ env: { CI: "true" } })).toBe(true);
     expect(isCI({ env: { GITHUB_ACTIONS: "true" } })).toBe(true);
-    expect(getEnvHints({ argv: ["--color=256"], env: { CI: "true", FORCE_COLOR: "1", NO_COLOR: "" }, process: undefined })).toEqual({
+    expect(
+      getEnvHints({
+        argv: ["--color=256"],
+        env: { CI: "true", FORCE_COLOR: "1", NO_COLOR: "" },
+        process: undefined,
+      }),
+    ).toEqual({
       ci: true,
       colorFlag: "256",
       forceColor: "1",

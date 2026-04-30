@@ -1,4 +1,5 @@
 import { defineCommand, type PluginDiscoveryReport } from "@reliverse/rempts";
+
 import { getRemptsTargetOptions, runTargetRemptsCommand } from "../../../../lib/target-cli";
 
 export default defineCommand({
@@ -13,12 +14,15 @@ export default defineCommand({
   async handler(ctx) {
     const targetOptions = getRemptsTargetOptions(ctx.options);
     const report = targetOptions.cli
-      ? (await runTargetRemptsCommand<PluginDiscoveryReport>({
-          commandPath: ["rempts", "plugins", "doctor"],
-          cwd: ctx.cwd,
-          rawTargetOptions: ctx.options,
-        })).data
-      : ctx.cli?.pluginDiscovery ?? ctx.exit(1, "Plugin discovery metadata is unavailable in this CLI session.");
+      ? (
+          await runTargetRemptsCommand<PluginDiscoveryReport>({
+            commandPath: ["rempts", "plugins", "doctor"],
+            cwd: ctx.cwd,
+            rawTargetOptions: ctx.options,
+          })
+        ).data
+      : (ctx.cli?.pluginDiscovery ??
+        ctx.exit(1, "Plugin discovery metadata is unavailable in this CLI session."));
 
     if (ctx.output.mode === "json") {
       ctx.output.result(report, "rempts plugins doctor");
@@ -31,7 +35,9 @@ export default defineCommand({
     ctx.out(`Global config: ${report.configPath}`);
     ctx.out(`Global entry: ${report.globalEntry ? "yes" : "no"}`);
     ctx.out(`Allowed patterns: ${report.allowedPatterns.join(", ") || "(none)"}`);
-    ctx.out(`Conflict priority: ${report.conflictPriority.join(", ") || "(default loaded-plugin order)"}`);
+    ctx.out(
+      `Conflict priority: ${report.conflictPriority.join(", ") || "(default loaded-plugin order)"}`,
+    );
     ctx.out(`Local manifest candidates: ${report.localManifestSpecifiers.join(", ") || "(none)"}`);
     ctx.out(`Global config candidates: ${report.globalConfigSpecifiers.join(", ") || "(none)"}`);
     ctx.out(`Ignored by pattern: ${report.ignored.length}`);

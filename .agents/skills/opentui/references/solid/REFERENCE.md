@@ -5,6 +5,7 @@ A SolidJS reconciler for building terminal user interfaces with fine-grained rea
 ## Overview
 
 OpenTUI Solid provides:
+
 - **Custom reconciler**: Solid components render to OpenTUI renderables
 - **JSX intrinsics**: `<text>`, `<box>`, `<input>`, etc.
 - **Hooks**: `useKeyboard`, `useRenderer`, `useTimeline`, etc.
@@ -14,6 +15,7 @@ OpenTUI Solid provides:
 ## When to Use Solid
 
 Use the Solid reconciler when:
+
 - You want optimal re-rendering performance
 - You prefer signal-based reactivity
 - You need fine-grained control over updates
@@ -22,12 +24,12 @@ Use the Solid reconciler when:
 
 ## When NOT to Use Solid
 
-| Scenario | Use Instead |
-|----------|-------------|
-| Team knows React, not Solid | `@opentui/react` |
-| Maximum control needed | `@opentui/core` |
-| Smallest bundle size | `@opentui/core` |
-| Building a framework/library | `@opentui/core` |
+| Scenario                     | Use Instead      |
+| ---------------------------- | ---------------- |
+| Team knows React, not Solid  | `@opentui/react` |
+| Maximum control needed       | `@opentui/core`  |
+| Smallest bundle size         | `@opentui/core`  |
+| Building a framework/library | `@opentui/core`  |
 
 ## Quick Start
 
@@ -49,26 +51,23 @@ bun install @opentui/solid @opentui/core solid-js
 ```
 
 ```tsx
-import { render } from "@opentui/solid"
-import { createSignal } from "solid-js"
+import { render } from "@opentui/solid";
+import { createSignal } from "solid-js";
 
 function App() {
-  const [count, setCount] = createSignal(0)
-  
+  const [count, setCount] = createSignal(0);
+
   return (
     <box border padding={2}>
       <text>Count: {count()}</text>
-      <box
-        border
-        onMouseDown={() => setCount(c => c + 1)}
-      >
+      <box border onMouseDown={() => setCount((c) => c + 1)}>
         <text>Click me!</text>
       </box>
     </box>
-  )
+  );
 }
 
-render(() => <App />)
+render(() => <App />);
 ```
 
 ## Core Concepts
@@ -78,17 +77,17 @@ render(() => <App />)
 Solid uses signals for reactive state:
 
 ```tsx
-import { createSignal, createEffect } from "solid-js"
+import { createSignal, createEffect } from "solid-js";
 
 function Counter() {
-  const [count, setCount] = createSignal(0)
-  
+  const [count, setCount] = createSignal(0);
+
   // Effect runs when count changes
   createEffect(() => {
-    console.log("Count is now:", count())
-  })
-  
-  return <text>Count: {count()}</text>
+    console.log("Count is now:", count());
+  });
+
+  return <text>Count: {count()}</text>;
 }
 ```
 
@@ -123,23 +122,27 @@ Inside `<text>`, use modifier elements:
 ## Available Components
 
 ### Layout & Display
+
 - `<text>` - Styled text content
 - `<box>` - Container with borders and layout
 - `<scrollbox>` - Scrollable container
 - `<ascii_font>` - ASCII art text (note underscore)
 
 ### Input
+
 - `<input>` - Single-line text input
 - `<textarea>` - Multi-line text input
 - `<select>` - List selection
 - `<tab_select>` - Tab-based selection (note underscore)
 
 ### Code & Diff
+
 - `<code>` - Syntax-highlighted code
 - `<line_number>` - Code with line numbers (note underscore)
 - `<diff>` - Unified or split diff viewer
 
 ### Text Modifiers (inside `<text>`)
+
 - `<span>` - Inline styled text
 - `<strong>`, `<b>` - Bold
 - `<em>`, `<i>` - Italic
@@ -154,7 +157,7 @@ Inside `<text>`, use modifier elements:
 Render children to a different mount node:
 
 ```tsx
-import { Portal } from "@opentui/solid"
+import { Portal } from "@opentui/solid";
 
 function Overlay() {
   return (
@@ -163,7 +166,7 @@ function Overlay() {
         <text>Overlay content</text>
       </box>
     </Portal>
-  )
+  );
 }
 ```
 
@@ -172,15 +175,10 @@ function Overlay() {
 Render components dynamically:
 
 ```tsx
-import { Dynamic } from "@opentui/solid"
+import { Dynamic } from "@opentui/solid";
 
 function DynamicInput(props: { multiline: boolean }) {
-  return (
-    <Dynamic
-      component={props.multiline ? "textarea" : "input"}
-      placeholder="Enter text..."
-    />
-  )
+  return <Dynamic component={props.multiline ? "textarea" : "input"} placeholder="Enter text..." />;
 }
 ```
 

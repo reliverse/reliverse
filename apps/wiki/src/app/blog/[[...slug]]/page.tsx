@@ -1,12 +1,11 @@
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
-import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LLMCopyButton, ViewOptions } from "~/components/ai/page-actions";
 import { gitConfig } from "~/lib/layout.shared";
 import { blogSource, getPageImage } from "~/lib/source";
-import { getMDXComponents } from "~/mdx-components";
+import { createRelativeMdxLink, getMDXComponents } from "~/mdx-components";
 
 type BlogPageProps = {
   params: Promise<{ slug?: string[] }>;
@@ -33,7 +32,7 @@ export default async function Page(props: BlogPageProps) {
       <DocsBody>
         <MDX
           components={getMDXComponents({
-            a: createRelativeLink(blogSource, page),
+            a: createRelativeMdxLink(blogSource.resolveHref, page),
           })}
         />
       </DocsBody>

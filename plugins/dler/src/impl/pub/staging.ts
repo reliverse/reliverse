@@ -1,6 +1,6 @@
 import { cp, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 function mergeFilesField(files: unknown, publishFrom: string): string[] {
   const existing: string[] = Array.isArray(files)

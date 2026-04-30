@@ -1,9 +1,16 @@
 import { basename, extname } from "node:path";
 
 import { detectTerminalSupport } from "@reliverse/myenv";
+import {
+  ParserUsageError,
+  ParserValidationError,
+  parseArgvTail,
+  type CommandOptionDefinition,
+  type CommandOptionsRecord,
+  type ParseArgvResult,
+} from "@reliverse/parser";
 import { createRelico } from "@reliverse/relico";
 
-import type { CommandOptionDefinition, CommandOptionsRecord } from "../options/types";
 import { createPromptRuntime } from "../prompts/adapter";
 import { inspectCommandTree } from "../runtime/command-diagnostics";
 import type { CommandNode } from "../runtime/command-source";
@@ -28,7 +35,6 @@ import { buildCommandHelpDocument, buildLauncherHelpDocument } from "../runtime/
 import { renderHelpDocument } from "../runtime/help-render";
 import { createCommandInput } from "../runtime/input";
 import { createRuntimeOutput } from "../runtime/output";
-import { parseArgvTail, type ParseArgvResult } from "../runtime/parse-argv";
 import { inspectPluginDiscovery, resolvePluginsFromReport } from "../runtime/plugin-discovery";
 import { createPluginCommandSource } from "../runtime/plugin-source";
 import { resolveEntry } from "../runtime/resolve-entry";
@@ -62,8 +68,6 @@ export interface CreateCLIOptions {
   readonly env?: NodeJS.ProcessEnv | undefined;
   readonly globalFlags?: GlobalFlagConfig | undefined;
   readonly interactionMode?: RemptsHostInteractionMode | undefined;
-  readonly noTTY?: boolean | undefined;
-  readonly noTUI?: boolean | undefined;
   readonly onError?: ((error: unknown) => Promise<void> | void) | undefined;
   readonly onExit?: ((result: CLIExecutionResult) => Promise<void> | void) | undefined;
   readonly outputMode?: OutputMode | undefined;
@@ -275,8 +279,6 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
       | { readonly examples?: readonly string[] | undefined; readonly text?: string | undefined }
       | undefined;
     readonly interactive?: RemptsInteractionMode | undefined;
-    readonly noTTY?: boolean | undefined;
-    readonly noTUI?: boolean | undefined;
     readonly options?: TOptions | undefined;
   },
 ): CommandRuntimeInfo<TOptions> {
@@ -291,8 +293,6 @@ function toCommandRuntimeInfo<TOptions extends CommandOptionsRecord>(
     help: definition.help?.text,
     interactive: definition.interactive ?? "never",
     name: commandName,
-    noTTY: definition.noTTY ?? false,
-    noTUI: definition.noTUI ?? false,
     options: definition.options,
     path: commandPath,
     safety: definition.safety,
@@ -516,7 +516,12 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
     try {
       parsed = await parseArgvTail(discovered.remainingArgv, effectiveCommand.options, env);
     } catch (error) {
-      if (error instanceof RemptsUsageError || error instanceof RemptsValidationError) {
+      if (
+        error instanceof ParserUsageError ||
+        error instanceof ParserValidationError ||
+        error instanceof RemptsUsageError ||
+        error instanceof RemptsValidationError
+      ) {
         output.problem({
           ...toStructuredRemptsError(error),
           hint: `Run "${commandHelp.usage[0]} --help" for examples and flag details.`,
@@ -547,8 +552,6 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       hostMode: options.interactionMode ?? "never",
       interactive: parsedGlobals.flags.interactive,
       noInput: parsedGlobals.flags.noInput,
-      noTTY: options.noTTY || effectiveCommand.noTTY,
-      noTUI: options.noTTY || effectiveCommand.noTTY || options.noTUI || effectiveCommand.noTUI,
       stderr,
       stdin,
       stdout,

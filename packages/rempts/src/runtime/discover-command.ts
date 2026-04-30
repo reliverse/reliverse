@@ -1,5 +1,5 @@
-import { RemptsUsageError } from "./errors";
 import type { CommandNode, CommandSource, DiscoveredSubcommand } from "./command-source";
+import { RemptsUsageError } from "./errors";
 
 export interface DiscoveredCommandPath {
   readonly availableSubcommands: readonly DiscoveredSubcommand[];
@@ -31,7 +31,9 @@ async function getMergedScope(
       })),
     )
   ).filter(
-    (entry): entry is { readonly scope: NonNullable<typeof entry.scope>; readonly sourceId: string } =>
+    (
+      entry,
+    ): entry is { readonly scope: NonNullable<typeof entry.scope>; readonly sourceId: string } =>
       entry.scope !== null,
   );
 
@@ -69,9 +71,7 @@ async function getMergedScope(
           })),
         )
       ).filter(
-        (
-          entry,
-        ): entry is { readonly canonicalName: string; readonly sourceId: string } =>
+        (entry): entry is { readonly canonicalName: string; readonly sourceId: string } =>
           entry.canonicalName !== null,
       );
 

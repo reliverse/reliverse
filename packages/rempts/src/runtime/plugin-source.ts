@@ -15,7 +15,10 @@ function withPluginMetadata(plugin: RemptsPlugin, node: CommandNode | null): Com
   };
 }
 
-function getSyntheticTopLevelNode(plugin: RemptsPlugin, path: readonly string[]): CommandNode | null {
+function getSyntheticTopLevelNode(
+  plugin: RemptsPlugin,
+  path: readonly string[],
+): CommandNode | null {
   if (path.length !== 1 || !plugin.description) {
     return null;
   }

@@ -108,7 +108,7 @@ The host plugin search is anchored to the CLI package (`apps/rse`) rather than t
 ```bash
 bun apps/rse/src/cli.ts --help
 bun apps/rse/src/cli.ts dler --help
-bun apps/rse/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/rse 
+bun apps/rse/src/cli.ts dler build --targets plugins/pm,plugins/dler,apps/rse
 bun apps/rse/src/cli.ts pm add zod --target packages/rempts --json
 bun apps/rse/src/cli.ts pm update typescript --json
 bun apps/rse/src/cli.ts escape --input README.md

@@ -15,7 +15,15 @@ function createJsonCtx(cwd: string, options: Record<string, unknown>) {
       cliPluginNames: ["dler"],
       colors: {
         stderr: { bold: (value: string) => value, yellow: (value: string) => value },
-        stdout: { bold: (value: string) => value, green: (value: string) => value },
+        stdout: {
+          bold: (value: string) => value,
+          cyan: (value: string) => value,
+          dim: (value: string) => value,
+          gray: (value: string) => value,
+          green: (value: string) => value,
+          magenta: (value: string) => value,
+          yellow: (value: string) => value,
+        },
       },
       cwd,
       env: process.env,
@@ -56,7 +64,15 @@ function createTextCtx(cwd: string, options: Record<string, unknown>) {
       cliPluginNames: ["dler"],
       colors: {
         stderr: { bold: (value: string) => value, yellow: (value: string) => value },
-        stdout: { bold: (value: string) => value, green: (value: string) => value },
+        stdout: {
+          bold: (value: string) => value,
+          cyan: (value: string) => value,
+          dim: (value: string) => value,
+          gray: (value: string) => value,
+          green: (value: string) => value,
+          magenta: (value: string) => value,
+          yellow: (value: string) => value,
+        },
       },
       cwd,
       env: process.env,
@@ -99,7 +115,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      prebuild: false,
       publishFrom: "dist",
       targets: "packages/private-pkg",
     });
@@ -140,7 +155,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      prebuild: false,
       publishFrom: "dist",
       targets: "packages/workspace-pkg",
     });
@@ -162,36 +176,7 @@ describe("dler pub command", () => {
     });
   });
 
-  test("text output surfaces prebuild failures clearly", async () => {
-    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
-    const pkgDir = join(root, "packages", "broken");
-    await mkdir(join(pkgDir, "src"), { recursive: true });
-    await writeFile(
-      join(root, "package.json"),
-      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
-      "utf8",
-    );
-    await writeFile(
-      join(pkgDir, "package.json"),
-      `${JSON.stringify({ name: "broken", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
-      "utf8",
-    );
-    await writeFile(join(pkgDir, "src", "index.ts"), "export const broken = ;\n", "utf8");
-
-    const { ctx, errorLines } = createTextCtx(root, {
-      apply: true,
-      prebuild: true,
-      targets: "packages/broken",
-    });
-
-    await expect(command.handler(ctx as never)).rejects.toThrow(
-      "EXIT 1: Prebuild failed for packages/broken during generated build execution (exit 1). Fix the build or use --no-prebuild.",
-    );
-
-    expect(errorLines.some((line) => line.length > 0)).toBe(true);
-  });
-
-  test("text output includes publish-from, package name, total duration, and summary", async () => {
+  test("text output renders concise publish preview and hides npm details by default", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "ok");
     await mkdir(join(pkgDir, "dist"), { recursive: true });
@@ -203,19 +188,72 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
 
     const { ctx, textLines } = createTextCtx(root, {
-      prebuild: false,
       publishFrom: "dist",
       targets: "packages/ok",
     });
 
     await command.handler(ctx as never);
 
+    const text = textLines.join("\n");
+    expect(text).toContain("dler pub preview");
     expect(textLines.some((line) => line.includes("Publish from: dist"))).toBe(true);
-    expect(textLines.some((line) => line.includes("Prepared: packages/ok (ok-pkg) in"))).toBe(true);
-    expect(textLines.some((line) => line.includes("Total duration:"))).toBe(true);
-    expect(
-      textLines.some((line) => line.includes("Summary: 1 prepared, 0 failed, 0 skipped.")),
-    ).toBe(true);
+    expect(text).toContain("Targets: 1 prepared, 0 skipped");
+    expect(text).toContain("Prepared\n  packages/ok  ok-pkg");
+    expect(text).toContain("No packages published. Pass --apply to publish to npm.");
+    expect(text).toContain("Use --verbose or --json to inspect npm output and durations.");
+    expect(text).not.toContain("Total duration:");
+    expect(text).not.toContain("npm stdout:");
+  });
+
+  test("publish preview defaults to dist artifacts without running build", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const pkgDir = join(root, "packages", "ok");
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "ok-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+
+    const { ctx, textLines } = createTextCtx(root, {
+      targets: "packages/ok",
+    });
+
+    await command.handler(ctx as never);
+
+    const text = textLines.join("\n");
+    expect(text).toContain("Publish from: dist");
+    expect(text).toContain("Targets: 1 prepared, 0 skipped");
+    expect(text).not.toContain("Prebuild");
+  });
+
+  test("text output shows npm details and durations in verbose mode", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const pkgDir = join(root, "packages", "ok");
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "ok-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+
+    const { ctx, textLines } = createTextCtx(root, {
+      publishFrom: "dist",
+      targets: "packages/ok",
+      verbose: true,
+    });
+
+    await command.handler(ctx as never);
+
+    const text = textLines.join("\n");
+    expect(text).toContain("Prepared\n  packages/ok  ok-pkg (");
+    expect(text).toContain("Command\n  npm publish --access public --dry-run");
+    expect(text).toContain("Details");
+    expect(text).toContain("Total duration:");
+    expect(text).toContain("npm");
+    expect(text).toContain("Use --json for the full machine-readable result.");
   });
 
   test("when --targets is omitted at package cwd, pub auto-targets only that package", async () => {
@@ -234,7 +272,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(pkgDir, {
-      prebuild: false,
       publishFrom: "dist",
     });
 
@@ -267,7 +304,6 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "src", "index.ts"), "export const aligned = 1;\n", "utf8");
 
     const { ctx, resultCalls } = createJsonCtx(pkgDir, {
-      prebuild: false,
       publishFrom: "dist",
     });
 
@@ -290,7 +326,6 @@ describe("dler pub command", () => {
     );
 
     const { ctx, resultCalls } = createJsonCtx(root, {
-      prebuild: false,
       publishFrom: "dist",
       targets: "packages/private-pkg",
     });
@@ -299,6 +334,7 @@ describe("dler pub command", () => {
 
     expect(resultCalls[0]?.value).toStrictEqual({
       apply: false,
+      concurrency: 1,
       preview: true,
       executedTargets: [],
       ok: false,

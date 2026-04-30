@@ -6,11 +6,8 @@ import type {
   PromptInputOptions,
   PromptSelectOptions,
 } from "../api/define-command";
-import {
-  getPromptUnavailableMessage,
-  type InteractionPolicy,
-} from "../runtime/noninteractive";
 import { PromptUnavailableError } from "../runtime/errors";
+import { getPromptUnavailableMessage, type InteractionPolicy } from "../runtime/noninteractive";
 
 export interface PlainPromptAdapterOptions {
   readonly env: NodeJS.ProcessEnv;
@@ -23,10 +20,7 @@ export interface PlainPromptAdapterOptions {
 type OutputStream = Pick<typeof process.stdout, "write">;
 
 function getPromptMessage(
-  options:
-    | PromptConfirmOptions
-    | PromptInputOptions
-    | PromptSelectOptions<string>,
+  options: PromptConfirmOptions | PromptInputOptions | PromptSelectOptions<string>,
 ): string {
   return options.message ?? options.title ?? "Prompt";
 }
@@ -35,10 +29,7 @@ function writeLine(stream: OutputStream, value: string): void {
   stream.write(`${value}\n`);
 }
 
-async function askQuestion(
-  options: PlainPromptAdapterOptions,
-  question: string,
-): Promise<string> {
+async function askQuestion(options: PlainPromptAdapterOptions, question: string): Promise<string> {
   const readline = createInterface({
     input: options.stdin,
     output: options.stdout,
@@ -68,15 +59,10 @@ export function createPlainPromptAdapter(
 
       while (true) {
         const suffix =
-          options.defaultValue === undefined
-            ? "[y/n]"
-            : options.defaultValue
-              ? "[Y/n]"
-              : "[y/N]";
-        const answer = (await askQuestion(
-          adapterOptions,
-          `${getPromptMessage(options)} ${suffix} `,
-        ))
+          options.defaultValue === undefined ? "[y/n]" : options.defaultValue ? "[Y/n]" : "[y/N]";
+        const answer = (
+          await askQuestion(adapterOptions, `${getPromptMessage(options)} ${suffix} `)
+        )
           .trim()
           .toLowerCase();
 
@@ -109,8 +95,7 @@ export function createPlainPromptAdapter(
 
       while (true) {
         const placeholder = options.placeholder ? ` (${options.placeholder})` : "";
-        const defaultValue =
-          options.defaultValue !== undefined ? ` [${options.defaultValue}]` : "";
+        const defaultValue = options.defaultValue !== undefined ? ` [${options.defaultValue}]` : "";
         const answer = await askQuestion(
           adapterOptions,
           `${getPromptMessage(options)}${placeholder}${defaultValue}: `,
@@ -160,7 +145,11 @@ export function createPlainPromptAdapter(
 
         const answerIndex = Number(answer);
 
-        if (Number.isInteger(answerIndex) && answerIndex >= 1 && answerIndex <= options.options.length) {
+        if (
+          Number.isInteger(answerIndex) &&
+          answerIndex >= 1 &&
+          answerIndex <= options.options.length
+        ) {
           const indexedOption = options.options[answerIndex - 1];
 
           if (indexedOption) {

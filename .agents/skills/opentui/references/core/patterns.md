@@ -7,33 +7,33 @@
 Create renderables and compose with `.add()`:
 
 ```typescript
-import { createCliRenderer, BoxRenderable, TextRenderable } from "@opentui/core"
+import { createCliRenderer, BoxRenderable, TextRenderable } from "@opentui/core";
 
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 // Create parent
 const container = new BoxRenderable(renderer, {
   id: "container",
   flexDirection: "column",
   padding: 1,
-})
+});
 
 // Create children
 const header = new TextRenderable(renderer, {
   id: "header",
   content: "Header",
   fg: "#00FF00",
-})
+});
 
 const body = new TextRenderable(renderer, {
   id: "body",
   content: "Body content",
-})
+});
 
 // Compose tree
-container.add(header)
-container.add(body)
-renderer.root.add(container)
+container.add(header);
+container.add(body);
+renderer.root.add(container);
 ```
 
 ### Declarative Composition (Constructs)
@@ -41,9 +41,9 @@ renderer.root.add(container)
 Use VNode functions for cleaner composition:
 
 ```typescript
-import { createCliRenderer, Box, Text, Input, delegate } from "@opentui/core"
+import { createCliRenderer, Box, Text, Input, delegate } from "@opentui/core";
 
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 // Compose as function calls
 const ui = Box(
@@ -54,9 +54,9 @@ const ui = Box(
     Text({ content: "Name:" }),
     Input({ id: "name", placeholder: "Enter name..." }),
   ),
-)
+);
 
-renderer.root.add(ui)
+renderer.root.add(ui);
 ```
 
 ### Reusable Components
@@ -67,26 +67,30 @@ Create factory functions for reusable UI pieces:
 // Imperative factory
 function createLabeledInput(
   renderer: RenderContext,
-  props: { id: string; label: string; placeholder: string }
+  props: { id: string; label: string; placeholder: string },
 ) {
   const container = new BoxRenderable(renderer, {
     id: `${props.id}-container`,
     flexDirection: "row",
     gap: 1,
-  })
-  
-  container.add(new TextRenderable(renderer, {
-    id: `${props.id}-label`,
-    content: props.label,
-  }))
-  
-  container.add(new InputRenderable(renderer, {
-    id: `${props.id}-input`,
-    placeholder: props.placeholder,
-    width: 20,
-  }))
-  
-  return container
+  });
+
+  container.add(
+    new TextRenderable(renderer, {
+      id: `${props.id}-label`,
+      content: props.label,
+    }),
+  );
+
+  container.add(
+    new InputRenderable(renderer, {
+      id: `${props.id}-input`,
+      placeholder: props.placeholder,
+      width: 20,
+    }),
+  );
+
+  return container;
 }
 
 // Declarative factory
@@ -102,7 +106,7 @@ function LabeledInput(props: { id: string; label: string; placeholder: string })
         width: 20,
       }),
     ),
-  )
+  );
 }
 ```
 
@@ -111,22 +115,22 @@ function LabeledInput(props: { id: string; label: string; placeholder: string })
 Route focus calls to nested elements:
 
 ```typescript
-import { delegate, Box, Input, Text } from "@opentui/core"
+import { delegate, Box, Input, Text } from "@opentui/core";
 
 const form = delegate(
   {
-    focus: "email-input",     // Route .focus() to this child
-    blur: "email-input",      // Route .blur() to this child
+    focus: "email-input", // Route .focus() to this child
+    blur: "email-input", // Route .blur() to this child
   },
   Box(
     { border: true, padding: 1 },
     Text({ content: "Email:" }),
     Input({ id: "email-input", placeholder: "you@example.com" }),
   ),
-)
+);
 
 // This focuses the input inside, not the box
-form.focus()
+form.focus();
 ```
 
 ## Event Handling
@@ -134,29 +138,29 @@ form.focus()
 ### Keyboard Events
 
 ```typescript
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 // Global keyboard handler
 renderer.keyInput.on("keypress", (key) => {
   if (key.name === "escape") {
-    renderer.destroy()
-    process.exit(0)
+    renderer.destroy();
+    process.exit(0);
   }
-  
+
   if (key.ctrl && key.name === "c") {
     // Ctrl+C handling (if exitOnCtrlC is false)
   }
-  
+
   if (key.name === "tab") {
     // Tab navigation
-    focusNext()
+    focusNext();
   }
-})
+});
 
 // Paste events
 renderer.keyInput.on("paste", (text) => {
-  currentInput?.setValue(currentInput.value + text)
-})
+  currentInput?.setValue(currentInput.value + text);
+});
 ```
 
 ### Component Events
@@ -195,16 +199,16 @@ const button = new BoxRenderable(renderer, {
   id: "button",
   border: true,
   onMouseDown: (event) => {
-    button.setBackgroundColor("#444444")
+    button.setBackgroundColor("#444444");
   },
   onMouseUp: (event) => {
-    button.setBackgroundColor("#222222")
-    handleClick()
+    button.setBackgroundColor("#222222");
+    handleClick();
   },
   onMouseMove: (event) => {
     // Hover effect
   },
-})
+});
 ```
 
 ## State Management
@@ -216,44 +220,44 @@ Manage state in closures or objects:
 ```typescript
 // Closure-based state
 function createCounter(renderer: RenderContext) {
-  let count = 0
-  
+  let count = 0;
+
   const display = new TextRenderable(renderer, {
     id: "count",
     content: `Count: ${count}`,
-  })
-  
+  });
+
   const increment = () => {
-    count++
-    display.setContent(`Count: ${count}`)
-  }
-  
-  return { display, increment }
+    count++;
+    display.setContent(`Count: ${count}`);
+  };
+
+  return { display, increment };
 }
 
 // Class-based state
 class CounterWidget {
-  private count = 0
-  private display: TextRenderable
-  
+  private count = 0;
+  private display: TextRenderable;
+
   constructor(renderer: RenderContext) {
     this.display = new TextRenderable(renderer, {
       id: "count",
       content: this.formatCount(),
-    })
+    });
   }
-  
+
   private formatCount() {
-    return `Count: ${this.count}`
+    return `Count: ${this.count}`;
   }
-  
+
   increment() {
-    this.count++
-    this.display.setContent(this.formatCount())
+    this.count++;
+    this.display.setContent(this.formatCount());
   }
-  
+
   getRenderable() {
-    return this.display
+    return this.display;
   }
 }
 ```
@@ -264,37 +268,37 @@ Track and manage focus across components:
 
 ```typescript
 class FocusManager {
-  private focusables: Renderable[] = []
-  private currentIndex = 0
-  
+  private focusables: Renderable[] = [];
+  private currentIndex = 0;
+
   register(renderable: Renderable) {
-    this.focusables.push(renderable)
+    this.focusables.push(renderable);
   }
-  
+
   focusNext() {
-    this.focusables[this.currentIndex]?.blur()
-    this.currentIndex = (this.currentIndex + 1) % this.focusables.length
-    this.focusables[this.currentIndex]?.focus()
+    this.focusables[this.currentIndex]?.blur();
+    this.currentIndex = (this.currentIndex + 1) % this.focusables.length;
+    this.focusables[this.currentIndex]?.focus();
   }
-  
+
   focusPrevious() {
-    this.focusables[this.currentIndex]?.blur()
-    this.currentIndex = (this.currentIndex - 1 + this.focusables.length) % this.focusables.length
-    this.focusables[this.currentIndex]?.focus()
+    this.focusables[this.currentIndex]?.blur();
+    this.currentIndex = (this.currentIndex - 1 + this.focusables.length) % this.focusables.length;
+    this.focusables[this.currentIndex]?.focus();
   }
 }
 
 // Usage
-const focusManager = new FocusManager()
-focusManager.register(input1)
-focusManager.register(input2)
-focusManager.register(select1)
+const focusManager = new FocusManager();
+focusManager.register(input1);
+focusManager.register(input2);
+focusManager.register(select1);
 
 renderer.keyInput.on("keypress", (key) => {
   if (key.name === "tab") {
-    key.shift ? focusManager.focusPrevious() : focusManager.focusNext()
+    key.shift ? focusManager.focusPrevious() : focusManager.focusNext();
   }
-})
+});
 ```
 
 ## Lifecycle Patterns
@@ -304,28 +308,30 @@ renderer.keyInput.on("keypress", (key) => {
 Always clean up resources:
 
 ```typescript
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 // Track intervals/timeouts
-const intervals: Timer[] = []
+const intervals: Timer[] = [];
 
-intervals.push(setInterval(() => {
-  updateClock()
-}, 1000))
+intervals.push(
+  setInterval(() => {
+    updateClock();
+  }, 1000),
+);
 
 // Cleanup on exit
 process.on("SIGINT", () => {
-  intervals.forEach(clearInterval)
-  renderer.destroy()
-  process.exit(0)
-})
+  intervals.forEach(clearInterval);
+  renderer.destroy();
+  process.exit(0);
+});
 
 // Or use onDestroy callback
 const renderer = await createCliRenderer({
   onDestroy: () => {
-    intervals.forEach(clearInterval)
+    intervals.forEach(clearInterval);
   },
-})
+});
 ```
 
 ### Dynamic Updates
@@ -337,21 +343,21 @@ async function createDashboard(renderer: RenderContext) {
   const statsText = new TextRenderable(renderer, {
     id: "stats",
     content: "Loading...",
-  })
-  
+  });
+
   // Poll for updates
   const updateStats = async () => {
-    const data = await fetchStats()
-    statsText.setContent(`CPU: ${data.cpu}% | Memory: ${data.memory}%`)
-  }
-  
+    const data = await fetchStats();
+    statsText.setContent(`CPU: ${data.cpu}% | Memory: ${data.memory}%`);
+  };
+
   // Initial load
-  await updateStats()
-  
+  await updateStats();
+
   // Periodic updates
-  setInterval(updateStats, 5000)
-  
-  return statsText
+  setInterval(updateStats, 5000);
+
+  return statsText;
 }
 ```
 
@@ -362,19 +368,19 @@ async function createDashboard(renderer: RenderContext) {
 Adapt to terminal size:
 
 ```typescript
-const renderer = await createCliRenderer()
+const renderer = await createCliRenderer();
 
 const mainPanel = new BoxRenderable(renderer, {
   id: "main",
   width: "100%",
   height: "100%",
   flexDirection: renderer.width > 80 ? "row" : "column",
-})
+});
 
 // Listen for resize
 process.stdout.on("resize", () => {
-  mainPanel.setFlexDirection(renderer.width > 80 ? "row" : "column")
-})
+  mainPanel.setFlexDirection(renderer.width > 80 ? "row" : "column");
+});
 ```
 
 ### Split Panels
@@ -386,24 +392,24 @@ function createSplitView(renderer: RenderContext, ratio = 0.3) {
     flexDirection: "row",
     width: "100%",
     height: "100%",
-  })
-  
+  });
+
   const left = new BoxRenderable(renderer, {
     id: "left",
     width: `${ratio * 100}%`,
     border: true,
-  })
-  
+  });
+
   const right = new BoxRenderable(renderer, {
     id: "right",
     flexGrow: 1,
     border: true,
-  })
-  
-  container.add(left)
-  container.add(right)
-  
-  return { container, left, right }
+  });
+
+  container.add(left);
+  container.add(right);
+
+  return { container, left, right };
 }
 ```
 
@@ -418,31 +424,31 @@ const renderer = await createCliRenderer({
   consoleOptions: {
     startInDebugMode: true,
   },
-})
+});
 
 // Show console
-renderer.console.show()
+renderer.console.show();
 
 // All console methods work
-console.log("Debug info")
-console.warn("Warning")
-console.error("Error")
+console.log("Debug info");
+console.warn("Warning");
+console.error("Error");
 
 // Toggle with keyboard
 renderer.keyInput.on("keypress", (key) => {
   if (key.name === "f12") {
-    renderer.console.toggle()
+    renderer.console.toggle();
   }
-})
+});
 ```
 
 ### State Inspection
 
 ```typescript
 function debugState(label: string, state: unknown) {
-  console.log(`[${label}]`, JSON.stringify(state, null, 2))
+  console.log(`[${label}]`, JSON.stringify(state, null, 2));
 }
 
 // In your update logic
-debugState("form", { name: nameInput.value, email: emailInput.value })
+debugState("form", { name: nameInput.value, email: emailInput.value });
 ```

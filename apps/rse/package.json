@@ -2,17 +2,16 @@
   "name": "@reliverse/rse",
   "version": "0.1.0",
   "private": false,
-  "type": "module",
-  "publishConfig": {
-    "access": "public"
-  },
   "author": "reliverse",
   "bin": {
     "rse": "./src/cli.ts"
   },
+  "type": "module",
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
-    "dev": "bun ./src/cli.ts",
-    "typecheck": "tsgo --noEmit"
+    "dev": "bun ./src/cli.ts"
   },
   "dependencies": {
     "@reliverse/rempts": "workspace:*"

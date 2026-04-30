@@ -130,25 +130,10 @@ describe("resolveInteractionPolicy", () => {
     expect(policy.canPrompt).toBe(false);
   });
 
-  test("legacy noTUI compatibility maps to tty command mode", () => {
+  test("omitted command mode stays non-interactive", () => {
     const policy = resolveInteractionPolicy({
       env: {},
       hostMode: "tui",
-      noTUI: true,
-      stdin: createTTYInput(true),
-      stdout: createTTYOutput(true),
-    });
-
-    expect(policy.commandMode).toBe("tty");
-    expect(policy.effectiveMode).toBe("tty");
-    expect(policy.isTUIAllowed).toBe(false);
-  });
-
-  test("legacy noTTY compatibility maps to never command mode", () => {
-    const policy = resolveInteractionPolicy({
-      env: {},
-      hostMode: "tui",
-      noTTY: true,
       stdin: createTTYInput(true),
       stdout: createTTYOutput(true),
     });
@@ -180,6 +165,8 @@ describe("resolveInteractionPolicy", () => {
       interactive: true,
     });
 
-    expect(getPromptUnavailableMessage("name", policy)).toContain("does not allow interactive prompts");
+    expect(getPromptUnavailableMessage("name", policy)).toContain(
+      "does not allow interactive prompts",
+    );
   });
 });

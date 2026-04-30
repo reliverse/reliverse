@@ -12,7 +12,9 @@ export interface UnsafeDependencySpecifier {
   readonly specifier: string;
 }
 
-export function findUnsafeDependencySpecifiers(pkg: Record<string, unknown>): UnsafeDependencySpecifier[] {
+export function findUnsafeDependencySpecifiers(
+  pkg: Record<string, unknown>,
+): UnsafeDependencySpecifier[] {
   const found: UnsafeDependencySpecifier[] = [];
 
   for (const field of DEPENDENCY_FIELDS) {

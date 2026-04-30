@@ -1,5 +1,5 @@
+import type { NormalizedOptionIssue } from "@reliverse/parser";
 import type { RelicoInstance } from "@reliverse/relico";
-import type { NormalizedOptionIssue } from "../options/types";
 
 export type OutputMode = "json" | "text";
 

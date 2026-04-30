@@ -54,7 +54,11 @@ function parseArgs(argv: string[]): Cli {
   return { deployRuntime, dev, dryRun, force, help };
 }
 
-async function writeFileSafe(path: string, content: string, opts: { dryRun: boolean; force: boolean }): Promise<void> {
+async function writeFileSafe(
+  path: string,
+  content: string,
+  opts: { dryRun: boolean; force: boolean },
+): Promise<void> {
   if (opts.dryRun) {
     console.log(`[dry-run] write ${path}`);
     return;

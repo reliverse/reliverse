@@ -1,7 +1,9 @@
+import { mapWithConcurrency } from "../concurrency";
 import { createBuildProviderRegistry } from "./provider-registry";
 import type { BuildProvider, BuildReport, BuildTarget } from "./provider/types";
 
 export interface BuildPlan {
+  readonly concurrency?: number | undefined;
   readonly provider?: string | undefined;
   readonly targets: readonly BuildTarget[];
 }
@@ -16,9 +18,7 @@ export interface CreateBuilderRuntimeOptions {
   readonly providers: readonly BuildProvider[];
 }
 
-export function createBuilderRuntime(
-  options: CreateBuilderRuntimeOptions,
-): BuilderRuntime {
+export function createBuilderRuntime(options: CreateBuilderRuntimeOptions): BuilderRuntime {
   const registry = createBuildProviderRegistry(options);
 
   return {
@@ -32,15 +32,24 @@ export function createBuilderRuntime(
       }
 
       const startedAt = performance.now();
+      const concurrency = plan.concurrency ?? 1;
       const results = [];
 
-      for (const target of plan.targets) {
-        const result = await provider.buildTarget(target);
-        results.push(result);
+      if (concurrency <= 1) {
+        for (const target of plan.targets) {
+          const result = await provider.buildTarget(target);
+          results.push(result);
 
-        if (!result.ok) {
-          break;
+          if (!result.ok) {
+            break;
+          }
         }
+      } else {
+        results.push(
+          ...(await mapWithConcurrency(plan.targets, concurrency, async (target) =>
+            provider.buildTarget(target),
+          )),
+        );
       }
 
       return {

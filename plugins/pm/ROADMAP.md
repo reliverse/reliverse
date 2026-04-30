@@ -57,8 +57,8 @@ Legend:
 - [x] Support smart update mode by default
 - [x] Support `--no-smart`
 - [x] Support `--apply`
-- [x] Run `bun update` or `bun install` depending on context
-- [x] Roll back manifest changes if final install/update fails
+- [x] Run only `bun install` after pm-controlled manifest/catalog changes
+- [x] Roll back manifest changes if final install fails
 
 ### Current output and UX
 

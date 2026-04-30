@@ -69,7 +69,8 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
     async getScope(path) {
       const directoryPath = join(resolvedEntry.commandRoot, ...path);
       const commandFilePath = join(directoryPath, resolvedEntry.commandFileName);
-      const directoryExists = path.length === 0 ? await pathExists(directoryPath) : await isDirectory(directoryPath);
+      const directoryExists =
+        path.length === 0 ? await pathExists(directoryPath) : await isDirectory(directoryPath);
       const commandExists = await pathExists(commandFilePath);
 
       if (!directoryExists && !commandExists) {
@@ -82,7 +83,9 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
           : null;
       }
 
-      const loadCurrentCommand = commandExists ? createCachedCommandLoader(commandFilePath) : undefined;
+      const loadCurrentCommand = commandExists
+        ? createCachedCommandLoader(commandFilePath)
+        : undefined;
       const childDirectories = directoryExists ? await listChildDirectories(directoryPath) : [];
       const childMetadata = await Promise.all(
         childDirectories.map(async (childName) => {
@@ -117,7 +120,7 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
       );
 
       const node = loadCurrentCommand
-          ? await loadCurrentCommand().then((command) => ({
+        ? await loadCurrentCommand().then((command) => ({
             agent: command.agent,
             aliases: command.meta?.aliases ?? [],
             conventions: command.conventions,

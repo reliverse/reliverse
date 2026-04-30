@@ -1,5 +1,5 @@
-import { cn } from "@repo/ui/utils/cn";
 import { Button, buttonVariants } from "@repo/ui/button";
+import { cn } from "@repo/ui/utils/cn";
 import { Link } from "@tanstack/react-router";
 import { ArrowRight, Sparkles } from "lucide-react";
 

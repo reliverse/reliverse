@@ -1,5 +1,6 @@
+import type { CommandOptionsOutput, CommandOptionsRecord } from "@reliverse/parser";
+
 import type { CommandEffect, CommandSafety, CommandSafetyAPI } from "../api/define-command";
-import type { CommandOptionsOutput, CommandOptionsRecord } from "../options/types";
 import { RemptsUsageError } from "./errors";
 
 function hasApplyOption(options: CommandOptionsOutput<CommandOptionsRecord>): boolean {

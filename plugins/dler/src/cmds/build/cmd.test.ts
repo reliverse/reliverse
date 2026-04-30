@@ -15,7 +15,15 @@ function createJsonCtx(cwd: string, options: Record<string, unknown>) {
       cliPluginNames: ["dler"],
       colors: {
         stderr: { bold: (value: string) => value, yellow: (value: string) => value },
-        stdout: { bold: (value: string) => value, green: (value: string) => value },
+        stdout: {
+          bold: (value: string) => value,
+          cyan: (value: string) => value,
+          dim: (value: string) => value,
+          gray: (value: string) => value,
+          green: (value: string) => value,
+          magenta: (value: string) => value,
+          yellow: (value: string) => value,
+        },
       },
       cwd,
       env: process.env,
@@ -56,7 +64,15 @@ function createTextCtx(cwd: string, options: Record<string, unknown>) {
       cliPluginNames: ["dler"],
       colors: {
         stderr: { bold: (value: string) => value, yellow: (value: string) => value },
-        stdout: { bold: (value: string) => value, green: (value: string) => value },
+        stdout: {
+          bold: (value: string) => value,
+          cyan: (value: string) => value,
+          dim: (value: string) => value,
+          gray: (value: string) => value,
+          green: (value: string) => value,
+          magenta: (value: string) => value,
+          yellow: (value: string) => value,
+        },
       },
       cwd,
       env: process.env,
@@ -214,11 +230,11 @@ describe("dler build command", () => {
     expect(text).toContain("Planned\n  plugins/ok");
     expect(text).toContain("Skipped\n  plugins/missing");
     expect(text).toContain("No changes made. Pass --apply to run the planned builds.");
-    expect(text).toContain("Use --show-commands or --json to inspect generated commands.");
+    expect(text).toContain("Use --verbose or --json to inspect generated commands.");
     expect(text).not.toContain("internal-runner.ts");
   });
 
-  test("text preview can show generated commands on request", async () => {
+  test("text preview can show generated commands in verbose mode", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-"));
     await mkdir(join(root, "plugins", "ok", "src"), { recursive: true });
     await writeFile(
@@ -239,7 +255,7 @@ describe("dler build command", () => {
 
     const { ctx, textLines } = createTextCtx(root, {
       provider: "bun",
-      showCommands: true,
+      verbose: true,
       targets: "plugins/ok",
     });
 
@@ -340,8 +356,9 @@ describe("dler build command", () => {
 
     await command.handler(ctx as never);
 
-    expect(resultCalls[0]?.value).toStrictEqual({
+    expect(resultCalls[0]?.value).toEqual({
       apply: false,
+      concurrency: 4,
       preview: true,
       executedTargets: [],
       ok: true,

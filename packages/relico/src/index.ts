@@ -107,7 +107,8 @@ function createInstance(options?: RelicoOptions): RelicoInstance {
   const stream = options?.stream ?? "stdout";
   const level = resolveLevel(options);
   const enabled = level > 0;
-  const style = (open: number, close: number) => createStyle(`\u001B[${open}m`, `\u001B[${close}m`, enabled);
+  const style = (open: number, close: number) =>
+    createStyle(`\u001B[${open}m`, `\u001B[${close}m`, enabled);
 
   return {
     bgBlack: style(40, 49),

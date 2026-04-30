@@ -1,6 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
-import { createBuildSummary, createPublishSummary, createPublishSummaryFromResults, formatBuildSummary, formatPublishSummary } from "./result-contract";
+import {
+  createBuildSummary,
+  createPublishSummary,
+  createPublishSummaryFromResults,
+  formatBuildSummary,
+  formatPublishSummary,
+} from "./result-contract";
 
 describe("dler result contract helpers", () => {
   test("creates and formats build summaries consistently", () => {
@@ -8,8 +14,26 @@ describe("dler result contract helpers", () => {
       planned: 3,
       skipped: [{ label: "packages/missing", reason: "missing" }],
       targets: [
-        { cwd: ".", durationMs: 1, exitCode: 0, label: "a", ok: true, provider: "bun", stderr: "", stdout: "" },
-        { cwd: ".", durationMs: 2, exitCode: 1, label: "b", ok: false, provider: "bun", stderr: "boom", stdout: "" },
+        {
+          cwd: ".",
+          durationMs: 1,
+          exitCode: 0,
+          label: "a",
+          ok: true,
+          provider: "bun",
+          stderr: "",
+          stdout: "",
+        },
+        {
+          cwd: ".",
+          durationMs: 2,
+          exitCode: 1,
+          label: "b",
+          ok: false,
+          provider: "bun",
+          stderr: "boom",
+          stdout: "",
+        },
       ],
     });
 

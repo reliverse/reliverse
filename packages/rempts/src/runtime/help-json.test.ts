@@ -94,7 +94,9 @@ describe("help JSON contract", () => {
 
     expect(serialized.scope).toBe("launcher");
     expect(serialized.scopeLabel).toBe("Subcommands");
-    expect(serialized.usage).toEqual(["example-cli [global-flags] dler <subcommand> [flags] [args]"]);
+    expect(serialized.usage).toEqual([
+      "example-cli [global-flags] dler <subcommand> [flags] [args]",
+    ]);
     expect(serialized.interactive).toBe("tty");
     expect(serialized.subcommands[0]).toEqual({
       description: "Publish artifacts",

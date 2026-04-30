@@ -1,4 +1,5 @@
 import { defineCommand, type PluginDiscoveryLoadedPlugin } from "@reliverse/rempts";
+
 import { getRemptsTargetOptions, runTargetRemptsCommand } from "../../../../lib/target-cli";
 
 interface PluginListReport {
@@ -53,7 +54,9 @@ export default defineCommand({
 
     ctx.out(`CLI: ${report.cliName}`);
     ctx.out(`Allowed patterns: ${report.allowedPatterns.join(", ") || "(none)"}`);
-    ctx.out(`Conflict priority: ${report.conflictPriority.join(", ") || "(default loaded-plugin order)"}`);
+    ctx.out(
+      `Conflict priority: ${report.conflictPriority.join(", ") || "(default loaded-plugin order)"}`,
+    );
     if (report.count === 0) {
       ctx.out("Loaded plugins: none");
       return;

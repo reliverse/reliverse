@@ -1,47 +1,190 @@
 import { defineCommand } from "@reliverse/rempts";
 
+import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
+import {
+  DLER_COMMAND_NAMES,
+  DLER_CONCURRENCY_DEFAULTS,
+  DLER_PUBLISH_DEFAULTS,
+} from "../../impl/constants";
 import { runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
-import { runPrebuildForPackage } from "../../impl/pub/prebuild";
 import { createPublishStaging } from "../../impl/pub/staging";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
 import { findUnsafeDependencySpecifiers } from "../../impl/pub/workspace-deps";
-import {
-  createPublishExecutedTargets,
-  createTargetSets,
-  formatSkippedMessages,
-} from "../../impl/report-helpers";
-import {
-  createPublishSummary,
-  createPublishSummaryFromResults,
-  formatPublishSummary,
-} from "../../impl/result-contract";
+import { createPublishExecutedTargets, createTargetSets } from "../../impl/report-helpers";
+import { createPublishSummary, createPublishSummaryFromResults } from "../../impl/result-contract";
 import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
 
-const BUILDER_PLUGIN_NAME = "dler";
-const DEFAULT_PUBLISH_FROM = "dist";
+type PreviewStyle = (value: unknown) => string;
 
-function formatPublishResultLine(options: {
-  readonly apply: boolean;
+interface PreviewColors {
+  readonly bold: PreviewStyle;
+  readonly cyan: PreviewStyle;
+  readonly dim: PreviewStyle;
+  readonly gray: PreviewStyle;
+  readonly green: PreviewStyle;
+  readonly magenta: PreviewStyle;
+  readonly yellow: PreviewStyle;
+}
+
+interface PublishTextResult {
   readonly durationMs: number;
   readonly label: string;
+  readonly npm: { readonly stderr: string; readonly stdout: string };
   readonly packageName: string;
+}
+
+function formatCount(
+  colors: PreviewColors,
+  count: number,
+  label: string,
+  accent: "green" | "yellow",
+): string {
+  const value = count > 0 ? colors[accent](String(count)) : colors.dim(String(count));
+
+  return `${value} ${label}`;
+}
+
+function formatLabelRows(
+  rows: ReadonlyArray<{ readonly label: string; readonly detail?: string | undefined }>,
+  colors: PreviewColors,
+): string[] {
+  if (rows.length === 0) {
+    return [`  ${colors.dim("none")}`];
+  }
+
+  const width = Math.max(...rows.map((row) => row.label.length));
+
+  return rows.map((row) => {
+    const label = colors.bold(row.label.padEnd(width));
+
+    return row.detail ? `  ${label}  ${colors.gray(row.detail)}` : `  ${colors.bold(row.label)}`;
+  });
+}
+
+function formatNpmCommand(options: {
+  readonly preview: boolean;
+  readonly tag?: string | undefined;
 }): string {
-  return `${options.apply ? "Published" : "Prepared"}: ${options.label} (${options.packageName}) in ${options.durationMs}ms`;
+  const parts = ["npm", "publish", "--access", "public"];
+  if (options.preview) {
+    parts.push("--dry-run");
+  }
+  if (options.tag && options.tag.trim().length > 0) {
+    parts.push("--tag", options.tag.trim());
+  }
+
+  return parts.join(" ");
 }
 
-function okLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
-  text: string,
-): string {
-  return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
+function pushNpmOutput(
+  lines: string[],
+  colors: PreviewColors,
+  label: string,
+  stream: "stdout" | "stderr",
+  value: string,
+): void {
+  const text = value.trim();
+  if (text.length === 0) {
+    return;
+  }
+
+  lines.push(
+    `  ${colors.bold(label)} ${colors.gray(`npm ${stream}:`)}`,
+    ...text.split("\n").map((line) => `     ${colors.gray(line)}`),
+  );
 }
 
-function warnLabel(
-  ctx: { colors: { stderr: { bold(text: string): string; yellow(text: string): string } } },
-  text: string,
-): string {
-  return ctx.colors.stderr.yellow(ctx.colors.stderr.bold(text));
+function formatPublishText(options: {
+  readonly apply: boolean;
+  readonly colors: PreviewColors;
+  readonly concurrency: number;
+  readonly publishFrom: string;
+  readonly results: readonly PublishTextResult[];
+  readonly skipped: readonly { readonly label: string; readonly reason: string }[];
+  readonly tag?: string | undefined;
+  readonly totalDurationMs: number;
+  readonly verbose: boolean;
+}): string[] {
+  const action = options.apply ? "published" : "prepared";
+  const title = options.apply ? DLER_COMMAND_NAMES.pub : `${DLER_COMMAND_NAMES.pub} preview`;
+  const lines = [
+    options.colors.bold(options.colors.cyan(title)),
+    "",
+    `${options.colors.bold("Publish from:")} ${options.colors.magenta(options.publishFrom)}`,
+    `${options.colors.bold("Concurrency:")} ${options.colors.magenta(options.concurrency)}`,
+  ];
+
+  if (options.tag && options.tag.trim().length > 0) {
+    lines.push(`${options.colors.bold("Tag:")} ${options.colors.magenta(options.tag.trim())}`);
+  }
+
+  lines.push(
+    `${options.colors.bold("Targets:")} ${formatCount(options.colors, options.results.length, action, "green")}, ${formatCount(options.colors, options.skipped.length, "skipped", "yellow")}`,
+  );
+
+  if (options.results.length > 0) {
+    lines.push(
+      "",
+      options.colors.bold(options.apply ? "Published" : "Prepared"),
+      ...formatLabelRows(
+        options.results.map((result) => ({
+          detail: options.verbose
+            ? `${result.packageName} (${result.durationMs}ms)`
+            : result.packageName,
+          label: result.label,
+        })),
+        options.colors,
+      ),
+    );
+  }
+
+  if (options.skipped.length > 0) {
+    lines.push(
+      "",
+      options.colors.bold(options.colors.yellow("Skipped")),
+      ...formatLabelRows(
+        options.skipped.map((target) => ({
+          detail: target.reason,
+          label: target.label,
+        })),
+        options.colors,
+      ),
+    );
+  }
+
+  if (options.verbose) {
+    if (options.results.length > 0) {
+      lines.push(
+        "",
+        options.colors.bold(options.colors.cyan("Command")),
+        `  ${options.colors.gray(formatNpmCommand({ preview: !options.apply, tag: options.tag }))}`,
+      );
+    }
+
+    lines.push(
+      "",
+      options.colors.bold(options.colors.cyan("Details")),
+      `  Total duration: ${options.colors.bold(`${options.totalDurationMs}ms`)}`,
+    );
+
+    for (const result of options.results) {
+      pushNpmOutput(lines, options.colors, result.label, "stdout", result.npm.stdout);
+      pushNpmOutput(lines, options.colors, result.label, "stderr", result.npm.stderr);
+    }
+  }
+
+  lines.push(
+    "",
+    options.apply
+      ? `${options.colors.green("Publish complete.")} Use ${options.colors.bold("--json")} for the machine-readable result.`
+      : `${options.colors.yellow("No packages published.")} Pass ${options.colors.bold("--apply")} to publish to npm.`,
+    options.verbose
+      ? `Use ${options.colors.bold("--json")} for the full machine-readable result.`
+      : `Use ${options.colors.bold("--verbose")} or ${options.colors.bold("--json")} to inspect npm output and durations.`,
+  );
+
+  return lines;
 }
 
 export default defineCommand({
@@ -52,7 +195,7 @@ export default defineCommand({
   },
   agent: {
     notes:
-      "Eligible packages: not private, type module, publishConfig.access public. Default execution prepares an npm publish preview. Pass --apply for real npm publish. With default prebuild enabled, dler first runs the generated build flow for each target. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
+      "Eligible packages: not private, type module, publishConfig.access public. Default execution prepares an npm publish preview from existing artifacts. Pass --apply for real npm publish. dler build is the recommended artifact producer, but any external build flow is valid if it prepares the selected --publish-from directory. v1 does not rewrite workspace/catalog specifiers — ensure versions are publishable. Requires npm CLI and registry auth for real publishes.",
   },
   interactive: "never",
   conventions: {
@@ -67,23 +210,19 @@ export default defineCommand({
   help: {
     examples: [
       "rse pub --targets packages/foo",
-      "rse pub --targets packages/foo --no-prebuild --publish-from dist",
+      "rse pub --targets packages/foo --publish-from dist",
+      "rse pub --targets packages/foo --verbose",
+      "rse pub --targets packages/foo --concurrency 2 --apply",
       "rse pub --targets packages/foo --publish-from dist --tag next --apply",
     ],
-    text: "Targets come from --targets or from cwd scope when omitted. With default prebuild, dler runs the generated build flow first and then stages package.json plus the chosen artifact directory before npm publish. With --no-prebuild, the caller is responsible for ensuring artifacts already exist.",
+    text: "Targets come from --targets or from cwd scope when omitted. dler pub stages package.json plus the chosen artifact directory before npm publish. Use dler build when you want the recommended Reliverse build path, or provide artifacts from any other build flow via --publish-from.",
   },
   options: {
-    prebuild: {
-      type: "boolean",
-      defaultValue: true,
-      description: "Run dler's generated prebuild flow before publish (use --no-prebuild to skip)",
-      inputSources: ["flag", "default"],
-    },
     publishFrom: {
       type: "string",
-      description:
-        "Directory relative to each package root to copy into the publish tarball (required with --no-prebuild; default dist when using prebuild)",
-      inputSources: ["flag"],
+      defaultValue: DLER_PUBLISH_DEFAULTS.publishFrom,
+      description: "Directory relative to each package root to copy into the publish tarball",
+      inputSources: ["flag", "default"],
     },
     tag: {
       type: "string",
@@ -97,8 +236,23 @@ export default defineCommand({
       hint: "Example: packages/rempts,plugins/pub",
       inputSources: ["flag"],
     },
+    concurrency: {
+      type: "number",
+      defaultValue: DLER_CONCURRENCY_DEFAULTS.pub,
+      description: "Maximum number of publish targets to process at once",
+      inputSources: ["flag", "default"],
+    },
+    verbose: {
+      type: "boolean",
+      description: "Show verbose text output, including npm output and durations",
+      inputSources: ["flag"],
+    },
   },
   async handler(ctx) {
+    const concurrency = resolveConcurrency(ctx.options.concurrency, {
+      defaultValue: DLER_CONCURRENCY_DEFAULTS.pub,
+      label: "--concurrency",
+    });
     const requestedTargets = await resolveRequestedTargets({
       cwd: ctx.cwd,
       rawTargets: ctx.options.targets,
@@ -115,27 +269,7 @@ export default defineCommand({
       );
     }
 
-    const prebuild = ctx.options.prebuild ?? true;
-    const hasBuilder = ctx.cliPluginNames.includes(BUILDER_PLUGIN_NAME);
-
-    if (prebuild && !hasBuilder) {
-      ctx.exit(
-        1,
-        "Prebuild is on by default but dler is not registered on this CLI. Install the dler plugin package and ensure it matches the host CLI's plugins.allowedPatterns. Alternatively use --no-prebuild with --publish-from after building manually.",
-      );
-    }
-
-    let publishFrom = ctx.options.publishFrom?.trim() ?? "";
-    if (!prebuild) {
-      if (publishFrom.length === 0) {
-        ctx.exit(
-          1,
-          "With --no-prebuild you must pass --publish-from (e.g. dist) relative to each package.",
-        );
-      }
-    } else {
-      publishFrom = publishFrom.length > 0 ? publishFrom : DEFAULT_PUBLISH_FROM;
-    }
+    const publishFrom = ctx.options.publishFrom?.trim() || DLER_PUBLISH_DEFAULTS.publishFrom;
 
     if (!isSafeRelativePublishFrom(publishFrom)) {
       ctx.exit(1, "Invalid --publish-from: use a relative path without .. segments.");
@@ -145,7 +279,7 @@ export default defineCommand({
     const preview = !apply;
     const startedAt = performance.now();
     const validation = await resolvePublishableTargets({
-      requireArtifactDir: !prebuild,
+      requireArtifactDir: true,
       publishFrom,
       targets: requestedTargets.resolution.resolved,
     });
@@ -153,93 +287,86 @@ export default defineCommand({
       ...requestedTargets.resolution.skipped,
       ...validation.skipped,
     ];
-    const results: {
+
+    type PublishResult = {
       cwd: string;
       durationMs: number;
       label: string;
       npm: { exitCode: number; stderr: string; stdout: string };
       packageName: string;
-    }[] = [];
+    };
 
-    for (const target of validation.publishable) {
-      const label = target.label;
-      const packageRoot = target.cwd;
-      const pkgRecord = target.packageRecord;
+    const outcomes = await mapWithConcurrency(
+      validation.publishable,
+      concurrency,
+      async (target) => {
+        const label = target.label;
+        const packageRoot = target.cwd;
+        const pkgRecord = target.packageRecord;
 
-      const unsafeSpecifiers = findUnsafeDependencySpecifiers(pkgRecord);
-      if (unsafeSpecifiers.length > 0) {
-        skipped.push({
-          label,
-          reason: `unsafe dependency specifiers for publish: ${unsafeSpecifiers.map((dep) => `${dep.name}@${dep.specifier}`).join(", ")}`,
-        });
-        continue;
-      }
-
-      if (prebuild && apply) {
-        ctx.safety.assertApplied("process.exec");
-        const report = await runPrebuildForPackage(packageRoot, label);
-        if (!report.ok) {
-          const failed = report.targets.find((t) => !t.ok);
-          if (ctx.output.mode !== "json" && failed) {
-            if (failed.stdout.trim()) ctx.out(failed.stdout.trim());
-            if (failed.stderr.trim()) ctx.err(failed.stderr.trim());
-          }
-
-          ctx.exit(
-            1,
-            failed
-              ? `Prebuild failed for ${label} during generated build execution (exit ${failed.exitCode}). Fix the build or use --no-prebuild.`
-              : `Prebuild failed for ${label}.`,
-          );
+        const unsafeSpecifiers = findUnsafeDependencySpecifiers(pkgRecord);
+        if (unsafeSpecifiers.length > 0) {
+          return {
+            skipped: {
+              label,
+              reason: `unsafe dependency specifiers for publish: ${unsafeSpecifiers.map((dep) => `${dep.name}@${dep.specifier}`).join(", ")}`,
+            },
+          };
         }
-      }
 
-      if (!(await pathIsDirectory(target.artifactDir))) {
-        skipped.push({
-          label,
-          reason: `missing publish directory: ${target.artifactDir}`,
-        });
-        continue;
-      }
+        if (!(await pathIsDirectory(target.artifactDir))) {
+          return {
+            skipped: {
+              label,
+              reason: `missing publish directory: ${target.artifactDir}`,
+            },
+          };
+        }
 
-      if (apply) {
-        ctx.safety.assertApplied("fs.write");
-      }
-      const staging = await createPublishStaging(packageRoot, publishFrom);
-      try {
-        const publishStartedAt = performance.now();
         if (apply) {
-          ctx.safety.assertApplied("network.publish");
+          ctx.safety.assertApplied("fs.write");
         }
-        const npmResult = await runNpmPublish({
-          cwd: staging.stagingDir,
-          preview,
-          env: ctx.env,
-          tag: ctx.options.tag,
-        });
-        results.push({
-          cwd: packageRoot,
-          durationMs: Math.round(performance.now() - publishStartedAt),
-          label,
-          npm: npmResult,
-          packageName: target.packageName,
-        });
+        const staging = await createPublishStaging(packageRoot, publishFrom);
+        try {
+          const publishStartedAt = performance.now();
+          if (apply) {
+            ctx.safety.assertApplied("network.publish");
+          }
+          const npmResult = await runNpmPublish({
+            cwd: staging.stagingDir,
+            preview,
+            env: ctx.env,
+            tag: ctx.options.tag,
+          });
+          const result = {
+            cwd: packageRoot,
+            durationMs: Math.round(performance.now() - publishStartedAt),
+            label,
+            npm: npmResult,
+            packageName: target.packageName,
+          } satisfies PublishResult;
 
-        if (npmResult.exitCode !== 0) {
-          if (ctx.output.mode !== "json") {
-            if (npmResult.stdout.trim()) ctx.out(npmResult.stdout.trim());
-            if (npmResult.stderr.trim()) ctx.err(npmResult.stderr.trim());
+          if (npmResult.exitCode !== 0) {
+            if (ctx.output.mode !== "json") {
+              if (npmResult.stdout.trim()) ctx.out(npmResult.stdout.trim());
+              if (npmResult.stderr.trim()) ctx.err(npmResult.stderr.trim());
+            }
+
+            ctx.exit(
+              1,
+              `npm publish failed for ${label} during staging publish (exit ${npmResult.exitCode}).`,
+            );
           }
 
-          ctx.exit(
-            1,
-            `npm publish failed for ${label} during staging publish (exit ${npmResult.exitCode}).`,
-          );
+          return { result };
+        } finally {
+          await staging.cleanup();
         }
-      } finally {
-        await staging.cleanup();
-      }
-    }
+      },
+    );
+
+    const results = outcomes.flatMap((outcome) => ("result" in outcome ? [outcome.result] : []));
+    skipped.push(...outcomes.flatMap((outcome) => ("skipped" in outcome ? [outcome.skipped] : [])));
 
     if (results.length === 0) {
       const summary = createPublishSummary({
@@ -256,6 +383,7 @@ export default defineCommand({
         ctx.output.result(
           {
             apply,
+            concurrency,
             preview,
             executedTargets: targetSets.executedTargets,
             ok: false,
@@ -266,13 +394,24 @@ export default defineCommand({
             skippedTargets: targetSets.skippedTargets,
             summary,
           },
-          "dler pub",
+          DLER_COMMAND_NAMES.pub,
         );
         return;
       }
 
-      for (const message of formatSkippedMessages(skipped)) {
-        ctx.err(message.replace("Skipped:", warnLabel(ctx, "Skipped:")));
+      const totalDurationMs = Math.round(performance.now() - startedAt);
+      for (const line of formatPublishText({
+        apply,
+        colors: ctx.colors.stdout,
+        concurrency,
+        publishFrom,
+        results,
+        skipped,
+        tag: ctx.options.tag,
+        totalDurationMs,
+        verbose: ctx.options.verbose === true,
+      })) {
+        ctx.out(line);
       }
 
       ctx.exit(1, "No publishable workspace targets remain after validation and artifact checks.");
@@ -293,6 +432,7 @@ export default defineCommand({
       ctx.output.result(
         {
           apply,
+          concurrency,
           preview,
           executedTargets: targetSets.executedTargets,
           ok: true,
@@ -311,41 +451,24 @@ export default defineCommand({
           summary,
           totalDurationMs: Math.round(performance.now() - startedAt),
         },
-        "dler pub",
+        DLER_COMMAND_NAMES.pub,
       );
       return;
     }
 
-    ctx.out(`Publish from: ${publishFrom}`);
-
-    for (const message of formatSkippedMessages(skipped)) {
-      ctx.err(message.replace("Skipped:", warnLabel(ctx, "Skipped:")));
+    const totalDurationMs = Math.round(performance.now() - startedAt);
+    for (const line of formatPublishText({
+      apply,
+      colors: ctx.colors.stdout,
+      concurrency,
+      publishFrom,
+      results,
+      skipped,
+      tag: ctx.options.tag,
+      totalDurationMs,
+      verbose: ctx.options.verbose === true,
+    })) {
+      ctx.out(line);
     }
-
-    for (const r of results) {
-      ctx.out(
-        okLabel(
-          ctx,
-          formatPublishResultLine({
-            apply,
-            durationMs: r.durationMs,
-            label: r.label,
-            packageName: r.packageName,
-          }),
-        ),
-      );
-    }
-
-    ctx.out(`Total duration: ${Math.round(performance.now() - startedAt)}ms`);
-    ctx.out(
-      formatPublishSummary(
-        createPublishSummaryFromResults({
-          planned: requestedTargets.resolution.resolved.length,
-          resultsCount: results.length,
-          skipped,
-        }),
-        !apply,
-      ),
-    );
   },
 });

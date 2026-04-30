@@ -4,9 +4,12 @@ import {
   type PluginDiscoveryLoadedPlugin,
   type PluginDiscoveryReport,
 } from "@reliverse/rempts";
+
 import { getRemptsTargetOptions, runTargetRemptsCommand } from "../../../../lib/target-cli";
 
-function buildPluginMap(report: PluginDiscoveryReport | undefined): Map<string, PluginDiscoveryLoadedPlugin> {
+function buildPluginMap(
+  report: PluginDiscoveryReport | undefined,
+): Map<string, PluginDiscoveryLoadedPlugin> {
   return new Map((report?.loaded ?? []).map((plugin) => [plugin.pluginName, plugin] as const));
 }
 
@@ -25,23 +28,31 @@ export default defineCommand({
   async handler(ctx) {
     const targetOptions = getRemptsTargetOptions(ctx.options);
     const report = targetOptions.cli
-      ? (await runTargetRemptsCommand<CommandTreeReport>({
-          commandPath: ["rempts", "commands", "tree"],
-          cwd: ctx.cwd,
-          rawTargetOptions: ctx.options,
-        })).data
-      : ctx.cli?.commandTree ?? ctx.exit(1, "Command-tree diagnostics are unavailable in this CLI session.");
+      ? (
+          await runTargetRemptsCommand<CommandTreeReport>({
+            commandPath: ["rempts", "commands", "tree"],
+            cwd: ctx.cwd,
+            rawTargetOptions: ctx.options,
+          })
+        ).data
+      : (ctx.cli?.commandTree ??
+        ctx.exit(1, "Command-tree diagnostics are unavailable in this CLI session."));
     const pluginDiscovery = targetOptions.cli
-      ? (await runTargetRemptsCommand<PluginDiscoveryReport>({
-          commandPath: ["rempts", "plugins", "doctor"],
-          cwd: ctx.cwd,
-          rawTargetOptions: ctx.options,
-        })).data
+      ? (
+          await runTargetRemptsCommand<PluginDiscoveryReport>({
+            commandPath: ["rempts", "plugins", "doctor"],
+            cwd: ctx.cwd,
+            rawTargetOptions: ctx.options,
+          })
+        ).data
       : ctx.cli?.pluginDiscovery;
     const pluginMap = buildPluginMap(pluginDiscovery);
 
     const payload = report.nodes.map((node) => {
-      const chosenPlugin = node.chosenCommand?.sourceKind === "plugin" ? pluginMap.get(node.chosenCommand.sourceId) : undefined;
+      const chosenPlugin =
+        node.chosenCommand?.sourceKind === "plugin"
+          ? pluginMap.get(node.chosenCommand.sourceId)
+          : undefined;
       return {
         availableSubcommands: node.availableSubcommands,
         owner: node.chosenCommand
@@ -53,7 +64,8 @@ export default defineCommand({
           : undefined,
         path: node.path,
         shadowed: node.shadowedCommands.map((entry) => ({
-          packageName: entry.sourceKind === "plugin" ? pluginMap.get(entry.sourceId)?.packageName : undefined,
+          packageName:
+            entry.sourceKind === "plugin" ? pluginMap.get(entry.sourceId)?.packageName : undefined,
           sourceId: entry.sourceId,
           sourceKind: entry.sourceKind,
         })),

@@ -100,19 +100,11 @@ export function SiteFooter() {
             </a>
             <a
               className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              href="https://twitter.com/blefnk"
+              href="https://x.com/blefnk"
               rel="noopener noreferrer"
               target="_blank"
             >
-              Twitter
-            </a>
-            <a
-              className="text-sm text-muted-foreground transition-colors hover:text-foreground"
-              href="https://linkedin.com/company/reliverse"
-              rel="noopener noreferrer"
-              target="_blank"
-            >
-              LinkedIn
+              X
             </a>
           </div>
         </div>

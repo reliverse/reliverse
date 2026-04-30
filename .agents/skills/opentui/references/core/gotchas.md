@@ -41,24 +41,24 @@ import express from "express"
 ```typescript
 // WRONG - Terminal may be left in broken state
 if (error) {
-  console.error("Fatal error")
-  process.exit(1)
+  console.error("Fatal error");
+  process.exit(1);
 }
 
 // CORRECT - Use renderer.destroy() for cleanup
 if (error) {
-  console.error("Fatal error")
-  await renderer.destroy()
-  process.exit(1)  // Only after destroy
+  console.error("Fatal error");
+  await renderer.destroy();
+  process.exit(1); // Only after destroy
 }
 
 // BETTER - Let destroy handle exit
 const renderer = await createCliRenderer({
-  exitOnCtrlC: true,  // Handles Ctrl+C properly
-})
+  exitOnCtrlC: true, // Handles Ctrl+C properly
+});
 
 // For programmatic exit
-renderer.destroy()  // Cleans up and exits
+renderer.destroy(); // Cleans up and exits
 ```
 
 `renderer.destroy()` restores the terminal to its original state before exiting.
@@ -69,11 +69,11 @@ Bun auto-loads `.env` files. Don't use dotenv:
 
 ```typescript
 // CORRECT
-const apiKey = process.env.API_KEY
+const apiKey = process.env.API_KEY;
 
 // WRONG
-import dotenv from "dotenv"
-dotenv.config()
+import dotenv from "dotenv";
+dotenv.config();
 ```
 
 ## Debugging TUIs
@@ -85,26 +85,29 @@ OpenTUI captures console output for the debug overlay. You can't see logs in the
 **Solutions:**
 
 1. **Use the console overlay:**
+
    ```typescript
-   const renderer = await createCliRenderer()
-   renderer.console.show()
-   console.log("This appears in the overlay")
+   const renderer = await createCliRenderer();
+   renderer.console.show();
+   console.log("This appears in the overlay");
    ```
 
 2. **Toggle with keyboard:**
+
    ```typescript
    renderer.keyInput.on("keypress", (key) => {
      if (key.name === "f12") {
-       renderer.console.toggle()
+       renderer.console.toggle();
      }
-   })
+   });
    ```
 
 3. **Write to a file:**
+
    ```typescript
-   import { appendFileSync } from "node:fs"
+   import { appendFileSync } from "node:fs";
    function debugLog(msg: string) {
-     appendFileSync("debug.log", `${new Date().toISOString()} ${msg}\n`)
+     appendFileSync("debug.log", `${new Date().toISOString()} ${msg}\n`);
    }
    ```
 
@@ -126,11 +129,11 @@ test("reproduces the issue", async () => {
     width: 40,
     height: 10,
   })
-  
+
   // Setup that reproduces the bug
   const box = new BoxRenderable(renderer, { ... })
   renderer.root.add(box)
-  
+
   // Verify with snapshot
   expect(snapshot()).toMatchSnapshot()
 })
@@ -146,15 +149,15 @@ Input components only receive keyboard input when focused:
 const input = new InputRenderable(renderer, {
   id: "input",
   placeholder: "Type here...",
-})
+});
 
-renderer.root.add(input)
+renderer.root.add(input);
 
 // WRONG - input won't receive keystrokes
 // (no focus call)
 
 // CORRECT
-input.focus()
+input.focus();
 ```
 
 ### Focus in Nested Components
@@ -162,26 +165,23 @@ input.focus()
 When a component is inside a container, focus the component directly:
 
 ```typescript
-const container = new BoxRenderable(renderer, { id: "container" })
-const input = new InputRenderable(renderer, { id: "input" })
-container.add(input)
-renderer.root.add(container)
+const container = new BoxRenderable(renderer, { id: "container" });
+const input = new InputRenderable(renderer, { id: "input" });
+container.add(input);
+renderer.root.add(container);
 
 // WRONG
-container.focus()
+container.focus();
 
 // CORRECT
-input.focus()
+input.focus();
 
 // Or use getRenderable
-container.getRenderable("input")?.focus()
+container.getRenderable("input")?.focus();
 
 // Or use delegate (constructs)
-const form = delegate(
-  { focus: "input" },
-  Box({}, Input({ id: "input" })),
-)
-form.focus()  // Routes to the input
+const form = delegate({ focus: "input" }, Box({}, Input({ id: "input" })));
+form.focus(); // Routes to the input
 ```
 
 ## Build Requirements
@@ -221,13 +221,13 @@ Usually means a renderable wasn't added to the tree:
 
 ```typescript
 // WRONG - not added to tree
-const text = new TextRenderable(renderer, { content: "Hello" })
+const text = new TextRenderable(renderer, { content: "Hello" });
 // text.someMethod() // May fail
 
 // CORRECT
-const text = new TextRenderable(renderer, { content: "Hello" })
-renderer.root.add(text)
-text.someMethod()
+const text = new TextRenderable(renderer, { content: "Hello" });
+renderer.root.add(text);
+text.someMethod();
 ```
 
 ### Layout Not Updating
@@ -236,8 +236,8 @@ Yoga layout is calculated lazily. Force a recalculation:
 
 ```typescript
 // After changing layout properties
-box.setWidth(newWidth)
-renderer.requestRender()
+box.setWidth(newWidth);
+renderer.requestRender();
 ```
 
 ### Text Overflow/Clipping
@@ -248,13 +248,13 @@ Text doesn't wrap by default. Set explicit width:
 // May overflow
 const text = new TextRenderable(renderer, {
   content: "Very long text that might overflow the terminal...",
-})
+});
 
 // Contained within width
 const text = new TextRenderable(renderer, {
   content: "Very long text that might overflow the terminal...",
-  width: 40,  // Will clip or wrap based on parent
-})
+  width: 40, // Will clip or wrap based on parent
+});
 ```
 
 ### Colors Not Showing
@@ -263,13 +263,13 @@ Check terminal capability and color format:
 
 ```typescript
 // CORRECT formats
-fg: "#FF0000"           // Hex
-fg: "red"               // CSS color name
-fg: RGBA.fromHex("#FF0000")
+fg: "#FF0000"; // Hex
+fg: "red"; // CSS color name
+fg: RGBA.fromHex("#FF0000");
 
 // WRONG
-fg: "FF0000"            // Missing #
-fg: 0xFF0000            // Number (not supported)
+fg: "FF0000"; // Missing #
+fg: 0xff0000; // Number (not supported)
 ```
 
 ## Performance
@@ -280,15 +280,15 @@ Batch updates when possible:
 
 ```typescript
 // WRONG - multiple render calls
-item1.setContent("...")
-item2.setContent("...")
-item3.setContent("...")
+item1.setContent("...");
+item2.setContent("...");
+item3.setContent("...");
 
 // BETTER - single render after all updates
 // (OpenTUI batches automatically, but be mindful)
 items.forEach((item, i) => {
-  item.setContent(data[i])
-})
+  item.setContent(data[i]);
+});
 ```
 
 ### Minimize Tree Depth
@@ -298,10 +298,10 @@ Deep nesting impacts layout calculation:
 ```typescript
 // Avoid unnecessary wrappers
 // WRONG
-Box({}, Box({}, Box({}, Text({ content: "Hello" }))))
+Box({}, Box({}, Box({}, Text({ content: "Hello" }))));
 
 // CORRECT
-Box({}, Text({ content: "Hello" }))
+Box({}, Text({ content: "Hello" }));
 ```
 
 ### Use display: none
@@ -310,12 +310,12 @@ Hide elements instead of removing/re-adding:
 
 ```typescript
 // For toggling visibility
-element.setDisplay("none")   // Hidden
-element.setDisplay("flex")   // Visible
+element.setDisplay("none"); // Hidden
+element.setDisplay("flex"); // Visible
 
 // Instead of
-parent.remove(element)
-parent.add(element)
+parent.remove(element);
+parent.add(element);
 ```
 
 ## Testing
@@ -325,11 +325,11 @@ parent.add(element)
 Use Bun's test runner:
 
 ```typescript
-import { test, expect, beforeEach, afterEach } from "bun:test"
+import { test, expect, beforeEach, afterEach } from "bun:test";
 
 test("my test", () => {
-  expect(1 + 1).toBe(2)
-})
+  expect(1 + 1).toBe(2);
+});
 ```
 
 ### Test from Package Directories
@@ -389,5 +389,5 @@ renderer.keyInput.on("keypress", (key) => {
   if (key.eventType === "repeat") {
     // Key being held down
   }
-})
+});
 ```

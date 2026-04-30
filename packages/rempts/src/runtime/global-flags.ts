@@ -1,5 +1,6 @@
-import { toFlagName } from "../options/flag-name";
-import type { CommandOptionsRecord } from "../options/types";
+import { toFlagName } from "@reliverse/parser";
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import { RemptsUsageError } from "./errors";
 import type { ParsedGlobalFlags } from "./types";
 

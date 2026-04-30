@@ -13,8 +13,6 @@ export interface InteractionPolicyOptions {
   readonly hostMode?: RemptsHostInteractionMode | undefined;
   readonly interactive?: boolean | undefined;
   readonly noInput?: boolean | undefined;
-  readonly noTTY?: boolean | undefined;
-  readonly noTUI?: boolean | undefined;
   readonly stdin: typeof process.stdin;
   readonly stdout: typeof process.stdout;
   readonly tui?: boolean | undefined;
@@ -50,19 +48,7 @@ function resolveRequestedHostMode(options: InteractionPolicyOptions): RemptsHost
 }
 
 function normalizeCommandMode(options: InteractionPolicyOptions): RemptsInteractionMode {
-  if (options.commandMode) {
-    return options.commandMode;
-  }
-
-  if (options.noTTY) {
-    return "never";
-  }
-
-  if (options.noTUI) {
-    return "tty";
-  }
-
-  return "never";
+  return options.commandMode ?? "never";
 }
 
 function intersectModes(
@@ -88,13 +74,12 @@ export function getStdinMode(stdin: typeof process.stdin): StdinMode {
   return stdin.isTTY ? "tty" : "pipe";
 }
 
-export function resolveInteractionPolicy(
-  options: InteractionPolicyOptions,
-): InteractionPolicy {
+export function resolveInteractionPolicy(options: InteractionPolicyOptions): InteractionPolicy {
   const stdinMode = getStdinMode(options.stdin);
   const requestedHostMode = resolveRequestedHostMode(options);
   const commandMode = normalizeCommandMode(options);
-  const capabilityTTY = Boolean(options.stdin.isTTY) && detectTTY("stdout", { stdout: options.stdout });
+  const capabilityTTY =
+    Boolean(options.stdin.isTTY) && detectTTY("stdout", { stdout: options.stdout });
   const isTTY = capabilityTTY;
   const ci = detectCI({ env: options.env });
   const environmentDisallowsInteraction = ci || !capabilityTTY;
@@ -144,8 +129,7 @@ export function getPromptUnavailableMessage(
       ? "This command does not allow interactive prompts."
       : interaction.requestedHostMode === "never"
         ? "Re-run with --interactive or --tui if this command supports guided input."
-        : "Re-run in an interactive TTY if you want guided input."
-;
+        : "Re-run in an interactive TTY if you want guided input.";
 
   return `Prompt "${promptLabel}" is unavailable in non-interactive mode (${interaction.reason}). Supply the value via flags, stdin, or defaultValue. ${optInHint}`;
 }

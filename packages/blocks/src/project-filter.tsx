@@ -1,7 +1,7 @@
 "use client";
 
-import { cn } from "@repo/ui/utils/cn";
 import { Badge } from "@repo/ui/badge";
+import { cn } from "@repo/ui/utils/cn";
 
 import { categories, type ProjectCategory } from "./lib/projects";
 

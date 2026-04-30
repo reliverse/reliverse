@@ -8,17 +8,17 @@
 
 ```tsx
 // WRONG - Terminal left in broken state
-process.exit(0)
+process.exit(0);
 
 // CORRECT - Use renderer.destroy()
-import { useRenderer } from "@opentui/solid"
+import { useRenderer } from "@opentui/solid";
 
 function App() {
-  const renderer = useRenderer()
-  
+  const renderer = useRenderer();
+
   const handleExit = () => {
-    renderer.destroy()  // Cleans up and exits properly
-  }
+    renderer.destroy(); // Cleans up and exits properly
+  };
 }
 ```
 
@@ -62,12 +62,12 @@ preload = ["@opentui/solid/preload"]
 **Fix**: Add Solid plugin to build:
 
 ```typescript
-import solidPlugin from "@opentui/solid/bun-plugin"
+import solidPlugin from "@opentui/solid/bun-plugin";
 
 await Bun.build({
   // ...
   plugins: [solidPlugin],
-})
+});
 ```
 
 ## Reactivity Issues
@@ -92,19 +92,19 @@ const [count, setCount] = createSignal(0)
 ```tsx
 // WRONG - Breaks reactivity
 function Component(props: { value: number }) {
-  const { value } = props  // Destructured once, never updates!
-  return <text>{value}</text>
+  const { value } = props; // Destructured once, never updates!
+  return <text>{value}</text>;
 }
 
 // CORRECT - Keep props reactive
 function Component(props: { value: number }) {
-  return <text>{props.value}</text>
+  return <text>{props.value}</text>;
 }
 
 // OR use splitProps
 function Component(props: { value: number; other: string }) {
-  const [local, rest] = splitProps(props, ["value"])
-  return <text>{local.value}</text>
+  const [local, rest] = splitProps(props, ["value"]);
+  return <text>{local.value}</text>;
 }
 ```
 
@@ -114,16 +114,16 @@ function Component(props: { value: number; other: string }) {
 
 ```tsx
 // WRONG - Signal not accessed in effect
-const [count, setCount] = createSignal(0)
+const [count, setCount] = createSignal(0);
 
 createEffect(() => {
-  console.log("Count changed")  // Never runs after initial!
-})
+  console.log("Count changed"); // Never runs after initial!
+});
 
 // CORRECT - Access the signal
 createEffect(() => {
-  console.log("Count:", count())  // Runs when count changes
-})
+  console.log("Count:", count()); // Runs when count changes
+});
 ```
 
 ## Component Naming
@@ -247,21 +247,21 @@ Show requires fallback for proper rendering:
 ```tsx
 // WRONG - Interval never cleared
 function Timer() {
-  const [time, setTime] = createSignal(0)
-  
-  setInterval(() => setTime(t => t + 1), 1000)
-  
-  return <text>{time()}</text>
+  const [time, setTime] = createSignal(0);
+
+  setInterval(() => setTime((t) => t + 1), 1000);
+
+  return <text>{time()}</text>;
 }
 
 // CORRECT
 function Timer() {
-  const [time, setTime] = createSignal(0)
-  
-  const interval = setInterval(() => setTime(t => t + 1), 1000)
-  onCleanup(() => clearInterval(interval))
-  
-  return <text>{time()}</text>
+  const [time, setTime] = createSignal(0);
+
+  const interval = setInterval(() => setTime((t) => t + 1), 1000);
+  onCleanup(() => clearInterval(interval));
+
+  return <text>{time()}</text>;
 }
 ```
 
@@ -269,14 +269,14 @@ function Timer() {
 
 ```tsx
 createEffect(() => {
-  const subscription = subscribe(data())
-  
+  const subscription = subscribe(data());
+
   // WRONG - No cleanup
   // subscription stays active
-  
+
   // CORRECT
-  onCleanup(() => subscription.unsubscribe())
-})
+  onCleanup(() => subscription.unsubscribe());
+});
 ```
 
 ## Store Issues
@@ -286,27 +286,27 @@ createEffect(() => {
 **Symptom**: Changes don't trigger updates
 
 ```tsx
-const [state, setState] = createStore({ items: [] })
+const [state, setState] = createStore({ items: [] });
 
 // WRONG - Direct mutation
-state.items.push(newItem)  // Won't trigger updates!
+state.items.push(newItem); // Won't trigger updates!
 
 // CORRECT - Use setState
-setState("items", items => [...items, newItem])
+setState("items", (items) => [...items, newItem]);
 ```
 
 ### Nested Updates
 
 ```tsx
 const [state, setState] = createStore({
-  user: { profile: { name: "John" } }
-})
+  user: { profile: { name: "John" } },
+});
 
 // WRONG
-state.user.profile.name = "Jane"
+state.user.profile.name = "Jane";
 
 // CORRECT
-setState("user", "profile", "name", "Jane")
+setState("user", "profile", "name", "Jane");
 ```
 
 ## Debugging
@@ -316,18 +316,18 @@ setState("user", "profile", "name", "Jane")
 OpenTUI captures console output:
 
 ```tsx
-import { useRenderer } from "@opentui/solid"
-import { onMount } from "solid-js"
+import { useRenderer } from "@opentui/solid";
+import { onMount } from "solid-js";
 
 function App() {
-  const renderer = useRenderer()
-  
+  const renderer = useRenderer();
+
   onMount(() => {
-    renderer.console.show()
-    console.log("Now visible!")
-  })
-  
-  return <box>{/* ... */}</box>
+    renderer.console.show();
+    console.log("Now visible!");
+  });
+
+  return <box>{/* ... */}</box>;
 }
 ```
 
@@ -340,8 +340,8 @@ createEffect(() => {
   console.log("State:", {
     count: count(),
     items: items(),
-  })
-})
+  });
+});
 ```
 
 ## Runtime Issues
@@ -364,14 +364,14 @@ The render function is async when creating a renderer:
 
 ```tsx
 // This is fine - Bun supports top-level await
-render(() => <App />)
+render(() => <App />);
 
 // If you need the renderer
-import { createCliRenderer } from "@opentui/core"
-import { render } from "@opentui/solid"
+import { createCliRenderer } from "@opentui/core";
+import { render } from "@opentui/solid";
 
-const renderer = await createCliRenderer()
-render(() => <App />, renderer)
+const renderer = await createCliRenderer();
+render(() => <App />, renderer);
 ```
 
 ## Common Error Messages

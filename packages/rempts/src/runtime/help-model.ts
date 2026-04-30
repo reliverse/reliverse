@@ -1,6 +1,7 @@
+import { toFlagName } from "@reliverse/parser";
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import type { CommandConventions, CommandDefinition, CommandSafety } from "../api/define-command";
-import { toFlagName } from "../options/flag-name";
-import type { CommandOptionsRecord } from "../options/types";
 import type { DiscoveredSubcommand } from "./command-source";
 import type { GlobalFlagDefinition } from "./global-flags";
 

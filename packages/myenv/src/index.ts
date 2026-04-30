@@ -103,7 +103,10 @@ const COLOR_FLAG_PREFIX = "--color=";
 const globalRef = globalThis as Record<string, unknown>;
 let memoizedSnapshot: MyEnvSnapshot | undefined;
 
-function hasOwn<TKey extends string>(value: object | undefined, key: TKey): value is Record<TKey, unknown> {
+function hasOwn<TKey extends string>(
+  value: object | undefined,
+  key: TKey,
+): value is Record<TKey, unknown> {
   return Boolean(value) && Object.prototype.hasOwnProperty.call(value, key);
 }
 
@@ -124,17 +127,23 @@ function resolveOptions(options?: DetectOptions): ResolvedDetectOptions {
   const denoLike = hasOwn(options, "deno") ? options.deno : getGlobalDeno();
 
   return {
-    argv: hasOwn(options, "argv") ? options.argv ?? [] : processLike?.argv ?? denoLike?.args ?? [],
-    browserDocument: hasOwn(options, "browserDocument") ? options.browserDocument : globalRef.document,
+    argv: hasOwn(options, "argv")
+      ? (options.argv ?? [])
+      : (processLike?.argv ?? denoLike?.args ?? []),
+    browserDocument: hasOwn(options, "browserDocument")
+      ? options.browserDocument
+      : globalRef.document,
     browserWindow: hasOwn(options, "browserWindow") ? options.browserWindow : globalRef.window,
     deno: denoLike,
-    env: hasOwn(options, "env") ? options.env ?? {} : processLike?.env ?? {},
+    env: hasOwn(options, "env") ? (options.env ?? {}) : (processLike?.env ?? {}),
     explicitColor: options?.explicitColor,
     navigator: hasOwn(options, "navigator") ? options.navigator : getGlobalNavigator(),
     process: processLike,
     stderr: hasOwn(options, "stderr") ? options.stderr : processLike?.stderr,
     stdout: hasOwn(options, "stdout") ? options.stdout : processLike?.stdout,
-    workerGlobalScope: hasOwn(options, "workerGlobalScope") ? options.workerGlobalScope : globalRef.WorkerGlobalScope,
+    workerGlobalScope: hasOwn(options, "workerGlobalScope")
+      ? options.workerGlobalScope
+      : globalRef.WorkerGlobalScope,
   };
 }
 
@@ -186,7 +195,9 @@ function getColorLevelFromDepth(depth: number | undefined): ColorSupportLevel {
   return 1;
 }
 
-function getNativeStreamColorLevel(stream: MinimalStream | undefined): ColorSupportLevel | undefined {
+function getNativeStreamColorLevel(
+  stream: MinimalStream | undefined,
+): ColorSupportLevel | undefined {
   if (!stream) {
     return undefined;
   }
@@ -282,11 +293,16 @@ function colorLevelFromFlag(flag: ColorFlagName | undefined): ColorSupportLevel 
 }
 
 function isBrowserMain(resolved: ResolvedDetectOptions): boolean {
-  return typeof resolved.browserWindow !== "undefined" && typeof resolved.browserDocument !== "undefined";
+  return (
+    typeof resolved.browserWindow !== "undefined" && typeof resolved.browserDocument !== "undefined"
+  );
 }
 
 function isWorkerLike(resolved: ResolvedDetectOptions): boolean {
-  return typeof resolved.workerGlobalScope !== "undefined" && typeof resolved.browserWindow === "undefined";
+  return (
+    typeof resolved.workerGlobalScope !== "undefined" &&
+    typeof resolved.browserWindow === "undefined"
+  );
 }
 
 /** Detect the current runtime conservatively using feature detection. */
@@ -410,7 +426,9 @@ function detectColorSupportFromResolved(
   }
 
   if (typeof resolved.explicitColor === "boolean") {
-    return resolved.explicitColor ? Math.max(getNativeStreamColorLevel(target) ?? 1, 1) as ColorSupportLevel : 0;
+    return resolved.explicitColor
+      ? (Math.max(getNativeStreamColorLevel(target) ?? 1, 1) as ColorSupportLevel)
+      : 0;
   }
 
   const colorFlag = colorLevelFromFlag(parseColorFlag(resolved.argv));
@@ -423,7 +441,10 @@ function detectColorSupportFromResolved(
     return forceColor;
   }
 
-  if (typeof resolved.env.NO_COLOR !== "undefined" || isTruthyEnv(resolved.env.NODE_DISABLE_COLORS)) {
+  if (
+    typeof resolved.env.NO_COLOR !== "undefined" ||
+    isTruthyEnv(resolved.env.NODE_DISABLE_COLORS)
+  ) {
     return 0;
   }
 
@@ -440,7 +461,10 @@ function detectColorSupportFromResolved(
 }
 
 /** Detect color support for stdout or stderr using explicit overrides, flags, env, native capabilities, then conservative fallback. */
-export function detectColorSupport(stream: StreamName = "stdout", options?: DetectOptions): ColorSupportLevel {
+export function detectColorSupport(
+  stream: StreamName = "stdout",
+  options?: DetectOptions,
+): ColorSupportLevel {
   return detectColorSupportFromResolved(stream, resolveOptions(options));
 }
 

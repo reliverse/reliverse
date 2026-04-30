@@ -18,17 +18,14 @@ export interface BaseOptionDefinition<
   readonly schema?: TSchema;
 }
 
-export type BooleanOptionDefinition<
-  TSchema extends StandardSchemaV1 | undefined = undefined,
-> = BaseOptionDefinition<"boolean", TSchema>;
+export type BooleanOptionDefinition<TSchema extends StandardSchemaV1 | undefined = undefined> =
+  BaseOptionDefinition<"boolean", TSchema>;
 
-export type NumberOptionDefinition<
-  TSchema extends StandardSchemaV1 | undefined = undefined,
-> = BaseOptionDefinition<"number", TSchema>;
+export type NumberOptionDefinition<TSchema extends StandardSchemaV1 | undefined = undefined> =
+  BaseOptionDefinition<"number", TSchema>;
 
-export type StringOptionDefinition<
-  TSchema extends StandardSchemaV1 | undefined = undefined,
-> = BaseOptionDefinition<"string", TSchema>;
+export type StringOptionDefinition<TSchema extends StandardSchemaV1 | undefined = undefined> =
+  BaseOptionDefinition<"string", TSchema>;
 
 export type CommandOptionDefinition =
   | BooleanOptionDefinition
@@ -37,12 +34,11 @@ export type CommandOptionDefinition =
 
 export type CommandOptionsRecord = Readonly<Record<string, CommandOptionDefinition>>;
 
-export type PrimitiveOptionValue<TType extends CommandOptionType> =
-  TType extends "boolean"
-    ? boolean
-    : TType extends "number"
-      ? number
-      : string;
+export type PrimitiveOptionValue<TType extends CommandOptionType> = TType extends "boolean"
+  ? boolean
+  : TType extends "number"
+    ? number
+    : string;
 
 export type EmptyCommandOptions = Readonly<Record<never, never>>;
 

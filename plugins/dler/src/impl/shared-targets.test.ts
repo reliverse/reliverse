@@ -1,9 +1,14 @@
 import { describe, expect, test } from "bun:test";
 import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
-import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { join } from "node:path";
 
-import { fileExists, parseTargetsOption, resolveDirectoryTargets, resolveRequestedTargets } from "./shared-targets";
+import {
+  fileExists,
+  parseTargetsOption,
+  resolveDirectoryTargets,
+  resolveRequestedTargets,
+} from "./shared-targets";
 
 describe("shared target helpers", () => {
   test("parseTargetsOption trims, drops empties, and deduplicates while preserving order", () => {

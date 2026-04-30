@@ -30,6 +30,18 @@ interface AddAction {
   readonly usesCatalog: boolean;
 }
 
+function createAddSummary(actions: readonly AddAction[]) {
+  return {
+    added: actions.filter((action) => action.action === "added").length,
+    unchanged: actions.filter((action) => action.action === "noop").length,
+    skipped: actions.filter((action) => action.action === "skipped").length,
+  };
+}
+
+function formatSummary(summary: ReturnType<typeof createAddSummary>): string {
+  return `${summary.added} added, ${summary.unchanged} unchanged, ${summary.skipped} skipped`;
+}
+
 function infoLabel(
   ctx: {
     colors: {
@@ -92,6 +104,13 @@ export default defineCommand({
     text: "For workspace packages, the command prefers the default Bun catalog when available. Use --catalog <name> to target a named Bun catalog and write catalog:<name> references.",
   },
   options: {
+    autoinstall: {
+      type: "boolean",
+      defaultValue: true,
+      description:
+        "Run bun install after applying manifest/catalog changes; pass --no-autoinstall to skip",
+      inputSources: ["flag", "default"],
+    },
     cwd: {
       type: "string",
       defaultValue: ".",
@@ -145,6 +164,7 @@ export default defineCommand({
       cwd: ctx.options.cwd,
       target: ctx.options.target,
     });
+    const autoinstall = ctx.options.autoinstall !== false;
     const requestedCatalogName = ctx.options.catalog?.trim() || undefined;
 
     if (
@@ -284,6 +304,7 @@ export default defineCommand({
       install: {
         command: "bun install",
         cwd: context.installCwd,
+        enabled: autoinstall,
         executed: false,
       },
       section: dependencySection,
@@ -302,11 +323,15 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`${warnLabel(ctx, "No changes:")} ${context.targetLabel}.`);
+      const summary = createAddSummary(actions);
+      ctx.out(warnLabel(ctx, "pm add"));
+      ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
+      ctx.out(`${infoLabel(ctx, "Summary:")} ${formatSummary(summary)}.`);
 
+      ctx.out(infoLabel(ctx, "Unchanged:"));
       for (const action of actions) {
         ctx.out(
-          `${infoLabel(ctx, `${action.action}:`)} ${ctx.colors.stdout.bold(action.packageName)} (${action.reason ?? action.nextSpecifier ?? action.section})`,
+          `${ctx.colors.stdout.yellow("-")} ${ctx.colors.stdout.bold(action.packageName)} ${action.reason ?? action.nextSpecifier ?? action.section}`,
         );
       }
 
@@ -319,13 +344,21 @@ export default defineCommand({
         return;
       }
 
-      ctx.out(`${infoLabel(ctx, "Preview:")} ${context.targetLabel}`);
+      const summary = createAddSummary(actions);
+      ctx.out(infoLabel(ctx, "pm add preview"));
+      ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
+      ctx.out(`${infoLabel(ctx, "Section:")} ${dependencySection}`);
+      ctx.out(`${infoLabel(ctx, "Summary:")} ${formatSummary(summary)}.`);
 
       for (const action of actions.filter((action) => action.action === "added")) {
         ctx.out(
-          `${infoLabel(ctx, "Would add")} ${ctx.colors.stdout.bold(action.packageName)} to ${action.section} as ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
+          `${ctx.colors.stdout.green("+")} ${ctx.colors.stdout.bold(action.packageName)} ${ctx.colors.stdout.green(action.nextSpecifier ?? "")} (${action.section})`,
         );
       }
+
+      ctx.out(
+        `${infoLabel(ctx, "Install step:")} ${autoinstall ? "bun install (after --apply)" : "disabled (--no-autoinstall)"}`,
+      );
 
       return;
     }
@@ -344,10 +377,9 @@ export default defineCommand({
       await writeManifest(context.repoRootManifestPath, nextRootManifest);
     }
 
-    ctx.safety.assertApplied("package.install");
-    const installResult = await runBunInstall(context.installCwd);
+    const installResult = autoinstall ? await runBunInstall(context.installCwd) : null;
 
-    if (!installResult.ok) {
+    if (installResult && !installResult.ok) {
       await restoreSnapshots(snapshots);
 
       if (installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
@@ -362,10 +394,18 @@ export default defineCommand({
 
     const successPayload = {
       ...resultPayload,
-      install: {
-        ...installResult,
-        executed: true,
-      },
+      install: installResult
+        ? {
+            ...installResult,
+            enabled: true,
+            executed: true,
+          }
+        : {
+            command: "bun install",
+            cwd: context.installCwd,
+            enabled: false,
+            executed: false,
+          },
     };
 
     if (ctx.output.mode === "json") {
@@ -373,14 +413,23 @@ export default defineCommand({
       return;
     }
 
-    ctx.out(`${okLabel(ctx, "Updated:")} ${context.targetLabel}.`);
+    const summary = createAddSummary(actions);
+    ctx.out(okLabel(ctx, "pm add"));
+    ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
+    ctx.out(`${infoLabel(ctx, "Summary:")} ${formatSummary(summary)}.`);
 
     for (const action of actions.filter((action) => action.action === "added")) {
       ctx.out(
-        `${okLabel(ctx, "Added")} ${ctx.colors.stdout.bold(action.packageName)} to ${action.section} as ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
+        `${ctx.colors.stdout.green("+")} ${ctx.colors.stdout.bold(action.packageName)} ${ctx.colors.stdout.green(action.nextSpecifier ?? "")} (${action.section})`,
       );
     }
 
-    ctx.out(`${okLabel(ctx, "Ran:")} bun install in ${ctx.colors.stdout.bold(context.installCwd)}`);
+    if (installResult) {
+      ctx.out(
+        `${okLabel(ctx, "Ran:")} bun install (${ctx.colors.stdout.bold(context.installCwd)})`,
+      );
+    } else {
+      ctx.out(`${warnLabel(ctx, "Install skipped:")} --no-autoinstall`);
+    }
   },
 });

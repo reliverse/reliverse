@@ -1,9 +1,10 @@
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import type {
   CommandAgentMetadata,
   CommandConventions,
   CommandDefinition,
 } from "../api/define-command";
-import type { CommandOptionsRecord } from "../options/types";
 
 export interface DiscoveredSubcommand {
   readonly description?: string | undefined;

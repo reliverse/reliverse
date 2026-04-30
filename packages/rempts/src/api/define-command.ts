@@ -1,11 +1,11 @@
-import type { RelicoInstance } from "@reliverse/relico";
-
 import type {
   CommandOptionsOutput,
   CommandOptionsRecord,
   EmptyCommandOptions,
   OptionInputSource,
-} from "../options/types";
+} from "@reliverse/parser";
+import type { RelicoInstance } from "@reliverse/relico";
+
 import type { CommandTreeReport } from "../runtime/command-diagnostics";
 import type { RemptsExitSignal } from "../runtime/errors";
 import type { RemptsReservedOptionName } from "../runtime/global-flags";
@@ -106,8 +106,6 @@ export interface CommandRuntimeInfo<TOptions extends CommandOptionsRecord = Empt
   readonly examples: readonly string[];
   readonly help?: string | undefined;
   readonly interactive: RemptsInteractionMode;
-  readonly noTTY: boolean;
-  readonly noTUI: boolean;
   readonly options?: TOptions | undefined;
   readonly safety?: CommandSafety | undefined;
   readonly filePath?: string | undefined;
@@ -170,8 +168,6 @@ export interface CommandConfig<TOptions extends CommandOptionsRecord = EmptyComm
       }
     | undefined;
   readonly interactive?: RemptsInteractionMode | undefined;
-  readonly noTTY?: boolean | undefined;
-  readonly noTUI?: boolean | undefined;
   readonly options?: TOptions | undefined;
   readonly handler: (
     ctx: CommandContext<TOptions>,

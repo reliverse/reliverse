@@ -27,7 +27,7 @@
     "noUnusedParameters": false,
     "noFallthroughCasesInSwitch": true,
     "strictNullChecks": true,
-    "types": ["bun"]
+    "types": ["bun", "react"]
   },
   "exclude": ["node_modules", "build", "dist", ".next"]
 }

@@ -5,6 +5,7 @@ OpenTUI provides a timeline-based animation system for smooth property transitio
 ## Overview
 
 Animations in OpenTUI use:
+
 - **Timeline**: Orchestrates multiple animations
 - **Animation Engine**: Manages timelines and rendering
 - **Easing Functions**: Control animation curves
@@ -18,16 +19,16 @@ Use this reference when you need timeline-driven animations, easing curves, or p
 ### React
 
 ```tsx
-import { useTimeline } from "@opentui/react"
-import { useEffect, useState } from "react"
+import { useTimeline } from "@opentui/react";
+import { useEffect, useState } from "react";
 
 function AnimatedBox() {
-  const [width, setWidth] = useState(0)
-  
+  const [width, setWidth] = useState(0);
+
   const timeline = useTimeline({
     duration: 2000,
-  })
-  
+  });
+
   useEffect(() => {
     timeline.add(
       { width: 0 },
@@ -36,35 +37,29 @@ function AnimatedBox() {
         duration: 2000,
         ease: "easeOutQuad",
         onUpdate: (anim) => {
-          setWidth(Math.round(anim.targets[0].width))
+          setWidth(Math.round(anim.targets[0].width));
         },
-      }
-    )
-  }, [])
-  
-  return (
-    <box
-      width={width}
-      height={3}
-      backgroundColor="#6a5acd"
-    />
-  )
+      },
+    );
+  }, []);
+
+  return <box width={width} height={3} backgroundColor="#6a5acd" />;
 }
 ```
 
 ### Solid
 
 ```tsx
-import { useTimeline } from "@opentui/solid"
-import { createSignal, onMount } from "solid-js"
+import { useTimeline } from "@opentui/solid";
+import { createSignal, onMount } from "solid-js";
 
 function AnimatedBox() {
-  const [width, setWidth] = createSignal(0)
-  
+  const [width, setWidth] = createSignal(0);
+
   const timeline = useTimeline({
     duration: 2000,
-  })
-  
+  });
+
   onMount(() => {
     timeline.add(
       { width: 0 },
@@ -73,34 +68,28 @@ function AnimatedBox() {
         duration: 2000,
         ease: "easeOutQuad",
         onUpdate: (anim) => {
-          setWidth(Math.round(anim.targets[0].width))
+          setWidth(Math.round(anim.targets[0].width));
         },
-      }
-    )
-  })
-  
-  return (
-    <box
-      width={width()}
-      height={3}
-      backgroundColor="#6a5acd"
-    />
-  )
+      },
+    );
+  });
+
+  return <box width={width()} height={3} backgroundColor="#6a5acd" />;
 }
 ```
 
 ### Core
 
 ```typescript
-import { createCliRenderer, Timeline, engine } from "@opentui/core"
+import { createCliRenderer, Timeline, engine } from "@opentui/core";
 
-const renderer = await createCliRenderer()
-engine.attach(renderer)
+const renderer = await createCliRenderer();
+engine.attach(renderer);
 
 const timeline = new Timeline({
   duration: 2000,
   autoplay: true,
-})
+});
 
 timeline.add(
   { x: 0 },
@@ -109,24 +98,24 @@ timeline.add(
     duration: 2000,
     ease: "easeOutQuad",
     onUpdate: (anim) => {
-      box.setLeft(Math.round(anim.targets[0].x))
+      box.setLeft(Math.round(anim.targets[0].x));
     },
-  }
-)
+  },
+);
 
-engine.addTimeline(timeline)
+engine.addTimeline(timeline);
 ```
 
 ## Timeline Options
 
 ```typescript
 const timeline = useTimeline({
-  duration: 2000,         // Total duration in ms
-  loop: false,            // Loop the timeline
-  autoplay: true,         // Start automatically
-  onComplete: () => {},   // Called when timeline completes
-  onPause: () => {},      // Called when timeline pauses
-})
+  duration: 2000, // Total duration in ms
+  loop: false, // Loop the timeline
+  autoplay: true, // Start automatically
+  onComplete: () => {}, // Called when timeline completes
+  onPause: () => {}, // Called when timeline pauses
+});
 ```
 
 ## Timeline Methods
@@ -149,22 +138,22 @@ timeline.duration         // Total duration
 
 ```typescript
 timeline.add(
-  { value: 0 },           // Target object with initial values
+  { value: 0 }, // Target object with initial values
   {
-    value: 100,           // Final value
-    duration: 1000,       // Animation duration in ms
-    ease: "linear",       // Easing function
-    delay: 0,             // Delay before starting
+    value: 100, // Final value
+    duration: 1000, // Animation duration in ms
+    ease: "linear", // Easing function
+    delay: 0, // Delay before starting
     onUpdate: (anim) => {
       // Called each frame
-      const current = anim.targets[0].value
+      const current = anim.targets[0].value;
     },
     onComplete: () => {
       // Called when this animation completes
     },
   },
-  0                       // Start time in timeline (optional)
-)
+  0, // Start time in timeline (optional)
+);
 ```
 
 ## Easing Functions
@@ -173,65 +162,65 @@ Available easing functions:
 
 ### Linear
 
-| Name | Description |
-|------|-------------|
+| Name     | Description    |
+| -------- | -------------- |
 | `linear` | Constant speed |
 
 ### Quad (Power of 2)
 
-| Name | Description |
-|------|-------------|
-| `easeInQuad` | Slow start |
-| `easeOutQuad` | Slow end |
+| Name            | Description        |
+| --------------- | ------------------ |
+| `easeInQuad`    | Slow start         |
+| `easeOutQuad`   | Slow end           |
 | `easeInOutQuad` | Slow start and end |
 
 ### Cubic (Power of 3)
 
-| Name | Description |
-|------|-------------|
-| `easeInCubic` | Slower start |
-| `easeOutCubic` | Slower end |
+| Name             | Description          |
+| ---------------- | -------------------- |
+| `easeInCubic`    | Slower start         |
+| `easeOutCubic`   | Slower end           |
 | `easeInOutCubic` | Slower start and end |
 
 ### Quart (Power of 4)
 
-| Name | Description |
-|------|-------------|
-| `easeInQuart` | Even slower start |
-| `easeOutQuart` | Even slower end |
+| Name             | Description               |
+| ---------------- | ------------------------- |
+| `easeInQuart`    | Even slower start         |
+| `easeOutQuart`   | Even slower end           |
 | `easeInOutQuart` | Even slower start and end |
 
 ### Expo (Exponential)
 
-| Name | Description |
-|------|-------------|
-| `easeInExpo` | Exponential start |
-| `easeOutExpo` | Exponential end |
+| Name            | Description               |
+| --------------- | ------------------------- |
+| `easeInExpo`    | Exponential start         |
+| `easeOutExpo`   | Exponential end           |
 | `easeInOutExpo` | Exponential start and end |
 
 ### Back (Overshoot)
 
-| Name | Description |
-|------|-------------|
-| `easeInBack` | Pull back, then forward |
-| `easeOutBack` | Overshoot, then settle |
-| `easeInOutBack` | Both |
+| Name            | Description             |
+| --------------- | ----------------------- |
+| `easeInBack`    | Pull back, then forward |
+| `easeOutBack`   | Overshoot, then settle  |
+| `easeInOutBack` | Both                    |
 
 ### Elastic
 
-| Name | Description |
-|------|-------------|
-| `easeInElastic` | Elastic start |
-| `easeOutElastic` | Elastic end (bouncy) |
-| `easeInOutElastic` | Both |
+| Name               | Description          |
+| ------------------ | -------------------- |
+| `easeInElastic`    | Elastic start        |
+| `easeOutElastic`   | Elastic end (bouncy) |
+| `easeInOutElastic` | Both                 |
 
 ### Bounce
 
-| Name | Description |
-|------|-------------|
-| `easeInBounce` | Bounce at start |
-| `easeOutBounce` | Bounce at end |
-| `easeInOutBounce` | Both |
+| Name              | Description     |
+| ----------------- | --------------- |
+| `easeInBounce`    | Bounce at start |
+| `easeOutBounce`   | Bounce at end   |
+| `easeInOutBounce` | Both            |
 
 ## Patterns
 
@@ -239,11 +228,11 @@ Available easing functions:
 
 ```tsx
 function ProgressBar({ progress }: { progress: number }) {
-  const [width, setWidth] = useState(0)
-  const maxWidth = 50
-  
-  const timeline = useTimeline()
-  
+  const [width, setWidth] = useState(0);
+  const maxWidth = 50;
+
+  const timeline = useTimeline();
+
   useEffect(() => {
     timeline.add(
       { value: width },
@@ -252,12 +241,12 @@ function ProgressBar({ progress }: { progress: number }) {
         duration: 300,
         ease: "easeOutQuad",
         onUpdate: (anim) => {
-          setWidth(Math.round(anim.targets[0].value))
+          setWidth(Math.round(anim.targets[0].value));
         },
-      }
-    )
-  }, [progress])
-  
+      },
+    );
+  }, [progress]);
+
   return (
     <box flexDirection="column" gap={1}>
       <text>Progress: {progress}%</text>
@@ -265,7 +254,7 @@ function ProgressBar({ progress }: { progress: number }) {
         <box width={width} height={1} backgroundColor="#00FF00" />
       </box>
     </box>
-  )
+  );
 }
 ```
 
@@ -273,10 +262,10 @@ function ProgressBar({ progress }: { progress: number }) {
 
 ```tsx
 function FadeIn({ children }) {
-  const [opacity, setOpacity] = useState(0)
-  
-  const timeline = useTimeline()
-  
+  const [opacity, setOpacity] = useState(0);
+
+  const timeline = useTimeline();
+
   useEffect(() => {
     timeline.add(
       { opacity: 0 },
@@ -285,17 +274,13 @@ function FadeIn({ children }) {
         duration: 500,
         ease: "easeOutQuad",
         onUpdate: (anim) => {
-          setOpacity(anim.targets[0].opacity)
+          setOpacity(anim.targets[0].opacity);
         },
-      }
-    )
-  }, [])
-  
-  return (
-    <box style={{ opacity }}>
-      {children}
-    </box>
-  )
+      },
+    );
+  }, []);
+
+  return <box style={{ opacity }}>{children}</box>;
 }
 ```
 
@@ -303,18 +288,18 @@ function FadeIn({ children }) {
 
 ```tsx
 function Spinner() {
-  const [frame, setFrame] = useState(0)
-  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-  
+  const [frame, setFrame] = useState(0);
+  const frames = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"];
+
   useEffect(() => {
     const interval = setInterval(() => {
-      setFrame(f => (f + 1) % frames.length)
-    }, 80)
-    
-    return () => clearInterval(interval)
-  }, [])
-  
-  return <text>{frames[frame]} Loading...</text>
+      setFrame((f) => (f + 1) % frames.length);
+    }, 80);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  return <text>{frames[frame]} Loading...</text>;
 }
 ```
 
@@ -322,28 +307,28 @@ function Spinner() {
 
 ```tsx
 function StaggeredList({ items }) {
-  const [visibleCount, setVisibleCount] = useState(0)
-  
+  const [visibleCount, setVisibleCount] = useState(0);
+
   useEffect(() => {
-    let count = 0
+    let count = 0;
     const interval = setInterval(() => {
-      count++
-      setVisibleCount(count)
+      count++;
+      setVisibleCount(count);
       if (count >= items.length) {
-        clearInterval(interval)
+        clearInterval(interval);
       }
-    }, 100)
-    
-    return () => clearInterval(interval)
-  }, [items.length])
-  
+    }, 100);
+
+    return () => clearInterval(interval);
+  }, [items.length]);
+
   return (
     <box flexDirection="column">
       {items.slice(0, visibleCount).map((item, i) => (
         <text key={i}>{item}</text>
       ))}
     </box>
-  )
+  );
 }
 ```
 
@@ -351,10 +336,10 @@ function StaggeredList({ items }) {
 
 ```tsx
 function SlideIn({ children, from = "left" }) {
-  const [offset, setOffset] = useState(from === "left" ? -20 : 20)
-  
-  const timeline = useTimeline()
-  
+  const [offset, setOffset] = useState(from === "left" ? -20 : 20);
+
+  const timeline = useTimeline();
+
   useEffect(() => {
     timeline.add(
       { offset: from === "left" ? -20 : 20 },
@@ -363,17 +348,17 @@ function SlideIn({ children, from = "left" }) {
         duration: 300,
         ease: "easeOutCubic",
         onUpdate: (anim) => {
-          setOffset(Math.round(anim.targets[0].offset))
+          setOffset(Math.round(anim.targets[0].offset));
         },
-      }
-    )
-  }, [])
-  
+      },
+    );
+  }, []);
+
   return (
     <box position="relative" left={offset}>
       {children}
     </box>
-  )
+  );
 }
 ```
 
@@ -389,8 +374,8 @@ Round animated values for character-based positioning:
 
 ```typescript
 onUpdate: (anim) => {
-  setX(Math.round(anim.targets[0].x))
-}
+  setX(Math.round(anim.targets[0].x));
+};
 ```
 
 ### Clean Up Timelines
@@ -399,7 +384,7 @@ Hooks automatically clean up, but for core:
 
 ```typescript
 // When done with timeline
-engine.removeTimeline(timeline)
+engine.removeTimeline(timeline);
 ```
 
 ## Gotchas

@@ -35,7 +35,9 @@ function toCandidate(node: CommandNode): CommandCandidate {
   };
 }
 
-export async function inspectCommandTree(sources: readonly CommandSource[]): Promise<CommandTreeReport> {
+export async function inspectCommandTree(
+  sources: readonly CommandSource[],
+): Promise<CommandTreeReport> {
   const visited = new Set<string>();
   const nodes: CommandTreeNodeDiagnostic[] = [];
 
@@ -54,7 +56,9 @@ export async function inspectCommandTree(sources: readonly CommandSource[]): Pro
         })),
       )
     ).filter(
-      (entry): entry is { readonly scope: NonNullable<typeof entry.scope>; readonly sourceId: string } =>
+      (
+        entry,
+      ): entry is { readonly scope: NonNullable<typeof entry.scope>; readonly sourceId: string } =>
         entry.scope !== null,
     );
 
@@ -77,7 +81,10 @@ export async function inspectCommandTree(sources: readonly CommandSource[]): Pro
       path,
       shadowedCommands: commandNodes.slice(1).map(toCandidate),
       subcommandDiagnostics: [...subcommandMap.entries()]
-        .map(([name, sourceIds]) => ({ name, sources: [...sourceIds].sort((a, b) => a.localeCompare(b)) }))
+        .map(([name, sourceIds]) => ({
+          name,
+          sources: [...sourceIds].sort((a, b) => a.localeCompare(b)),
+        }))
         .sort((a, b) => a.name.localeCompare(b.name)),
     });
 

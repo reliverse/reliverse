@@ -37,15 +37,16 @@ For React and Solid, use **nested modifier tags** for text styling:
 ### Styling (Core) - Text Attributes
 
 ```typescript
-import { TextRenderable, TextAttributes } from "@opentui/core"
+import { TextRenderable, TextAttributes } from "@opentui/core";
 
 const text = new TextRenderable(renderer, {
   content: "Styled",
   attributes: TextAttributes.BOLD | TextAttributes.UNDERLINE,
-})
+});
 ```
 
 **Available attributes:**
+
 - `TextAttributes.BOLD`
 - `TextAttributes.DIM`
 - `TextAttributes.ITALIC`
@@ -134,7 +135,9 @@ Inline styled text:
   </span>
   and
   <span fg="#FF0000">
-    <em><u>italic underlined red</u></em>
+    <em>
+      <u>italic underlined red</u>
+    </em>
   </span>
 </text>
 ```
@@ -144,30 +147,30 @@ Inline styled text:
 The `t` template literal for complex styling:
 
 ```typescript
-import { t, bold, italic, underline, fg, bg, dim } from "@opentui/core"
+import { t, bold, italic, underline, fg, bg, dim } from "@opentui/core";
 
 const styled = t`
   ${bold("Bold")} and ${italic("italic")} text.
   ${fg("#FF0000")("Red text")} with ${bg("#0000FF")("blue background")}.
   ${dim("Dimmed")} and ${underline("underlined")}.
-`
+`;
 
 const text = new TextRenderable(renderer, {
   content: styled,
-})
+});
 ```
 
 ### Style Functions
 
-| Function | Description |
-|----------|-------------|
-| `bold(text)` | Bold text |
-| `italic(text)` | Italic text |
-| `underline(text)` | Underlined text |
-| `dim(text)` | Dimmed text |
-| `strikethrough(text)` | Strikethrough text |
-| `fg(color)(text)` | Set foreground color |
-| `bg(color)(text)` | Set background color |
+| Function              | Description          |
+| --------------------- | -------------------- |
+| `bold(text)`          | Bold text            |
+| `italic(text)`        | Italic text          |
+| `underline(text)`     | Underlined text      |
+| `dim(text)`           | Dimmed text          |
+| `strikethrough(text)` | Strikethrough text   |
+| `fg(color)(text)`     | Set foreground color |
+| `bg(color)(text)`     | Set background color |
 
 ## ASCII Font Component
 
@@ -192,31 +195,27 @@ const title = new ASCIIFontRenderable(renderer, {
 
 ### Available Fonts
 
-| Font | Description |
-|------|-------------|
-| `tiny` | Compact ASCII font |
+| Font    | Description         |
+| ------- | ------------------- |
+| `tiny`  | Compact ASCII font  |
 | `block` | Block-style letters |
-| `slick` | Sleek modern style |
-| `shade` | Shaded 3D effect |
+| `slick` | Sleek modern style  |
+| `shade` | Shaded 3D effect    |
 
 ### Styling
 
 ```tsx
 // React
-<ascii-font
-  text="HELLO"
-  font="block"
-  color="#00FF00"
-/>
+<ascii-font text="HELLO" font="block" color="#00FF00" />;
 
 // Core
-import { RGBA } from "@opentui/core"
+import { RGBA } from "@opentui/core";
 
 const title = new ASCIIFontRenderable(renderer, {
   text: "HELLO",
   font: "block",
   color: RGBA.fromHex("#00FF00"),
-})
+});
 ```
 
 ### Example Output
@@ -255,28 +254,29 @@ Font: block
 The `RGBA` class from `@opentui/core` can be used in **all frameworks** (Core, React, Solid) for programmatic color manipulation:
 
 ```typescript
-import { RGBA } from "@opentui/core"
+import { RGBA } from "@opentui/core";
 
 // From hex string (most common)
-const red = RGBA.fromHex("#FF0000")
-const shortHex = RGBA.fromHex("#F00")       // Short form supported
+const red = RGBA.fromHex("#FF0000");
+const shortHex = RGBA.fromHex("#F00"); // Short form supported
 
 // From integers (0-255 range for each channel)
-const green = RGBA.fromInts(0, 255, 0, 255)   // r, g, b, a
-const semiGreen = RGBA.fromInts(0, 255, 0, 128) // 50% transparent
+const green = RGBA.fromInts(0, 255, 0, 255); // r, g, b, a
+const semiGreen = RGBA.fromInts(0, 255, 0, 128); // 50% transparent
 
 // From normalized floats (0.0-1.0 range)
-const blue = RGBA.fromValues(0.0, 0.0, 1.0, 1.0)  // r, g, b, a
-const overlay = RGBA.fromValues(0.1, 0.1, 0.1, 0.7) // Dark semi-transparent
+const blue = RGBA.fromValues(0.0, 0.0, 1.0, 1.0); // r, g, b, a
+const overlay = RGBA.fromValues(0.1, 0.1, 0.1, 0.7); // Dark semi-transparent
 
 // Common use cases
-const backgroundColor = RGBA.fromHex("#1a1a2e")
-const textColor = RGBA.fromHex("#FFFFFF")
-const borderColor = RGBA.fromInts(122, 162, 247, 255) // Tokyo Night blue
-const shadowColor = RGBA.fromValues(0.0, 0.0, 0.0, 0.5) // 50% black
+const backgroundColor = RGBA.fromHex("#1a1a2e");
+const textColor = RGBA.fromHex("#FFFFFF");
+const borderColor = RGBA.fromInts(122, 162, 247, 255); // Tokyo Night blue
+const shadowColor = RGBA.fromValues(0.0, 0.0, 0.0, 0.5); // 50% black
 ```
 
 **When to use each method:**
+
 - `fromHex()` - When working with design specs or CSS colors
 - `fromInts()` - When you have 8-bit color values (0-255)
 - `fromValues()` - When doing color math or interpolation (normalized 0.0-1.0)
@@ -285,16 +285,16 @@ const shadowColor = RGBA.fromValues(0.0, 0.0, 0.0, 0.5) // 50% black
 
 ```tsx
 // React or Solid - RGBA works with color props
-import { RGBA } from "@opentui/core"
+import { RGBA } from "@opentui/core";
 
-const primaryColor = RGBA.fromHex("#7aa2f7")
+const primaryColor = RGBA.fromHex("#7aa2f7");
 
 function MyComponent() {
   return (
     <box backgroundColor={primaryColor} borderColor={primaryColor}>
       <text fg={RGBA.fromHex("#c0caf5")}>Styled with RGBA</text>
     </box>
-  )
+  );
 }
 ```
 
@@ -307,8 +307,7 @@ Text wraps based on parent container:
 ```tsx
 <box width={40}>
   <text>
-    This long text will wrap when it reaches the edge of the 
-    40-character wide parent container.
+    This long text will wrap when it reaches the edge of the 40-character wide parent container.
   </text>
 </box>
 ```
@@ -319,8 +318,8 @@ Text wraps based on parent container:
 
 ```tsx
 function Counter() {
-  const [count, setCount] = useState(0)
-  return <text>Count: {count}</text>
+  const [count, setCount] = useState(0);
+  return <text>Count: {count}</text>;
 }
 ```
 
@@ -328,8 +327,8 @@ function Counter() {
 
 ```tsx
 function Counter() {
-  const [count, setCount] = createSignal(0)
-  return <text>Count: {count()}</text>
+  const [count, setCount] = createSignal(0);
+  return <text>Count: {count()}</text>;
 }
 ```
 
@@ -339,10 +338,10 @@ function Counter() {
 const text = new TextRenderable(renderer, {
   id: "counter",
   content: "Count: 0",
-})
+});
 
 // Update later
-text.setContent("Count: 1")
+text.setContent("Count: 1");
 ```
 
 ## Gotchas

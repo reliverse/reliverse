@@ -1,6 +1,6 @@
-import { cn } from "@repo/ui/utils/cn";
 import { Badge } from "@repo/ui/badge";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@repo/ui/tooltip";
+import { cn } from "@repo/ui/utils/cn";
 
 interface ProjectStatusBadgeProps {
   status: "live" | "beta" | "development" | "concept";

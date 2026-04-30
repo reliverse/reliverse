@@ -7,7 +7,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@repo/ui/dropdown-menu";
-import { Check, Link2, Linkedin, Share2, Twitter } from "lucide-react";
+import { XIcon } from "@repo/ui/icons";
+import { Check, Link2, Share2 } from "lucide-react";
 import { useState } from "react";
 
 interface ShareButtonsProps {
@@ -29,16 +30,9 @@ export function ShareButtons({ title, url }: ShareButtonsProps) {
     }
   };
 
-  const shareOnTwitter = () => {
+  const shareOnX = () => {
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
-      "_blank",
-    );
-  };
-
-  const shareOnLinkedIn = () => {
-    window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+      `https://x.com/intent/tweet?text=${encodeURIComponent(title)}&url=${encodeURIComponent(shareUrl)}`,
       "_blank",
     );
   };
@@ -52,13 +46,8 @@ export function ShareButtons({ title, url }: ShareButtonsProps) {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={shareOnTwitter}>
-          <Twitter className="mr-2 size-4" />
-          Twitter
-        </DropdownMenuItem>
-        <DropdownMenuItem onClick={shareOnLinkedIn}>
-          <Linkedin className="mr-2 size-4" />
-          LinkedIn
+        <DropdownMenuItem onClick={shareOnX}>
+          <XIcon className="mr-2 size-4" />X
         </DropdownMenuItem>
         <DropdownMenuItem onClick={copyToClipboard}>
           {copied ? (

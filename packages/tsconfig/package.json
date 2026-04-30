@@ -2,12 +2,12 @@
   "name": "@repo/tsconfig",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "Shared TypeScript configuration",
   "files": [
     "./ts-only.json",
     "./ts-tsx.json"
   ],
+  "type": "module",
   "exports": {
     "./ts-only.json": "./ts-only.json",
     "./ts-tsx.json": "./ts-tsx.json"

@@ -67,7 +67,7 @@ export type {
   CommandOptionsRecord,
   CommandOptionType,
   EmptyCommandOptions,
-} from "./options/types";
+} from "@reliverse/parser";
 export type {
   ConfirmationMode,
   OutputMode,

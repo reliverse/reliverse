@@ -1,7 +1,6 @@
 import type { RequestedTarget, SkippedTarget } from "../shared-targets";
-
-import { resolveBuildableTargets, type BuildableTarget } from "./validation";
 import type { BuildTarget } from "./provider/types";
+import { resolveBuildableTargets, type BuildableTarget } from "./validation";
 
 export interface PlannedBuildTarget {
   readonly cwd: string;

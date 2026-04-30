@@ -18,8 +18,8 @@ export function RoadmapPage() {
             </Badge>
             <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">Product Roadmap</h1>
             <p className="mt-4 max-w-2xl text-lg text-muted-foreground">
-              Our vision for the future of the Reliverse ecosystem. Track our progress and see what's
-              coming next.
+              Our vision for the future of the Reliverse ecosystem. Track our progress and see
+              what's coming next.
             </p>
           </div>
         </section>

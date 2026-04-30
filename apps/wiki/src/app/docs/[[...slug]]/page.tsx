@@ -1,12 +1,11 @@
 import { DocsBody, DocsDescription, DocsPage, DocsTitle } from "fumadocs-ui/layouts/docs/page";
-import { createRelativeLink } from "fumadocs-ui/mdx";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { LLMCopyButton, ViewOptions } from "~/components/ai/page-actions";
 import { gitConfig } from "~/lib/layout.shared";
 import { getPageImage, source } from "~/lib/source";
-import { getMDXComponents } from "~/mdx-components";
+import { createRelativeMdxLink, getMDXComponents } from "~/mdx-components";
 
 type DocsPageProps = {
   params: Promise<{ slug?: string[] }>;
@@ -34,7 +33,7 @@ export default async function Page(props: DocsPageProps) {
         <MDX
           components={getMDXComponents({
             // this allows you to link to other pages with relative file paths
-            a: createRelativeLink(source, page),
+            a: createRelativeMdxLink(source.resolveHref, page),
           })}
         />
       </DocsBody>

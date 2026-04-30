@@ -1,8 +1,8 @@
 "use client";
 
-import { cn } from "@repo/ui/utils/cn";
 import { Badge } from "@repo/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@repo/ui/card";
+import { cn } from "@repo/ui/utils/cn";
 import { Link } from "@tanstack/react-router";
 import { ArrowUpRight, Calendar, ExternalLink } from "lucide-react";
 import type React from "react";

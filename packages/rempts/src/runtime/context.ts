@@ -1,10 +1,11 @@
+import type { CommandOptionsOutput, CommandOptionsRecord } from "@reliverse/parser";
+
 import type {
   CommandContext,
   CommandPromptAPI,
   CommandRuntimeInfo,
   CommandSafetyAPI,
 } from "../api/define-command";
-import type { CommandOptionsOutput, CommandOptionsRecord } from "../options/types";
 import type { CommandTreeReport } from "./command-diagnostics";
 import { RemptsExitSignal } from "./errors";
 import type { CommandInputAPI } from "./input";

@@ -1,5 +1,6 @@
+import type { CommandOptionsRecord } from "@reliverse/parser";
+
 import type { RemptsPlugin } from "../api/define-plugin";
-import type { CommandOptionsRecord } from "../options/types";
 import { RemptsUsageError } from "./errors";
 import {
   readGlobalHostPluginSpecifiers,
@@ -217,9 +218,13 @@ export async function inspectPluginDiscovery(
     );
     const globalLoaded =
       allowedGlobalSpecifiers.length > 0
-        ? await inspectPluginsFromHostManifest(hostRoot ?? hostSearchRoot, allowedGlobalSpecifiers, {
-            resolvePaths: [bunGlobalNodeModules],
-          })
+        ? await inspectPluginsFromHostManifest(
+            hostRoot ?? hostSearchRoot,
+            allowedGlobalSpecifiers,
+            {
+              resolvePaths: [bunGlobalNodeModules],
+            },
+          )
         : { loaded: [], rejected: [] };
 
     return {
@@ -260,12 +265,11 @@ export async function resolveDiscoveredPlugins(
   return resolvePluginsFromReport(report);
 }
 
-export function resolvePluginsFromReport(
-  report: PluginDiscoveryReport,
-): readonly RemptsPlugin[] {
-
+export function resolvePluginsFromReport(report: PluginDiscoveryReport): readonly RemptsPlugin[] {
   const disallowedGlobal = report.rejected.filter(
-    (entry) => entry.source === "global-config" && entry.reason.includes("not allowed by this CLI's plugins.allowedPatterns"),
+    (entry) =>
+      entry.source === "global-config" &&
+      entry.reason.includes("not allowed by this CLI's plugins.allowedPatterns"),
   );
 
   if (disallowedGlobal.length > 0) {
@@ -285,7 +289,9 @@ export function resolvePluginsFromReport(
     );
   }
 
-  const loadFailure = report.rejected.find((entry) => !entry.reason.includes("not allowed by this CLI's plugins.allowedPatterns"));
+  const loadFailure = report.rejected.find(
+    (entry) => !entry.reason.includes("not allowed by this CLI's plugins.allowedPatterns"),
+  );
   if (loadFailure) {
     throw new RemptsUsageError(`Failed to load Rempts host plugins: ${loadFailure.reason}`, 1);
   }

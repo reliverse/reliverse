@@ -1,9 +1,10 @@
 "use client";
 
-import { cn } from "@repo/ui/utils/cn";
 import { Button } from "@repo/ui/button";
+import { GitHubIcon } from "@repo/ui/icons";
+import { cn } from "@repo/ui/utils/cn";
 import { Link } from "@tanstack/react-router";
-import { ExternalLink, Github, Menu, X } from "lucide-react";
+import { ExternalLink, Menu, X } from "lucide-react";
 import { useState } from "react";
 
 import { KeyboardHint } from "./keyboard-hint";
@@ -64,7 +65,7 @@ export function SiteHeader() {
               rel="noopener noreferrer"
               target="_blank"
             >
-              <Github className="size-4" />
+              <GitHubIcon className="size-4" />
             </a>
           </Button>
           <ThemeToggle />

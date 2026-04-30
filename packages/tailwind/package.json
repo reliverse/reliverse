@@ -9,11 +9,11 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",
+    "@types/bun": "catalog:",
+    "@typescript/native-preview": "catalog:",
     "postcss": "catalog:",
     "postcss-load-config": "catalog:",
     "tailwindcss": "catalog:",
-    "tw-animate-css": "catalog:",
-    "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:"
+    "tw-animate-css": "catalog:"
   }
 }

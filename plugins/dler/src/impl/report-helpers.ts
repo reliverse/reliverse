@@ -54,7 +54,9 @@ export function formatSkippedMessages(skippedTargets: readonly SkippedTarget[]):
   return skippedTargets.map((target) => `Skipped: ${target.label}: ${target.reason}`);
 }
 
-export function createPublishExecutedTargets(results: readonly PublishExecutionResultLike[]): ExecutedTarget[] {
+export function createPublishExecutedTargets(
+  results: readonly PublishExecutionResultLike[],
+): ExecutedTarget[] {
   return results.map((result) => ({
     cwd: result.cwd,
     exitCode: result.npm.exitCode,

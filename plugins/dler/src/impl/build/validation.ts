@@ -1,10 +1,13 @@
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
-import { explainMissingPackageBuildCommand, resolvePackageBuildCommand } from "./package-build-command";
 import { fileExists, type RequestedTarget, type SkippedTarget } from "../shared-targets";
 import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
+import { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
+import {
+  explainMissingPackageBuildCommand,
+  resolvePackageBuildCommand,
+} from "./package-build-command";
 
 export interface BuildableTarget extends RequestedTarget {
   readonly orchestratorCommand: BuildCommandInvocation;
@@ -14,7 +17,10 @@ export interface BuildableTarget extends RequestedTarget {
 
 export async function resolveBuildableTargets(options: {
   readonly targets: readonly RequestedTarget[];
-}): Promise<{ readonly buildable: readonly BuildableTarget[]; readonly skipped: readonly SkippedTarget[] }> {
+}): Promise<{
+  readonly buildable: readonly BuildableTarget[];
+  readonly skipped: readonly SkippedTarget[];
+}> {
   const buildable: BuildableTarget[] = [];
   const skipped: SkippedTarget[] = [];
 
@@ -41,7 +47,10 @@ export async function resolveBuildableTargets(options: {
 
     const packageCommand = await resolvePackageBuildCommand(target);
     if (!packageCommand) {
-      skipped.push({ label: target.label, reason: await explainMissingPackageBuildCommand(target) });
+      skipped.push({
+        label: target.label,
+        reason: await explainMissingPackageBuildCommand(target),
+      });
       continue;
     }
 

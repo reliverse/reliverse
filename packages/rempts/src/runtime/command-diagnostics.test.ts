@@ -9,9 +9,14 @@ import { createFileCommandSource } from "./file-source";
 import { createPluginCommandSource } from "./plugin-source";
 import { resolveEntry } from "./resolve-entry";
 
-const defineCommandModulePath = "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/api/define-command.ts";
+const defineCommandModulePath =
+  "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/api/define-command.ts";
 
-async function writeCommandFile(filePath: string, name: string, description: string): Promise<void> {
+async function writeCommandFile(
+  filePath: string,
+  name: string,
+  description: string,
+): Promise<void> {
   await mkdir(dirname(filePath), { recursive: true });
   await writeFile(
     filePath,
@@ -45,7 +50,11 @@ async function createPluginSource(root: string, pluginName: string, commands: re
   await mkdir(dirname(entryPath), { recursive: true });
   await writeFile(entryPath, "export {};\n");
   for (const path of commands) {
-    await writeCommandFile(join(root, "src", "cmds", ...path, "cmd.ts"), path.at(-1) ?? "cmd", `${pluginName} ${path.join("/")}`);
+    await writeCommandFile(
+      join(root, "src", "cmds", ...path, "cmd.ts"),
+      path.at(-1) ?? "cmd",
+      `${pluginName} ${path.join("/")}`,
+    );
   }
   return createPluginCommandSource(
     definePlugin({ apiVersion: REMPTS_PLUGIN_API_VERSION, entry: entryPath, name: pluginName }),
@@ -56,8 +65,14 @@ describe("inspectCommandTree", () => {
   test("reports chosen and shadowed command nodes plus merged subcommands", async () => {
     const root = await mkdtemp(join(tmpdir(), "rempts-command-diag-"));
     const local = await createLocalSource(join(root, "local"));
-    const pluginA = await createPluginSource(join(root, "plugin-a"), "plugin-a", [["dler"], ["dler", "build"]]);
-    const pluginB = await createPluginSource(join(root, "plugin-b"), "plugin-b", [["dler"], ["dler", "pub"]]);
+    const pluginA = await createPluginSource(join(root, "plugin-a"), "plugin-a", [
+      ["dler"],
+      ["dler", "build"],
+    ]);
+    const pluginB = await createPluginSource(join(root, "plugin-b"), "plugin-b", [
+      ["dler"],
+      ["dler", "pub"],
+    ]);
 
     const report = await inspectCommandTree([local, pluginA, pluginB]);
     const dler = report.nodes.find((node) => node.path.join("/") === "dler");

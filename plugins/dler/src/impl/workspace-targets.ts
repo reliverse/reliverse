@@ -21,7 +21,9 @@ async function readWorkspaceRootConfig(startDir: string): Promise<WorkspaceRootC
         const workspaces = manifest.workspaces;
         const packagePatterns = Array.isArray(workspaces)
           ? workspaces.filter((value): value is string => typeof value === "string")
-          : workspaces && typeof workspaces === "object" && Array.isArray((workspaces as { packages?: unknown }).packages)
+          : workspaces &&
+              typeof workspaces === "object" &&
+              Array.isArray((workspaces as { packages?: unknown }).packages)
             ? (workspaces as { packages: unknown[] }).packages.filter(
                 (value): value is string => typeof value === "string",
               )
@@ -53,7 +55,10 @@ export async function resolveWorkspaceRootFromCwd(cwd: string): Promise<string> 
   return workspace.rootDir;
 }
 
-async function discoverWorkspacePackageDirs(rootDir: string, packagePatterns: readonly string[]): Promise<string[]> {
+async function discoverWorkspacePackageDirs(
+  rootDir: string,
+  packagePatterns: readonly string[],
+): Promise<string[]> {
   const dirs = new Set<string>();
 
   for (const pattern of packagePatterns) {
@@ -85,9 +90,14 @@ export async function resolveWorkspaceTargetsFromCwd(cwd: string): Promise<{
     throw new Error(`Could not find a monorepo workspace root from ${cwd}.`);
   }
 
-  const packageDirs = await discoverWorkspacePackageDirs(workspace.rootDir, workspace.packagePatterns);
+  const packageDirs = await discoverWorkspacePackageDirs(
+    workspace.rootDir,
+    workspace.packagePatterns,
+  );
   if (packageDirs.length === 0) {
-    throw new Error(`Workspace root ${workspace.rootDir} does not contain any discoverable workspace packages.`);
+    throw new Error(
+      `Workspace root ${workspace.rootDir} does not contain any discoverable workspace packages.`,
+    );
   }
 
   const normalizedCwd = resolve(cwd);

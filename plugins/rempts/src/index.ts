@@ -15,7 +15,8 @@ export default definePlugin({
       type: "boolean",
     },
     strictGlobal: {
-      description: "Require global target resolution only; do not fall back to local workspace/package discovery.",
+      description:
+        "Require global target resolution only; do not fall back to local workspace/package discovery.",
       type: "boolean",
     },
   },
