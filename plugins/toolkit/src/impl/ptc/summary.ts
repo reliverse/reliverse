@@ -1,10 +1,5 @@
 import { getTotalIncludedBytes } from "./collect";
-import type {
-  PtcPackRunResult,
-  PtcRunResult,
-  PtcSummaryColors,
-  PtcUnpackRunResult,
-} from "./types";
+import type { PtcPackRunResult, PtcRunResult, PtcSummaryColors, PtcUnpackRunResult } from "./types";
 
 export function formatPtcSummary(run: PtcRunResult, colors?: PtcSummaryColors): string {
   if (run.mode === "unpack") {
@@ -18,8 +13,7 @@ function formatPtcPackSummary(run: PtcPackRunResult, colors?: PtcSummaryColors):
   const { config, result, outputInfo, bytesWritten } = run;
   const lines: string[] = [];
   const c = createSummaryColors(colors);
-  const row = (key: string, value: string | number) =>
-    `${c.key(key)}: ${c.value(String(value))}`;
+  const row = (key: string, value: string | number) => `${c.key(key)}: ${c.value(String(value))}`;
 
   lines.push(row("Mode", config.apply ? c.success("apply") : c.info("summary-only")));
   lines.push(row("Operation", c.value("pack")));
@@ -76,8 +70,7 @@ function formatPtcUnpackSummary(run: PtcUnpackRunResult, colors?: PtcSummaryColo
   const { config, unpack, bytesWritten } = run;
   const lines: string[] = [];
   const c = createSummaryColors(colors);
-  const row = (key: string, value: string | number) =>
-    `${c.key(key)}: ${c.value(String(value))}`;
+  const row = (key: string, value: string | number) => `${c.key(key)}: ${c.value(String(value))}`;
   const skippedFiles = unpack.files.filter((file) => file.skippedReason);
   const writeFiles = unpack.files.filter((file) => file.action === "write" && !file.skippedReason);
   const overwriteFiles = unpack.files.filter(

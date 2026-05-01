@@ -2,22 +2,27 @@ import { describe, expect, test } from "bun:test";
 
 import { createDeclarPipelinePlan } from "./plan";
 
+function createPackageJsonWithTypes() {
+  return {
+    exports: {
+      ".": {
+        types: "./dist/index.d.ts",
+        import: "./dist/index.js",
+      },
+    },
+  };
+}
+
 describe("createDeclarPipelinePlan", () => {
   test("creates the default declaration pipeline plan", () => {
     const plan = createDeclarPipelinePlan({
       packageDir: "/repo/packages/declar",
-      packageJson: {
-        exports: {
-          ".": {
-            types: "./dist/index.d.ts",
-            import: "./dist/index.js",
-          },
-        },
-      },
+      packageJson: createPackageJsonWithTypes(),
     });
 
     expect(plan).toEqual({
       declarationMap: false,
+      diagnostics: [],
       entrypoints: [
         {
           defaultPath: undefined,
@@ -56,11 +61,44 @@ describe("createDeclarPipelinePlan", () => {
       rollup: false,
       tsconfigPath: "tsconfig.json",
       updatePackageJson: false,
-      warnings: [],
     });
   });
 
-  test("adds bundle and package wiring phases when enabled", () => {
+  test("adds only bundle declaration phase when rollup is enabled", () => {
+    const plan = createDeclarPipelinePlan({
+      packageDir: "/repo/packages/declar",
+      packageJson: createPackageJsonWithTypes(),
+      rollup: true,
+    });
+
+    expect(plan.phases).toEqual([
+      "read-tsconfig",
+      "discover-entrypoints",
+      "typescript-declaration-emit",
+      "validate-package-types",
+      "bundle-declarations",
+      "warn",
+    ]);
+  });
+
+  test("adds only package wiring phase when package update is enabled", () => {
+    const plan = createDeclarPipelinePlan({
+      packageDir: "/repo/packages/declar",
+      packageJson: createPackageJsonWithTypes(),
+      updatePackageJson: true,
+    });
+
+    expect(plan.phases).toEqual([
+      "read-tsconfig",
+      "discover-entrypoints",
+      "typescript-declaration-emit",
+      "validate-package-types",
+      "wire-package-types",
+      "warn",
+    ]);
+  });
+
+  test("adds bundle and package wiring phases in order when both are enabled", () => {
     const plan = createDeclarPipelinePlan({
       declarationMap: true,
       outDir: "build",
@@ -95,7 +133,7 @@ describe("createDeclarPipelinePlan", () => {
     ]);
   });
 
-  test("includes discovery warnings in the pipeline plan", () => {
+  test("includes discovery diagnostics in the pipeline plan", () => {
     const plan = createDeclarPipelinePlan({
       packageDir: "/repo/packages/declar",
       packageJson: {
@@ -107,11 +145,12 @@ describe("createDeclarPipelinePlan", () => {
       },
     });
 
-    expect(plan.warnings).toEqual([
+    expect(plan.diagnostics).toEqual([
       {
         code: "DECLAR_EXPORT_MISSING_TYPES",
         message: "Export . does not declare a types condition.",
         path: ["package.json", "exports", "."],
+        severity: "warning",
       },
     ]);
   });

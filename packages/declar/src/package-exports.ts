@@ -3,17 +3,17 @@ import type {
   DeclarEntrypoint,
   DeclarEntrypointKind,
   DeclarPackageJson,
-  DeclarWarning,
+  DeclarDiagnostic,
 } from "./types";
 
 interface EntrypointDiscoveryResult {
   readonly entrypoints: readonly DeclarEntrypoint[];
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 }
 
 interface EntrypointDiscoveryValueResult {
   readonly entrypoint?: DeclarEntrypoint | undefined;
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 }
 
 interface TargetReadResult {
@@ -21,13 +21,13 @@ interface TargetReadResult {
   readonly runtimeConditions: readonly DeclarConditionPath[];
   readonly typesPath?: string | undefined;
   readonly typesConditions: readonly DeclarConditionPath[];
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 }
 
 interface DirectTypesReadResult {
   readonly typesPath?: string | undefined;
   readonly typesConditions: readonly DeclarConditionPath[];
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 }
 
 const runtimeConditionKeys = new Set(["default", "import", "require"]);
@@ -56,31 +56,38 @@ function getEntrypointKind(exportPath: string): DeclarEntrypointKind {
   return exportPath.includes("*") ? "pattern" : "subpath";
 }
 
-function createWarning(
-  code: DeclarWarning["code"],
+function createDiagnostic(
+  code: DeclarDiagnostic["code"],
   message: string,
   path: readonly string[],
-): DeclarWarning {
-  return { code, message, path };
+): DeclarDiagnostic {
+  return { code, message, path, severity: "warning" };
 }
 
-function createRelativeTargetWarning(
+function createEntrypointDiscoveryResult(
+  entrypoints: readonly DeclarEntrypoint[],
+  diagnostics: readonly DeclarDiagnostic[],
+): EntrypointDiscoveryResult {
+  return { diagnostics, entrypoints };
+}
+
+function createRelativeTargetDiagnostic(
   targetPath: string,
   path: readonly string[],
-): DeclarWarning | undefined {
+): DeclarDiagnostic | undefined {
   if (targetPath.startsWith("./")) return undefined;
 
-  return createWarning(
+  return createDiagnostic(
     "DECLAR_EXPORT_TARGET_NOT_RELATIVE",
     `Export target ${targetPath} should be a relative path starting with "./".`,
     path,
   );
 }
 
-function createTypesOrderWarning(
+function createTypesOrderDiagnostic(
   value: Record<string, unknown>,
   path: readonly string[],
-): DeclarWarning | undefined {
+): DeclarDiagnostic | undefined {
   const keys = Object.keys(value);
   const hasTypesCondition = keys.some(isTypesConditionKey);
   const firstKey = keys[0];
@@ -89,7 +96,7 @@ function createTypesOrderWarning(
     return undefined;
   }
 
-  return createWarning(
+  return createDiagnostic(
     "DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST",
     `Types condition should be the first condition, but "${firstKey}" appears first.`,
     path,
@@ -102,16 +109,16 @@ function readExportTargetPath(
   path: readonly string[],
 ): {
   readonly path?: string | undefined;
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 } {
   if (value === undefined || value === null) {
-    return { warnings: [] };
+    return { diagnostics: [] };
   }
 
   if (typeof value !== "string") {
     return {
-      warnings: [
-        createWarning(
+      diagnostics: [
+        createDiagnostic(
           "DECLAR_EXPORT_UNSUPPORTED_SHAPE",
           `Export condition "${condition}" must point to a string target for Declar milestone 1.`,
           path,
@@ -120,11 +127,11 @@ function readExportTargetPath(
     };
   }
 
-  const relativeTargetWarning = createRelativeTargetWarning(value, path);
+  const relativeTargetDiagnostic = createRelativeTargetDiagnostic(value, path);
 
   return {
     path: value,
-    warnings: relativeTargetWarning ? [relativeTargetWarning] : [],
+    diagnostics: relativeTargetDiagnostic ? [relativeTargetDiagnostic] : [],
   };
 }
 
@@ -132,7 +139,7 @@ function readDirectTypes(
   value: Record<string, unknown>,
   path: readonly string[],
 ): DirectTypesReadResult {
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
   const typesConditions: DeclarConditionPath[] = [];
   let typesPath: string | undefined;
 
@@ -140,7 +147,7 @@ function readDirectTypes(
     if (!isTypesConditionKey(condition)) continue;
 
     const result = readExportTargetPath(conditionValue, condition, [...path, condition]);
-    warnings.push(...result.warnings);
+    diagnostics.push(...result.diagnostics);
 
     if (result.path) {
       typesPath ??= result.path;
@@ -154,7 +161,7 @@ function readDirectTypes(
   return {
     typesPath,
     typesConditions,
-    warnings,
+    diagnostics,
   };
 }
 
@@ -167,7 +174,7 @@ function readConditionalTarget(
     return {
       runtimeConditions: [],
       typesConditions: [],
-      warnings: [],
+      diagnostics: [],
     };
   }
 
@@ -185,7 +192,7 @@ function readConditionalTarget(
           ]
         : [],
       typesConditions: [],
-      warnings: result.warnings,
+      diagnostics: result.diagnostics,
     };
   }
 
@@ -193,8 +200,8 @@ function readConditionalTarget(
     return {
       runtimeConditions: [],
       typesConditions: [],
-      warnings: [
-        createWarning(
+      diagnostics: [
+        createDiagnostic(
           "DECLAR_EXPORT_UNSUPPORTED_SHAPE",
           `Export condition "${condition}" uses an unsupported shape.`,
           path,
@@ -203,20 +210,20 @@ function readConditionalTarget(
     };
   }
 
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
   const runtimeConditions: DeclarConditionPath[] = [];
 
-  const orderWarning = createTypesOrderWarning(value, path);
-  if (orderWarning) warnings.push(orderWarning);
+  const orderDiagnostic = createTypesOrderDiagnostic(value, path);
+  if (orderDiagnostic) diagnostics.push(orderDiagnostic);
 
   const directTypes = readDirectTypes(value, path);
-  warnings.push(...directTypes.warnings);
+  diagnostics.push(...directTypes.diagnostics);
 
   const defaultResult = readExportTargetPath(value.default, `${condition}.default`, [
     ...path,
     "default",
   ]);
-  warnings.push(...defaultResult.warnings);
+  diagnostics.push(...defaultResult.diagnostics);
 
   if (defaultResult.path) {
     runtimeConditions.push({
@@ -239,7 +246,7 @@ function readConditionalTarget(
         ...path,
         nestedCondition,
       ]);
-      warnings.push(...nestedResult.warnings);
+      diagnostics.push(...nestedResult.diagnostics);
 
       if (nestedResult.path) {
         runtimeConditions.push({
@@ -249,8 +256,8 @@ function readConditionalTarget(
       }
     }
 
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_NESTED_CONDITIONS_UNSUPPORTED",
         `Nested export condition "${condition}.${nestedCondition}" is preserved in diagnostics but cannot be flattened into a primary Declar target yet.`,
         [...path, nestedCondition],
@@ -263,7 +270,7 @@ function readConditionalTarget(
     runtimeConditions,
     typesPath: directTypes.typesPath,
     typesConditions: directTypes.typesConditions,
-    warnings,
+    diagnostics,
   };
 }
 
@@ -272,10 +279,10 @@ function readUnknownRuntimeConditions(
   path: readonly string[],
 ): {
   readonly runtimeConditions: readonly DeclarConditionPath[];
-  readonly warnings: readonly DeclarWarning[];
+  readonly diagnostics: readonly DeclarDiagnostic[];
 } {
   const runtimeConditions: DeclarConditionPath[] = [];
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
 
   for (const [condition, conditionValue] of Object.entries(value)) {
     if (
@@ -292,7 +299,7 @@ function readUnknownRuntimeConditions(
 
     if (typeof conditionValue === "string") {
       const result = readExportTargetPath(conditionValue, condition, [...path, condition]);
-      warnings.push(...result.warnings);
+      diagnostics.push(...result.diagnostics);
 
       if (result.path) {
         runtimeConditions.push({
@@ -302,8 +309,8 @@ function readUnknownRuntimeConditions(
       }
     }
 
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_CONDITION_UNSUPPORTED",
         `Export condition "${condition}" is not a primary Declar condition yet.`,
         [...path, condition],
@@ -311,7 +318,7 @@ function readUnknownRuntimeConditions(
     );
   }
 
-  return { runtimeConditions, warnings };
+  return { runtimeConditions, diagnostics };
 }
 
 function hasTypes(entrypoint: DeclarEntrypoint): boolean {
@@ -331,7 +338,7 @@ function entrypointFromExportValue(
   const kind = getEntrypointKind(normalizedExportPath);
 
   if (value === null) {
-    return { warnings: [] };
+    return { diagnostics: [] };
   }
 
   if (typeof value === "string") {
@@ -355,9 +362,9 @@ function entrypointFromExportValue(
 
     return {
       entrypoint,
-      warnings: [
-        ...result.warnings,
-        createWarning(
+      diagnostics: [
+        ...result.diagnostics,
+        createDiagnostic(
           "DECLAR_EXPORT_MISSING_TYPES",
           `Export ${normalizedExportPath} does not declare a types condition.`,
           path,
@@ -368,8 +375,8 @@ function entrypointFromExportValue(
 
   if (!isRecord(value)) {
     return {
-      warnings: [
-        createWarning(
+      diagnostics: [
+        createDiagnostic(
           "DECLAR_EXPORT_UNSUPPORTED_SHAPE",
           `Export ${normalizedExportPath} uses an unsupported exports shape.`,
           path,
@@ -378,28 +385,28 @@ function entrypointFromExportValue(
     };
   }
 
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
 
-  const orderWarning = createTypesOrderWarning(value, path);
-  if (orderWarning) warnings.push(orderWarning);
+  const orderDiagnostic = createTypesOrderDiagnostic(value, path);
+  if (orderDiagnostic) diagnostics.push(orderDiagnostic);
 
   const directTypes = readDirectTypes(value, path);
-  warnings.push(...directTypes.warnings);
+  diagnostics.push(...directTypes.diagnostics);
 
   const importTarget = readConditionalTarget("import", value.import, [...path, "import"]);
-  warnings.push(...importTarget.warnings);
+  diagnostics.push(...importTarget.diagnostics);
 
   const requireTarget = readConditionalTarget("require", value.require, [...path, "require"]);
-  warnings.push(...requireTarget.warnings);
+  diagnostics.push(...requireTarget.diagnostics);
 
   const defaultTarget = readConditionalTarget("default", value.default, [...path, "default"]);
-  warnings.push(...defaultTarget.warnings);
+  diagnostics.push(...defaultTarget.diagnostics);
 
   const sourceResult = readExportTargetPath(value.source, "source", [...path, "source"]);
-  warnings.push(...sourceResult.warnings);
+  diagnostics.push(...sourceResult.diagnostics);
 
   const unknownRuntimeConditions = readUnknownRuntimeConditions(value, path);
-  warnings.push(...unknownRuntimeConditions.warnings);
+  diagnostics.push(...unknownRuntimeConditions.diagnostics);
 
   const entrypoint: DeclarEntrypoint = {
     defaultPath: defaultTarget.path,
@@ -436,8 +443,8 @@ function entrypointFromExportValue(
   };
 
   if (!hasTypes(entrypoint)) {
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_MISSING_TYPES",
         `Export ${normalizedExportPath} does not declare a types condition.`,
         path,
@@ -446,8 +453,8 @@ function entrypointFromExportValue(
   }
 
   if (!hasRuntimeTarget(entrypoint)) {
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_MISSING_RUNTIME_TARGET",
         `Export ${normalizedExportPath} does not declare an import, require, default, or supported runtime condition.`,
         path,
@@ -456,8 +463,8 @@ function entrypointFromExportValue(
   }
 
   if (entrypoint.kind === "pattern" && hasTypes(entrypoint)) {
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_PATTERN_TYPES_UNVERIFIED",
         `Export pattern ${normalizedExportPath} declares types, but pattern targets cannot be fully verified until Declar has filesystem-aware validation.`,
         path,
@@ -465,13 +472,13 @@ function entrypointFromExportValue(
     );
   }
 
-  return { entrypoint, warnings };
+  return { entrypoint, diagnostics };
 }
 
 function entrypointFromLegacyPackageFields(
   packageJson: DeclarPackageJson,
 ): EntrypointDiscoveryResult {
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
   const entrypoints: DeclarEntrypoint[] = [];
 
   const typesPath = packageJson.types ?? packageJson.typings;
@@ -480,16 +487,13 @@ function entrypointFromLegacyPackageFields(
   const defaultPath = importPath ?? requirePath;
 
   if (!defaultPath && !typesPath) {
-    return {
-      entrypoints,
-      warnings: [
-        createWarning(
-          "DECLAR_PACKAGE_MISSING_EXPORTS",
-          "package.json does not define exports, main, module, types, or typings.",
-          ["package.json"],
-        ),
-      ],
-    };
+    return createEntrypointDiscoveryResult(entrypoints, [
+      createDiagnostic(
+        "DECLAR_PACKAGE_MISSING_EXPORTS",
+        "package.json does not define exports, main, module, types, or typings.",
+        ["package.json"],
+      ),
+    ]);
   }
 
   const runtimeConditions: DeclarConditionPath[] = [];
@@ -535,8 +539,8 @@ function entrypointFromLegacyPackageFields(
   });
 
   if (!typesPath) {
-    warnings.push(
-      createWarning(
+    diagnostics.push(
+      createDiagnostic(
         "DECLAR_EXPORT_MISSING_TYPES",
         "Root package entrypoint does not declare package.json#types.",
         ["package.json", "types"],
@@ -544,13 +548,13 @@ function entrypointFromLegacyPackageFields(
     );
   }
 
-  return { entrypoints, warnings };
+  return createEntrypointDiscoveryResult(entrypoints, diagnostics);
 }
 
 export function discoverPackageEntrypoints(
   packageJson: DeclarPackageJson,
 ): EntrypointDiscoveryResult {
-  const warnings: DeclarWarning[] = [];
+  const diagnostics: DeclarDiagnostic[] = [];
   const entrypoints: DeclarEntrypoint[] = [];
 
   if (!packageJson.exports) {
@@ -560,21 +564,18 @@ export function discoverPackageEntrypoints(
   if (typeof packageJson.exports === "string") {
     const result = entrypointFromExportValue(".", packageJson.exports, ["package.json", "exports"]);
     if (result.entrypoint) entrypoints.push(result.entrypoint);
-    warnings.push(...result.warnings);
-    return { entrypoints, warnings };
+    diagnostics.push(...result.diagnostics);
+    return createEntrypointDiscoveryResult(entrypoints, diagnostics);
   }
 
   if (!isRecord(packageJson.exports)) {
-    return {
-      entrypoints,
-      warnings: [
-        createWarning(
-          "DECLAR_EXPORT_UNSUPPORTED_SHAPE",
-          "package.json#exports must be a string or object for Declar milestone 1.",
-          ["package.json", "exports"],
-        ),
-      ],
-    };
+    return createEntrypointDiscoveryResult(entrypoints, [
+      createDiagnostic(
+        "DECLAR_EXPORT_UNSUPPORTED_SHAPE",
+        "package.json#exports must be a string or object for Declar milestone 1.",
+        ["package.json", "exports"],
+      ),
+    ]);
   }
 
   const exportEntries = Object.entries(packageJson.exports);
@@ -583,8 +584,8 @@ export function discoverPackageEntrypoints(
   if (!usesSubpathMap) {
     const result = entrypointFromExportValue(".", packageJson.exports, ["package.json", "exports"]);
     if (result.entrypoint) entrypoints.push(result.entrypoint);
-    warnings.push(...result.warnings);
-    return { entrypoints, warnings };
+    diagnostics.push(...result.diagnostics);
+    return createEntrypointDiscoveryResult(entrypoints, diagnostics);
   }
 
   for (const [exportPath, value] of exportEntries) {
@@ -599,8 +600,8 @@ export function discoverPackageEntrypoints(
     ]);
 
     if (result.entrypoint) entrypoints.push(result.entrypoint);
-    warnings.push(...result.warnings);
+    diagnostics.push(...result.diagnostics);
   }
 
-  return { entrypoints, warnings };
+  return createEntrypointDiscoveryResult(entrypoints, diagnostics);
 }

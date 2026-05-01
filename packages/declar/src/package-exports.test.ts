@@ -1,12 +1,12 @@
 import { describe, expect, test } from "bun:test";
 
 import { discoverPackageEntrypoints } from "./package-exports";
-import type { DeclarWarningCode } from "./types";
+import type { DeclarDiagnosticCode } from "./types";
 
-function getWarningCodes(
+function getDiagnosticCodes(
   result: ReturnType<typeof discoverPackageEntrypoints>,
-): DeclarWarningCode[] {
-  return result.warnings.map((warning) => warning.code);
+): DeclarDiagnosticCode[] {
+  return result.diagnostics.map((diagnostic) => diagnostic.code);
 }
 
 describe("discoverPackageEntrypoints", () => {
@@ -17,7 +17,7 @@ describe("discoverPackageEntrypoints", () => {
       types: "./dist/index.d.ts",
     });
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.entrypoints).toHaveLength(1);
 
     expect(result.entrypoints[0]).toEqual({
@@ -52,7 +52,7 @@ describe("discoverPackageEntrypoints", () => {
     });
 
     expect(result.entrypoints).toEqual([]);
-    expect(getWarningCodes(result)).toEqual(["DECLAR_PACKAGE_MISSING_EXPORTS"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_PACKAGE_MISSING_EXPORTS"]);
   });
 
   test("discovers a string export and warns about missing types", () => {
@@ -75,7 +75,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     ]);
 
-    expect(getWarningCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_TYPES"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_TYPES"]);
   });
 
   test("discovers conditional root exports with types, import, and require", () => {
@@ -89,7 +89,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.entrypoints).toHaveLength(1);
 
     expect(result.entrypoints[0]).toEqual({
@@ -122,6 +122,52 @@ describe("discoverPackageEntrypoints", () => {
     });
   });
 
+  test("discovers versioned TypeScript types conditions", () => {
+    const result = discoverPackageEntrypoints({
+      exports: {
+        ".": {
+          "types@>=5.0": "./dist/index.d.ts",
+          import: "./dist/index.js",
+        },
+      },
+    });
+
+    expect(result.diagnostics).toEqual([]);
+    expect(result.entrypoints).toHaveLength(1);
+    expect(result.entrypoints[0]?.typesPath).toBe("./dist/index.d.ts");
+    expect(result.entrypoints[0]?.typesConditions).toContainEqual({
+      condition: "types@>=5.0",
+      path: "./dist/index.d.ts",
+    });
+  });
+
+  test("preserves unknown runtime conditions as diagnostics", () => {
+    const result = discoverPackageEntrypoints({
+      exports: {
+        ".": {
+          types: "./dist/index.d.ts",
+          browser: "./dist/index.browser.js",
+          default: "./dist/index.js",
+        },
+      },
+    });
+
+    expect(result.entrypoints).toHaveLength(1);
+    expect(result.entrypoints[0]?.runtimeConditions).toEqual([
+      {
+        condition: "default",
+        path: "./dist/index.js",
+      },
+      {
+        condition: "browser",
+        path: "./dist/index.browser.js",
+      },
+    ]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_CONDITION_UNSUPPORTED"]);
+    expect(getDiagnosticCodes(result)).not.toContain("DECLAR_EXPORT_MISSING_RUNTIME_TARGET");
+    expect(getDiagnosticCodes(result)).not.toContain("DECLAR_EXPORT_MISSING_TYPES");
+  });
+
   test("discovers multiple subpath exports", () => {
     const result = discoverPackageEntrypoints({
       exports: {
@@ -136,7 +182,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.entrypoints).toHaveLength(2);
 
     expect(result.entrypoints.map((entrypoint) => entrypoint.exportPath)).toEqual([".", "./cli"]);
@@ -151,7 +197,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.entrypoints).toHaveLength(1);
     expect(result.entrypoints[0]?.exportPath).toBe(".");
     expect(result.entrypoints[0]?.kind).toBe("root");
@@ -169,7 +215,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(getWarningCodes(result)).toContain("DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST");
+    expect(getDiagnosticCodes(result)).toContain("DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST");
   });
 
   test("warns when export target is not relative", () => {
@@ -182,7 +228,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(getWarningCodes(result)).toEqual([
+    expect(getDiagnosticCodes(result)).toEqual([
       "DECLAR_EXPORT_TARGET_NOT_RELATIVE",
       "DECLAR_EXPORT_TARGET_NOT_RELATIVE",
     ]);
@@ -198,7 +244,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(getWarningCodes(result)).toEqual([
+    expect(getDiagnosticCodes(result)).toEqual([
       "DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST",
       "DECLAR_EXPORT_TARGET_NOT_RELATIVE",
       "DECLAR_EXPORT_TARGET_NOT_RELATIVE",
@@ -214,7 +260,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(getWarningCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_TYPES"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_TYPES"]);
   });
 
   test("warns when a conditional export is missing runtime target", () => {
@@ -226,7 +272,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(getWarningCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_RUNTIME_TARGET"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_MISSING_RUNTIME_TARGET"]);
   });
 
   test("discovers pattern exports and warns that pattern types are not fully verified yet", () => {
@@ -242,7 +288,7 @@ describe("discoverPackageEntrypoints", () => {
     expect(result.entrypoints).toHaveLength(1);
     expect(result.entrypoints[0]?.exportPath).toBe("./*");
     expect(result.entrypoints[0]?.kind).toBe("pattern");
-    expect(getWarningCodes(result)).toEqual(["DECLAR_EXPORT_PATTERN_TYPES_UNVERIFIED"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_PATTERN_TYPES_UNVERIFIED"]);
   });
 
   test("supports nested import and require declaration conditions", () => {
@@ -290,7 +336,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     ]);
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
   });
 
   test("warns about unsupported nested non-default runtime conditions", () => {
@@ -317,7 +363,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     ]);
 
-    expect(getWarningCodes(result)).toEqual([
+    expect(getDiagnosticCodes(result)).toEqual([
       "DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST",
       "DECLAR_EXPORT_NESTED_CONDITIONS_UNSUPPORTED",
     ]);
@@ -334,7 +380,7 @@ describe("discoverPackageEntrypoints", () => {
       },
     });
 
-    expect(result.warnings).toEqual([]);
+    expect(result.diagnostics).toEqual([]);
     expect(result.entrypoints).toHaveLength(1);
     expect(result.entrypoints[0]?.exportPath).toBe(".");
   });
@@ -345,6 +391,6 @@ describe("discoverPackageEntrypoints", () => {
     });
 
     expect(result.entrypoints).toEqual([]);
-    expect(getWarningCodes(result)).toEqual(["DECLAR_EXPORT_UNSUPPORTED_SHAPE"]);
+    expect(getDiagnosticCodes(result)).toEqual(["DECLAR_EXPORT_UNSUPPORTED_SHAPE"]);
   });
 });

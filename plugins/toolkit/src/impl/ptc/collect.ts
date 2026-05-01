@@ -3,13 +3,7 @@ import path from "node:path";
 
 import { normalizeExtension } from "./config";
 import { DEFAULT_OUTPUT_FILE } from "./constants";
-import type {
-  CliConfig,
-  CollectResult,
-  CollectState,
-  InputInfo,
-  InputType,
-} from "./types";
+import type { CliConfig, CollectResult, CollectState, InputInfo, InputType } from "./types";
 import { isNodeError } from "./utils/errors";
 import { isPathInside, isSamePath, normalizePathForDisplay, resolveUserPath } from "./utils/path";
 import { looksBinary } from "./utils/text";

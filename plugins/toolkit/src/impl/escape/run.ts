@@ -3,7 +3,11 @@ import { resolve } from "node:path";
 
 import pMap from "p-map";
 
-import { createEscapedModuleContent, extractContentFromEscapedModule, unescapeContent } from "./content";
+import {
+  createEscapedModuleContent,
+  extractContentFromEscapedModule,
+  unescapeContent,
+} from "./content";
 import {
   findConvertibleFiles,
   findEscapedFiles,
@@ -42,7 +46,9 @@ export async function runEscape(options: EscapeRunOptions): Promise<EscapeRunRes
     : await findConvertibleFiles(inputPath, mappings, options.recursive);
 
   if (files.length === 0) {
-    throw new Error(options.unescape ? "No escaped files found to process." : "No files found to process.");
+    throw new Error(
+      options.unescape ? "No escaped files found to process." : "No files found to process.",
+    );
   }
 
   const fileResults = await pMap(
@@ -191,6 +197,8 @@ function createAction(options: {
     kind: options.kind,
     outputPath: options.outputPath,
     reason:
-      options.existingOutput === undefined ? "created output file" : "overwrote existing output file",
+      options.existingOutput === undefined
+        ? "created output file"
+        : "overwrote existing output file",
   };
 }

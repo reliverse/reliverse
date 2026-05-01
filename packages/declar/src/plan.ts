@@ -25,6 +25,7 @@ export function createDeclarPipelinePlan(options: DeclarPipelineOptions): Declar
 
   return {
     declarationMap: options.declarationMap ?? false,
+    diagnostics: discovery.diagnostics,
     entrypoints: discovery.entrypoints,
     outDir: options.outDir ?? "dist",
     packageDir: options.packageDir,
@@ -32,6 +33,5 @@ export function createDeclarPipelinePlan(options: DeclarPipelineOptions): Declar
     rollup,
     tsconfigPath: options.tsconfigPath ?? "tsconfig.json",
     updatePackageJson,
-    warnings: discovery.warnings,
   };
 }

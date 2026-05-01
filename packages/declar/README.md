@@ -1,91 +1,191 @@
 # `@reliverse/declar`
 
-Declaration generation pipeline for modern TypeScript packages.
+Declaration pipeline planning for modern TypeScript packages.
 
-Declar is not an attempt to rewrite TypeScript. It is a focused declaration pipeline that makes TypeScript declaration generation predictable for package publishing:
+Declar does **not** replace TypeScript. It keeps the TypeScript compiler as the source of truth, then adds the package-publishing layer around declaration output: entrypoint discovery, export/type diagnostics, pipeline planning, and later declaration emit/validation stages.
 
 ```txt
-TypeScript compiler emit
-  -> Declar validations
-  -> package entrypoints
-  -> optional .d.ts rollup
-  -> package.json types wiring
+package.json exports
+  -> entrypoint discovery
+  -> diagnostics
+  -> declaration pipeline plan
+  -> future TypeScript-backed emit + validation
 ```
 
-`dler build` will use `@reliverse/declar` as the declaration layer instead of growing declaration-specific logic inside the build command.
+`dler build` will eventually use `@reliverse/declar` as its declaration layer instead of growing declaration-specific logic inside the build command.
 
 ## Current status
 
-Declar is currently at Milestone 0.1: package entrypoint discovery and declaration pipeline planning.
+Declar is currently at **Milestone 0.1**.
 
-It does not emit `.d.ts` files yet.
+It supports:
 
-## Current package shape
+- package entrypoint discovery
+- declaration pipeline planning
+- structured diagnostics
 
-The initial package is intentionally small. It currently provides:
+It does **not** emit `.d.ts` files yet. No TypeScript compiler execution, filesystem-aware validation, declaration rollup, or `package.json` rewriting happens in this milestone.
 
-- public types for Declar plans, warnings, package entrypoints, and condition paths
-- package entrypoint discovery from `package.json#exports`
-- fallback entrypoint discovery from legacy `main`, `module`, `types`, and `typings` fields
-- detection of root, subpath, and pattern entrypoints
-- validation warnings for exports without matching `types`
-- validation warnings for exports without runtime targets
-- validation warnings for non-relative export targets
-- validation warnings for `types` conditions that are not listed first
-- basic support for nested `import.types` and `require.types` declaration conditions
-- diagnostics for unsupported or partially-supported export condition shapes
-- a minimal pipeline plan shape that `dler build` can consume later
-- Bun tests for the current entrypoint discovery and pipeline planning behavior
+## Install
 
-No compiler execution happens yet. Milestone 1 will add the TypeScript-backed implementation.
+```bash
+bun add @reliverse/declar
+```
 
-## Philosophy
+## Quick example
 
-> Not "we rewrote TypeScript”, but "we built a proper declaration pipeline for modern packages”.
+```ts
+import { createDeclarPipelinePlan } from "@reliverse/declar";
 
-Declar keeps the TypeScript compiler as the source of truth for type analysis and declaration emit. The package adds the missing pipeline around it: entrypoint discovery, validation, warning UX, optional declaration bundling, and package metadata wiring.
+const plan = createDeclarPipelinePlan({
+  packageDir: process.cwd(),
+  packageJson: {
+    exports: {
+      ".": {
+        types: "./dist/index.d.ts",
+        import: "./dist/index.js",
+      },
+    },
+  },
+  declarationMap: true,
+});
 
-The goal is not to guess types from arbitrary source files. The goal is to understand the package's public surface, emit declarations through the right backend, validate the result, and make publish-time type wiring boring.
+console.log(plan.entrypoints);
+console.log(plan.diagnostics);
+```
 
-## Why package entrypoints matter
+Example plan shape:
 
-Modern TypeScript packages usually expose their public API through `package.json#exports`.
-
-A package can have one root entrypoint:
-
-```json
+```ts
 {
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+  declarationMap: true,
+  diagnostics: [],
+  entrypoints: [
+    {
+      exportPath: ".",
+      kind: "root",
+      importPath: "./dist/index.js",
+      runtimeConditions: [
+        { condition: "import", path: "./dist/index.js" }
+      ],
+      typesConditions: [
+        { condition: "types", path: "./dist/index.d.ts" }
+      ],
+      typesPath: "./dist/index.d.ts"
     }
-  }
+  ],
+  outDir: "dist",
+  packageDir: "/repo/packages/example",
+  phases: [
+    "read-tsconfig",
+    "discover-entrypoints",
+    "typescript-declaration-emit",
+    "validate-package-types",
+    "warn"
+  ],
+  rollup: false,
+  tsconfigPath: "tsconfig.json",
+  updatePackageJson: false,
 }
 ```
 
-Or multiple subpath entrypoints:
+## Public API
 
-```json
-{
-  "exports": {
+### `discoverPackageEntrypoints(packageJson)`
+
+Discovers public package entrypoints from parsed package metadata.
+
+```ts
+import { discoverPackageEntrypoints } from "@reliverse/declar";
+
+const result = discoverPackageEntrypoints({
+  exports: {
     ".": {
-      "types": "./dist/index.d.ts",
-      "import": "./dist/index.js"
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
     },
     "./cli": {
-      "types": "./dist/cli.d.ts",
-      "import": "./dist/cli.js"
-    }
-  }
-}
+      types: "./dist/cli.d.ts",
+      import: "./dist/cli.js",
+    },
+  },
+});
 ```
 
-Declar treats these entrypoints as the package's public declaration surface. That makes it possible to validate declaration output against what users can actually import.
+Returns:
 
-## Supported entrypoint shapes
+- `entrypoints` — discovered public declaration surface
+- `diagnostics` — structured issues found while reading package metadata
 
-Declar currently understands these common package shapes.
+### `createDeclarPipelinePlan(options)`
+
+Creates a declarative pipeline plan for later declaration work.
+
+```ts
+import { createDeclarPipelinePlan } from "@reliverse/declar";
+
+const plan = createDeclarPipelinePlan({
+  packageDir: process.cwd(),
+  packageJson,
+  declarationMap: true,
+  outDir: "dist",
+  rollup: false,
+  tsconfigPath: "tsconfig.json",
+  updatePackageJson: false,
+});
+```
+
+The current implementation plans stages only. It does not execute the TypeScript compiler or write files.
+
+## Pipeline options
+
+### `packageDir`
+
+Package directory used as the base for future filesystem-aware stages.
+
+### `packageJson`
+
+Parsed package metadata. Declar receives this object instead of reading `package.json` directly in Milestone 0.1.
+
+### `declarationMap`
+
+Whether declaration maps should be requested during future TypeScript-backed declaration emit. Defaults to `false`.
+
+Declaration maps are useful for editor flows like Go to Definition because they connect generated `.d.ts` files back to original `.ts` sources.
+
+### `outDir`
+
+Output directory for future declaration artifacts. Defaults to `dist`.
+
+### `rollup`
+
+Whether declaration bundling should be included in the pipeline plan. Defaults to `false`.
+
+In Milestone 0.1 this only adds the `bundle-declarations` phase to the plan.
+
+### `tsconfigPath`
+
+Path to the TypeScript config file relative to `packageDir`. Defaults to `tsconfig.json`.
+
+### `updatePackageJson`
+
+Whether package metadata wiring should be included in the pipeline plan. Defaults to `false`.
+
+In Milestone 0.1 this only adds the `wire-package-types` phase to the plan.
+
+## Entrypoint model
+
+Declar treats `package.json#exports` as the package's public declaration surface. This matters because users import through exports, not through arbitrary source files.
+
+Each entrypoint has:
+
+- `exportPath` — `"."`, `"./cli"`, `"./*"`, etc.
+- `kind` — `"root"`, `"subpath"`, or `"pattern"`
+- runtime targets such as `importPath`, `requirePath`, or `defaultPath`
+- declaration targets such as `typesPath`, `importTypesPath`, or `requireTypesPath`
+- normalized `runtimeConditions` and `typesConditions`
+
+## Supported package shapes
 
 ### Legacy package fields
 
@@ -105,7 +205,7 @@ Declar currently understands these common package shapes.
 }
 ```
 
-This is valid runtime metadata, but Declar will warn because no declaration target is declared.
+This is valid runtime metadata, but Declar reports a diagnostic because no declaration target is declared.
 
 ### Root conditional exports
 
@@ -132,6 +232,21 @@ This is valid runtime metadata, but Declar will warn because no declaration targ
 }
 ```
 
+### Versioned TypeScript types conditions
+
+```json
+{
+  "exports": {
+    ".": {
+      "types@>=5.0": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  }
+}
+```
+
+Declar treats `types@...` keys as valid declaration conditions.
+
 ### Nested import/require declaration conditions
 
 ```json
@@ -151,7 +266,23 @@ This is valid runtime metadata, but Declar will warn because no declaration targ
 }
 ```
 
-This shape is important for packages that publish separate ESM and CJS artifacts.
+This shape is useful when ESM and CJS artifacts need separate declaration files.
+
+### Additional runtime conditions
+
+```json
+{
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "browser": "./dist/index.browser.js",
+      "default": "./dist/index.js"
+    }
+  }
+}
+```
+
+Declar preserves supported string runtime targets like `browser` in `runtimeConditions`, but reports `DECLAR_EXPORT_CONDITION_UNSUPPORTED` because they are not primary Declar conditions yet.
 
 ### Pattern exports
 
@@ -166,13 +297,24 @@ This shape is important for packages that publish separate ESM and CJS artifacts
 }
 ```
 
-Declar can detect pattern entrypoints, but full pattern validation is intentionally deferred until filesystem-aware validation exists.
+Declar can detect pattern entrypoints. Full pattern validation is deferred until filesystem-aware validation exists.
 
-## Warning codes
+## Diagnostics
 
-Declar warnings are structured and designed to be rendered by `dler build` later.
+Diagnostics are structured and designed to be rendered by `dler build` later.
 
-Current warning codes:
+```ts
+export type DeclarDiagnosticSeverity = "info" | "warning" | "error";
+
+export interface DeclarDiagnostic {
+  readonly code: DeclarDiagnosticCode;
+  readonly message: string;
+  readonly path?: readonly string[] | undefined;
+  readonly severity: DeclarDiagnosticSeverity;
+}
+```
+
+Current diagnostic codes:
 
 - `DECLAR_EXPORT_CONDITION_UNSUPPORTED`
 - `DECLAR_EXPORT_MISSING_RUNTIME_TARGET`
@@ -184,7 +326,7 @@ Current warning codes:
 - `DECLAR_EXPORT_UNSUPPORTED_SHAPE`
 - `DECLAR_PACKAGE_MISSING_EXPORTS`
 
-Warnings are not just strings. They include a stable code, a human-readable message, and an optional path pointing back to the relevant package metadata location.
+All Milestone 0.1 diagnostics currently use `severity: "warning"`.
 
 Example:
 
@@ -192,64 +334,14 @@ Example:
 {
   code: "DECLAR_EXPORT_MISSING_TYPES",
   message: "Export . does not declare a types condition.",
-  path: ["package.json", "exports", "."]
+  path: ["package.json", "exports", "."],
+  severity: "warning"
 }
 ```
 
-## Intended pipeline
+## Planned pipeline
 
-```ts
-import { createDeclarPipelinePlan } from "@reliverse/declar";
-
-const plan = createDeclarPipelinePlan({
-  packageDir: process.cwd(),
-  packageJson,
-  declarationMap: true,
-});
-```
-
-The current implementation returns a declarative plan:
-
-```ts
-{
-  declarationMap: true,
-  entrypoints: [
-    {
-      exportPath: ".",
-      kind: "root",
-      importPath: "./dist/index.js",
-      typesPath: "./dist/index.d.ts",
-      runtimeConditions: [
-        {
-          condition: "import",
-          path: "./dist/index.js"
-        }
-      ],
-      typesConditions: [
-        {
-          condition: "types",
-          path: "./dist/index.d.ts"
-        }
-      ]
-    }
-  ],
-  outDir: "dist",
-  packageDir: "/repo/packages/example",
-  phases: [
-    "read-tsconfig",
-    "discover-entrypoints",
-    "typescript-declaration-emit",
-    "validate-package-types",
-    "warn"
-  ],
-  rollup: false,
-  tsconfigPath: "tsconfig.json",
-  updatePackageJson: false,
-  warnings: []
-}
-```
-
-The future implementation should evolve this plan into executable stages:
+Declar's planned executable pipeline is:
 
 1. Load package metadata.
 2. Load and resolve `tsconfig.json`.
@@ -258,55 +350,13 @@ The future implementation should evolve this plan into executable stages:
 5. Validate export/type wiring.
 6. Optionally roll up declarations.
 7. Optionally update `package.json`.
-8. Return structured warnings and artifacts.
+8. Return structured diagnostics and artifacts.
 
-## Pipeline options
+Milestone 0.1 only builds the plan and discovers entrypoints.
 
-```ts
-import { createDeclarPipelinePlan } from "@reliverse/declar";
+## Milestone 1: TypeScript-backed emit
 
-const plan = createDeclarPipelinePlan({
-  packageDir: process.cwd(),
-  packageJson,
-  declarationMap: true,
-  outDir: "dist",
-  rollup: false,
-  tsconfigPath: "tsconfig.json",
-  updatePackageJson: false,
-});
-```
-
-### `packageDir`
-
-Package directory used as the base for future filesystem-aware stages.
-
-### `packageJson`
-
-Parsed package metadata. Declar intentionally receives this object instead of reading it directly in the current milestone.
-
-### `declarationMap`
-
-Whether declaration maps should be requested during TypeScript-backed declaration emit.
-
-### `outDir`
-
-Output directory for generated declaration artifacts. Defaults to `dist`.
-
-### `rollup`
-
-Whether declaration bundling should be included in the pipeline plan. Defaults to `false`.
-
-### `tsconfigPath`
-
-Path to the TypeScript config file relative to `packageDir`. Defaults to `tsconfig.json`.
-
-### `updatePackageJson`
-
-Whether package metadata wiring should be included in the pipeline plan. Defaults to `false`.
-
-## Milestone 1: TypeScript-backed
-
-Declar should first use the TypeScript compiler API directly.
+Milestone 1 should use the TypeScript compiler API directly.
 
 Goals:
 
@@ -318,11 +368,9 @@ Goals:
 - optionally enable `declarationMap`
 - validate that every `package.json#exports` entry has matching `types`
 - validate that emitted declaration files exist for declared type targets
-- produce clear, pretty warnings
+- produce clear diagnostics
 
-Why `declarationMap` matters: TypeScript documents it as generating sourcemaps for declaration files, which helps editors map `.d.ts` declarations back to the original `.ts` source for features like Go to Definition.
-
-Reference: [https://www.typescriptlang.org/tsconfig/declarationMap.html](https://www.typescriptlang.org/tsconfig/declarationMap.html)
+Reference: [TypeScript `declarationMap`](https://www.typescriptlang.org/tsconfig/declarationMap.html)
 
 ## Milestone 2: bundle mode
 
@@ -336,11 +384,9 @@ Goals:
 - normalize imports
 - generate files such as `dist/index.d.ts` and `dist/foo.d.ts`
 - update `package.json` with correct `types` conditions
-- keep the output stable enough for publish-time diffs
+- keep output stable enough for publish-time diffs
 
-This mode should not be the only path. Some packages may prefer unbundled declarations when that better matches their source structure.
-
-Declaration rollup should be opt-in until raw emit and package wiring validation are reliable.
+Declaration rollup should stay opt-in until raw emit and package wiring validation are reliable.
 
 ## Milestone 3: fast isolated mode
 
@@ -354,21 +400,7 @@ Goals:
 - fall back to TypeScript for complex files or unsupported syntax
 - make fallback behavior explicit in diagnostics
 
-The important rule: fast mode is an optimization, not a semantic replacement for TypeScript.
-
-## Tests
-
-Run the current Declar tests with Bun:
-
-```bash
-bun test packages/declar/src/package-exports.test.ts packages/declar/src/plan.test.ts
-```
-
-Or run the package source tests:
-
-```bash
-bun test packages/declar/src
-```
+Fast mode is an optimization, not a semantic replacement for TypeScript.
 
 ## Non-goals
 
@@ -385,8 +417,22 @@ bun test packages/declar/src
 
 - build JavaScript/runtime artifacts through the existing build provider
 - delegate declaration generation to `@reliverse/declar`
-- surface Declar warnings in the same concise Dler report format
+- surface Declar diagnostics in the same concise Dler report format
 - fail publish-oriented builds when package export/type wiring is invalid
 - keep declaration-specific behavior out of the main build command
 
 This keeps Dler as the orchestrator and Declar as the declaration pipeline.
+
+## Tests
+
+Run the focused tests:
+
+```bash
+bun test packages/declar/src/package-exports.test.ts packages/declar/src/plan.test.ts
+```
+
+Or from the package directory:
+
+```bash
+bun --cwd packages/declar test
+```

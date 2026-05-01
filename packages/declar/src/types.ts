@@ -1,4 +1,4 @@
-export type DeclarWarningCode =
+export type DeclarDiagnosticCode =
   | "DECLAR_EXPORT_CONDITION_UNSUPPORTED"
   | "DECLAR_EXPORT_MISSING_RUNTIME_TARGET"
   | "DECLAR_EXPORT_MISSING_TYPES"
@@ -9,10 +9,13 @@ export type DeclarWarningCode =
   | "DECLAR_EXPORT_UNSUPPORTED_SHAPE"
   | "DECLAR_PACKAGE_MISSING_EXPORTS";
 
-export interface DeclarWarning {
-  readonly code: DeclarWarningCode;
+export type DeclarDiagnosticSeverity = "error" | "info" | "warning";
+
+export interface DeclarDiagnostic {
+  readonly code: DeclarDiagnosticCode;
   readonly message: string;
   readonly path?: readonly string[] | undefined;
+  readonly severity: DeclarDiagnosticSeverity;
 }
 
 export type DeclarEntrypointKind = "root" | "subpath" | "pattern";
@@ -59,6 +62,7 @@ export interface DeclarPipelineOptions {
 
 export interface DeclarPipelinePlan {
   readonly declarationMap: boolean;
+  readonly diagnostics: readonly DeclarDiagnostic[];
   readonly entrypoints: readonly DeclarEntrypoint[];
   readonly outDir: string;
   readonly packageDir: string;
@@ -66,7 +70,6 @@ export interface DeclarPipelinePlan {
   readonly rollup: boolean;
   readonly tsconfigPath: string;
   readonly updatePackageJson: boolean;
-  readonly warnings: readonly DeclarWarning[];
 }
 
 export type DeclarPipelinePhase =

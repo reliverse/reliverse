@@ -329,7 +329,9 @@ function getPackedInputRelativeRoot(
   resolvedPath: string,
   type: InputType,
 ): string {
-  const relativeResolvedPath = normalizePathForDisplay(path.relative(packedProjectRoot, resolvedPath));
+  const relativeResolvedPath = normalizePathForDisplay(
+    path.relative(packedProjectRoot, resolvedPath),
+  );
 
   if (type === "file") {
     return normalizePathForDisplay(path.dirname(relativeResolvedPath));
@@ -432,11 +434,7 @@ function normalizePackedFilePath(inputRoot: PackedInputRoot, packedPath: string)
 
   let relativeFilePath = path.posix.normalize(normalizedPackedPath);
 
-  if (
-    relativeFilePath === "." ||
-    relativeFilePath === ".." ||
-    relativeFilePath.startsWith("../")
-  ) {
+  if (relativeFilePath === "." || relativeFilePath === ".." || relativeFilePath.startsWith("../")) {
     throw new PackedPathError(`Packed file path escapes the input root: ${packedPath}`);
   }
 
@@ -450,11 +448,7 @@ function normalizePackedFilePath(inputRoot: PackedInputRoot, packedPath: string)
     relativeFilePath = normalizePathForDisplay(path.basename(inputRoot.resolvedPath));
   }
 
-  if (
-    relativeFilePath === "." ||
-    relativeFilePath === ".." ||
-    relativeFilePath.startsWith("../")
-  ) {
+  if (relativeFilePath === "." || relativeFilePath === ".." || relativeFilePath.startsWith("../")) {
     throw new PackedPathError(`Packed file path escapes the input root: ${packedPath}`);
   }
 
