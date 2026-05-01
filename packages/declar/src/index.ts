@@ -1,4 +1,8 @@
 export {
+  bundleTypeScriptDeclarations,
+  collectDeclarDeclarationBundleTargets,
+} from "./bundle-declarations";
+export {
   createDeclarDiagnostic,
   createDeclarError,
   createDeclarWarning,
@@ -8,7 +12,11 @@ export { discoverPackageEntrypoints } from "./package-exports";
 export { createDeclarPipelinePlan } from "./plan";
 export { loadDeclarTsconfig } from "./tsconfig";
 export { emitTypeScriptDeclarations } from "./typescript-emit";
-export { collectDeclarConditionPaths, validateDeclarEntrypointFiles } from "./validate";
+export {
+  collectDeclarConditionPaths,
+  validateDeclarEmittedFiles,
+  validateDeclarEntrypointFiles,
+} from "./validate";
 export type {
   DeclarConditionPath,
   DeclarDiagnostic,
@@ -23,6 +31,13 @@ export type {
   DeclarPipelinePhase,
   DeclarPipelinePlan,
 } from "./types";
+export type {
+  DeclarDeclarationBundle,
+  DeclarDeclarationBundleHost,
+  DeclarDeclarationBundleOptions,
+  DeclarDeclarationBundleResult,
+  DeclarDeclarationBundleTarget,
+} from "./bundle-declarations";
 export type {
   DeclarParsedCommandLine,
   DeclarReadConfigFileResult,
@@ -41,6 +56,7 @@ export type {
   DeclarTypeScriptProgram,
 } from "./typescript-emit";
 export type {
+  DeclarEmittedFileValidationOptions,
   DeclarEntrypointFileValidationOptions,
   DeclarEntrypointFileValidationResult,
   DeclarFileSystemHost,

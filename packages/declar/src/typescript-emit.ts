@@ -1,5 +1,9 @@
 import { resolve } from "node:path";
 
+import {
+  type DeclarDeclarationBundleHost,
+  bundleTypeScriptDeclarations,
+} from "./bundle-declarations";
 import { createDeclarError, hasDeclarErrors } from "./diagnostics";
 import { discoverPackageEntrypoints } from "./package-exports";
 import {
@@ -9,18 +13,12 @@ import {
   loadDeclarTsconfig,
 } from "./tsconfig";
 import type { DeclarDiagnostic, DeclarPackageJson } from "./types";
-import { validateDeclarEntrypointFiles } from "./validate";
+import { validateDeclarEmittedFiles, validateDeclarEntrypointFiles } from "./validate";
 
 export interface DeclarTypeScriptEmitAdapter extends DeclarTypeScriptConfigAdapter {
-  readonly createProgram: (
-    rootNames: readonly string[],
-    options: Record<string, unknown>,
-  ) => DeclarTypeScriptProgram;
-  readonly formatDiagnosticsWithColorAndContext?: (
-    diagnostics: readonly unknown[],
-    host: DeclarTypeScriptFormatHost,
-  ) => string;
-  readonly getPreEmitDiagnostics?: (program: DeclarTypeScriptProgram) => readonly unknown[];
+  createProgram(options: { rootNames: readonly string[]; options: any }): DeclarTypeScriptProgram;
+  // any here is fine because this is a boundary to the external compiler api
+  getPreEmitDiagnostics(program: any): readonly unknown[];
 }
 
 export interface DeclarTypeScriptProgram {
@@ -45,22 +43,29 @@ export interface DeclarTypeScriptFormatHost {
 }
 
 export interface DeclarTypeScriptDeclarationEmitOptions {
+  readonly bundleHost?: DeclarDeclarationBundleHost | undefined;
   readonly checkRuntimeTargets?: boolean | undefined;
-  readonly compiler: DeclarTypeScriptEmitAdapter;
+  readonly compiler?: DeclarTypeScriptEmitAdapter | undefined;
   readonly declarationMap?: boolean | undefined;
   readonly outDir?: string | undefined;
   readonly packageDir: string;
   readonly packageJson: DeclarPackageJson;
+  readonly rollup?: boolean | undefined;
   readonly tsconfigPath?: string | undefined;
   readonly validateEmittedFiles?: boolean | undefined;
 }
 
 export interface DeclarTypeScriptDeclarationEmitResult {
+  readonly bundledFiles: readonly string[];
   readonly diagnostics: readonly DeclarDiagnostic[];
   readonly emittedFiles: readonly string[];
   readonly emitSkipped: boolean;
   readonly tsconfig: DeclarTsconfigLoadResult;
 }
+
+type TypeScriptModule = DeclarTypeScriptEmitAdapter & {
+  readonly default?: DeclarTypeScriptEmitAdapter | undefined;
+};
 
 function createFormatHost(compiler: DeclarTypeScriptEmitAdapter): DeclarTypeScriptFormatHost {
   const sys = compiler.sys;
@@ -72,6 +77,38 @@ function createFormatHost(compiler: DeclarTypeScriptEmitAdapter): DeclarTypeScri
     getCurrentDirectory: () => sys?.getCurrentDirectory() ?? process.cwd(),
     getNewLine: () => sys?.newLine ?? "\n",
   };
+}
+
+function isTypeScriptEmitAdapter(value: unknown): value is DeclarTypeScriptEmitAdapter {
+  const compiler = value as Partial<DeclarTypeScriptEmitAdapter>;
+
+  return (
+    typeof compiler === "object" &&
+    compiler !== null &&
+    typeof compiler.createProgram === "function" &&
+    typeof compiler.parseJsonConfigFileContent === "function" &&
+    typeof compiler.readConfigFile === "function"
+  );
+}
+
+async function importDefaultTypeScriptCompiler(): Promise<DeclarTypeScriptEmitAdapter | undefined> {
+  try {
+    const compilerModule = (await import("typescript")) as TypeScriptModule;
+    return compilerModule.default ?? compilerModule;
+  } catch {
+    return undefined;
+  }
+}
+
+async function resolveTypeScriptCompiler(
+  compiler: DeclarTypeScriptEmitAdapter | undefined,
+): Promise<DeclarTypeScriptEmitAdapter | undefined> {
+  if (compiler) {
+    return isTypeScriptEmitAdapter(compiler) ? compiler : undefined;
+  }
+
+  const defaultCompiler = await importDefaultTypeScriptCompiler();
+  return isTypeScriptEmitAdapter(defaultCompiler) ? defaultCompiler : undefined;
 }
 
 function formatTypeScriptDiagnostics(
@@ -110,6 +147,14 @@ function createTypeScriptEmitDiagnostic(
   );
 }
 
+function createCompilerUnavailableDiagnostic(): DeclarDiagnostic {
+  return createDeclarError(
+    "DECLAR_TYPESCRIPT_COMPILER_UNAVAILABLE",
+    "Declar needs a TypeScript compiler. Pass compiler: ts to emitTypeScriptDeclarations, or install TypeScript so Declar can load it automatically.",
+    ["typescript"],
+  );
+}
+
 function createCompilerOptions(
   parsedCommandLine: DeclarParsedCommandLine,
   options: DeclarTypeScriptDeclarationEmitOptions,
@@ -125,11 +170,55 @@ function createCompilerOptions(
   };
 }
 
+function createUnavailableTsconfigResult(
+  options: DeclarTypeScriptDeclarationEmitOptions,
+  diagnostic: DeclarDiagnostic,
+): DeclarTsconfigLoadResult {
+  return {
+    configFilePath: resolve(options.packageDir, options.tsconfigPath ?? "tsconfig.json"),
+    diagnostics: [diagnostic],
+  };
+}
+
+function getDiagnosticKey(diagnostic: DeclarDiagnostic): string {
+  return `${diagnostic.severity}:${diagnostic.code}:${diagnostic.message}:${diagnostic.path?.join("/") ?? ""}`;
+}
+
+function dedupeDiagnostics(diagnostics: readonly DeclarDiagnostic[]): readonly DeclarDiagnostic[] {
+  const seen = new Set<string>();
+  const result: DeclarDiagnostic[] = [];
+
+  for (const diagnostic of diagnostics) {
+    const key = getDiagnosticKey(diagnostic);
+
+    if (seen.has(key)) continue;
+
+    seen.add(key);
+    result.push(diagnostic);
+  }
+
+  return result;
+}
+
 export async function emitTypeScriptDeclarations(
   options: DeclarTypeScriptDeclarationEmitOptions,
 ): Promise<DeclarTypeScriptDeclarationEmitResult> {
+  const compiler = await resolveTypeScriptCompiler(options.compiler);
+
+  if (!compiler) {
+    const diagnostic = createCompilerUnavailableDiagnostic();
+
+    return {
+      bundledFiles: [],
+      diagnostics: [diagnostic],
+      emittedFiles: [],
+      emitSkipped: true,
+      tsconfig: createUnavailableTsconfigResult(options, diagnostic),
+    };
+  }
+
   const tsconfig = loadDeclarTsconfig({
-    compiler: options.compiler,
+    compiler,
     declarationMap: options.declarationMap,
     outDir: options.outDir,
     packageDir: options.packageDir,
@@ -140,6 +229,7 @@ export async function emitTypeScriptDeclarations(
 
   if (!tsconfig.parsedCommandLine || hasDeclarErrors(diagnostics)) {
     return {
+      bundledFiles: [],
       diagnostics,
       emittedFiles: [],
       emitSkipped: true,
@@ -148,16 +238,14 @@ export async function emitTypeScriptDeclarations(
   }
 
   const compilerOptions = createCompilerOptions(tsconfig.parsedCommandLine, options);
-  const program = options.compiler.createProgram(
-    tsconfig.parsedCommandLine.fileNames,
-    compilerOptions,
-  );
-  const preEmitDiagnostics = options.compiler.getPreEmitDiagnostics?.(program) ?? [];
+  const program = compiler.createProgram(tsconfig.parsedCommandLine.fileNames, compilerOptions);
+  const preEmitDiagnostics = compiler.getPreEmitDiagnostics?.(program) ?? [];
 
   if (preEmitDiagnostics.length > 0) {
-    diagnostics.push(createTypeScriptEmitDiagnostic(options.compiler, preEmitDiagnostics));
+    diagnostics.push(createTypeScriptEmitDiagnostic(compiler, preEmitDiagnostics));
 
     return {
+      bundledFiles: [],
       diagnostics,
       emittedFiles: [],
       emitSkipped: true,
@@ -166,26 +254,56 @@ export async function emitTypeScriptDeclarations(
   }
 
   const emitResult = program.emit(undefined, undefined, undefined, true);
+  const emittedFiles = emitResult.emittedFiles ?? [];
   const emitDiagnostics = emitResult.diagnostics ?? [];
 
   if (emitDiagnostics.length > 0 || emitResult.emitSkipped) {
-    diagnostics.push(createTypeScriptEmitDiagnostic(options.compiler, emitDiagnostics));
+    diagnostics.push(createTypeScriptEmitDiagnostic(compiler, emitDiagnostics));
+
+    return {
+      bundledFiles: [],
+      diagnostics: dedupeDiagnostics(diagnostics),
+      emittedFiles,
+      emitSkipped: emitResult.emitSkipped ?? true,
+      tsconfig,
+    };
   }
 
+  const discovery = discoverPackageEntrypoints(options.packageJson);
+  diagnostics.push(...discovery.diagnostics);
+
   if (options.validateEmittedFiles ?? true) {
-    const discovery = discoverPackageEntrypoints(options.packageJson);
-    const validation = await validateDeclarEntrypointFiles({
+    const emittedValidation = validateDeclarEmittedFiles({
+      emittedFiles,
+      entrypoints: discovery.entrypoints,
+      packageDir: options.packageDir,
+    });
+    const fileValidation = await validateDeclarEntrypointFiles({
       checkRuntimeTargets: options.checkRuntimeTargets,
       entrypoints: discovery.entrypoints,
       packageDir: options.packageDir,
     });
 
-    diagnostics.push(...discovery.diagnostics, ...validation.diagnostics);
+    diagnostics.push(...emittedValidation.diagnostics, ...fileValidation.diagnostics);
+  }
+
+  const bundledFiles: string[] = [];
+
+  if (options.rollup && !hasDeclarErrors(diagnostics)) {
+    const bundleResult = await bundleTypeScriptDeclarations({
+      entrypoints: discovery.entrypoints,
+      host: options.bundleHost,
+      packageDir: options.packageDir,
+    });
+
+    diagnostics.push(...bundleResult.diagnostics);
+    bundledFiles.push(...bundleResult.bundles.map((bundle) => bundle.path));
   }
 
   return {
-    diagnostics,
-    emittedFiles: emitResult.emittedFiles ?? [],
+    bundledFiles,
+    diagnostics: dedupeDiagnostics(diagnostics),
+    emittedFiles,
     emitSkipped: emitResult.emitSkipped ?? false,
     tsconfig,
   };

@@ -1,13 +1,13 @@
 import { describe, expect, test } from "bun:test";
 
 import type { DeclarEntrypoint } from "./types";
-import { validateDeclarEntrypointFiles } from "./validate";
+import { validateDeclarEmittedFiles, validateDeclarEntrypointFiles } from "./validate";
 
 function createEntrypoint(typesPath: string): DeclarEntrypoint {
   return {
     exportPath: ".",
     importPath: "./dist/index.js",
-    kind: "root",
+    kind: typesPath.includes("*") ? "pattern" : "root",
     runtimeConditions: [
       {
         condition: "import",
@@ -100,14 +100,77 @@ describe("validateDeclarEntrypointFiles", () => {
     ]);
   });
 
-  test("skips pattern targets until filesystem-aware pattern expansion exists", async () => {
+  test("validates pattern targets when a filesystem host can list files", async () => {
     const result = await validateDeclarEntrypointFiles({
       entrypoints: [createEntrypoint("./dist/*.d.ts")],
       host: {
-        access: async () => {
-          throw new Error("patterns should not be checked directly");
-        },
+        access: async () => {},
+        readDirectory: async () => [
+          "/repo/packages/declar/dist/index.d.ts",
+          "/repo/packages/declar/dist/cli.d.ts",
+        ],
       },
+      packageDir: "/repo/packages/declar",
+    });
+
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("reports missing pattern targets when no files match", async () => {
+    const result = await validateDeclarEntrypointFiles({
+      entrypoints: [createEntrypoint("./dist/*.d.ts")],
+      host: {
+        access: async () => {},
+        readDirectory: async () => ["/repo/packages/declar/dist/index.js"],
+      },
+      packageDir: "/repo/packages/declar",
+    });
+
+    expect(result.diagnostics).toEqual([
+      {
+        code: "DECLAR_DECLARATION_TARGET_MISSING",
+        message:
+          "Export . declares types at ./dist/*.d.ts, but the declaration file does not exist.",
+        path: ["package.json", "exports", "."],
+        severity: "error",
+      },
+    ]);
+  });
+});
+
+describe("validateDeclarEmittedFiles", () => {
+  test("passes when declared declaration targets were emitted", () => {
+    const result = validateDeclarEmittedFiles({
+      emittedFiles: ["/repo/packages/declar/dist/index.d.ts"],
+      entrypoints: [createEntrypoint("./dist/index.d.ts")],
+      packageDir: "/repo/packages/declar",
+    });
+
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  test("reports declaration targets that were not emitted", () => {
+    const result = validateDeclarEmittedFiles({
+      emittedFiles: ["/repo/packages/declar/dist/other.d.ts"],
+      entrypoints: [createEntrypoint("./dist/index.d.ts")],
+      packageDir: "/repo/packages/declar",
+    });
+
+    expect(result.diagnostics).toEqual([
+      {
+        code: "DECLAR_DECLARATION_TARGET_NOT_EMITTED",
+        message:
+          "Export . declares types at ./dist/index.d.ts, but TypeScript did not emit that declaration file.",
+        path: ["package.json", "exports", "."],
+        severity: "error",
+      },
+    ]);
+  });
+
+  test("validates pattern declaration targets against emitted files", () => {
+    const result = validateDeclarEmittedFiles({
+      emittedFiles: ["/repo/packages/declar/dist/index.d.ts"],
+      entrypoints: [createEntrypoint("./dist/*.d.ts")],
       packageDir: "/repo/packages/declar",
     });
 

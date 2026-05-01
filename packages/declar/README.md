@@ -10,15 +10,17 @@ package.json exports
   -> structured diagnostics
   -> tsconfig loading
   -> TypeScript-backed declaration emit
+  -> emitted-file validation
   -> package export/type validation
-  -> future declaration rollup + package.json wiring
+  -> early declaration bundling
+  -> future package.json wiring
 ```
 
 `dler build` will use `@reliverse/declar` as its declaration layer instead of growing declaration-specific logic inside the build command.
 
 ## Current status
 
-Declar has completed **Milestone 0** and has started **Milestone 1**.
+Declar has completed **Milestone 0** and **Milestone 1**. **Milestone 2** has started.
 
 Milestone 0 is closed:
 
@@ -28,14 +30,25 @@ Milestone 0 is closed:
 - diagnostic severity support
 - support for common `package.json#exports` shapes
 
-Milestone 1 has started:
+Milestone 1 is closed:
 
 - filesystem-aware declaration target validation
+- filesystem-aware pattern target validation
 - `tsconfig.json` loading through a TypeScript compiler adapter
 - first TypeScript-backed declaration emit primitive
-- error-level diagnostics for missing files, invalid tsconfig, unavailable compiler adapters, and failed TypeScript emit
+- emitted declaration target validation
+- smoother TypeScript compiler integration through either an explicit compiler adapter or automatic `typescript` loading
+- end-to-end declaration emit tests with temporary fixture packages
+- error-level diagnostics for missing files, invalid tsconfig, unavailable compiler adapters, failed TypeScript emit, and declaration targets that were not emitted
 
-Declar can now model and validate more of the real declaration pipeline, but it is still early. It does **not** yet provide declaration rollup or automatic `package.json` rewriting.
+Milestone 2 has started:
+
+- first raw declaration bundle primitive
+- local `.d.ts` import/re-export inlining
+- optional `rollup: true` flow after TypeScript-backed emit
+- bundle diagnostics for missing entrypoints, unsupported pattern targets, unresolved local imports, read/write failures, and bundle cycles
+
+Declar can now model, emit, validate, and start bundling declaration output, but bundle mode is still early. It does **not** yet provide a semantic API Extractor-style declaration rollup or automatic `package.json` rewriting.
 
 ## Install
 
@@ -207,6 +220,10 @@ const plan = createDeclarPipelinePlan({
 
 This function plans stages. It does not execute the TypeScript compiler or write files.
 
+When `rollup: true` is enabled, the plan includes the `bundle-declarations` phase. The executable `emitTypeScriptDeclarations` flow can now run the first raw bundle primitive after successful emit and validation.
+
+When `updatePackageJson: true` is enabled, the plan includes the `wire-package-types` phase. Automatic package rewriting is still not implemented.
+
 ### `validateDeclarEntrypointFiles(options)`
 
 Validates that declared package export targets exist on disk.
@@ -236,7 +253,29 @@ await validateDeclarEntrypointFiles({
 });
 ```
 
-Pattern targets such as `./dist/*.d.ts` are currently skipped by direct filesystem validation. Full pattern expansion will come later.
+Pattern targets such as `./dist/*.d.ts` are validated when the filesystem host can list files. The default host supports recursive directory reads.
+
+### `validateDeclarEmittedFiles(options)`
+
+Validates that TypeScript actually emitted the declaration targets declared by package exports.
+
+```ts
+import { discoverPackageEntrypoints, validateDeclarEmittedFiles } from "@reliverse/declar";
+
+const discovery = discoverPackageEntrypoints(packageJson);
+
+const validation = validateDeclarEmittedFiles({
+  packageDir: process.cwd(),
+  entrypoints: discovery.entrypoints,
+  emittedFiles: ["/repo/packages/example/dist/index.d.ts"],
+});
+
+console.log(validation.diagnostics);
+```
+
+This catches cases where a stale file exists in `dist`, but the current TypeScript emit did not produce the declaration target declared in `package.json#exports`.
+
+Pattern declaration targets are checked against emitted files too.
 
 ### `loadDeclarTsconfig(options)`
 
@@ -275,7 +314,7 @@ The tsconfig loader forces declaration-oriented compiler options:
 
 ### `emitTypeScriptDeclarations(options)`
 
-Runs the first TypeScript-backed declaration emit path.
+Runs the TypeScript-backed declaration emit path.
 
 ```ts
 import { emitTypeScriptDeclarations } from "@reliverse/declar";
@@ -291,20 +330,126 @@ const result = await emitTypeScriptDeclarations({
 });
 
 console.log(result.emittedFiles);
+console.log(result.bundledFiles);
 console.log(result.diagnostics);
 ```
 
-This is an early Milestone 1 primitive. It is intentionally compiler-backed and does not try to replace TypeScript semantics.
+Declar can use an explicit compiler adapter:
+
+```ts
+await emitTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  packageJson,
+  compiler: ts,
+});
+```
+
+If no compiler is passed, Declar tries to load `typescript` automatically from the runtime environment:
+
+```ts
+await emitTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  packageJson,
+});
+```
 
 The function:
 
-1. loads `tsconfig.json`
-2. creates declaration-oriented compiler options
-3. creates a TypeScript program
-4. emits declaration files with `emitDeclarationOnly`
-5. optionally validates declared package type targets
+1. resolves a TypeScript compiler adapter
+2. loads `tsconfig.json`
+3. creates declaration-oriented compiler options
+4. creates a TypeScript program
+5. checks pre-emit diagnostics
+6. emits declaration files with `emitDeclarationOnly`
+7. validates that declared package type targets were emitted
+8. validates declared package type targets on disk
+9. optionally validates runtime targets on disk
+10. optionally runs the early declaration bundle primitive when `rollup: true`
 
-It does not roll up declarations and does not rewrite `package.json`.
+It does not automatically rewrite `package.json`.
+
+Options:
+
+```ts
+await emitTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  packageJson,
+  compiler: ts,
+  declarationMap: true,
+  outDir: "dist",
+  tsconfigPath: "tsconfig.json",
+  checkRuntimeTargets: false,
+  validateEmittedFiles: true,
+  rollup: false,
+});
+```
+
+`validateEmittedFiles` defaults to `true`.
+
+### `bundleTypeScriptDeclarations(options)`
+
+Runs the first raw declaration bundle primitive.
+
+```ts
+import { bundleTypeScriptDeclarations, discoverPackageEntrypoints } from "@reliverse/declar";
+
+const discovery = discoverPackageEntrypoints(packageJson);
+
+const result = await bundleTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  entrypoints: discovery.entrypoints,
+});
+
+console.log(result.bundles);
+console.log(result.diagnostics);
+```
+
+The current bundle primitive:
+
+- starts from concrete `types` declaration targets
+- reads emitted `.d.ts`, `.d.mts`, or `.d.cts` files
+- inlines local declaration imports and re-exports
+- keeps external package imports untouched
+- strips declaration source map comments
+- writes the bundled declaration back to the entrypoint declaration file by default
+
+Use `write: false` to preview bundle contents without changing files:
+
+```ts
+const result = await bundleTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  entrypoints: discovery.entrypoints,
+  write: false,
+});
+```
+
+Use `banner: false` to omit the generated banner:
+
+```ts
+await bundleTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  entrypoints: discovery.entrypoints,
+  banner: false,
+});
+```
+
+This is an early Milestone 2 primitive. It is useful for simple local declaration graphs, but it is not yet a semantic API Extractor-style rollup.
+
+### `collectDeclarDeclarationBundleTargets(entrypoints)`
+
+Collects concrete declaration bundle targets from discovered entrypoints.
+
+```ts
+import {
+  collectDeclarDeclarationBundleTargets,
+  discoverPackageEntrypoints,
+} from "@reliverse/declar";
+
+const discovery = discoverPackageEntrypoints(packageJson);
+const targets = collectDeclarDeclarationBundleTargets(discovery.entrypoints);
+
+console.log(targets);
+```
 
 ### Diagnostic helpers
 
@@ -341,9 +486,11 @@ Output directory for declaration artifacts. Defaults to `dist`.
 
 ### `rollup`
 
-Whether declaration bundling should be included in the pipeline plan. Defaults to `false`.
+Whether declaration bundling should be included in the pipeline plan and executable emit flow. Defaults to `false`.
 
-This only adds the `bundle-declarations` phase to the plan. Declaration rollup is not implemented yet.
+In the executable flow, `rollup: true` runs `bundleTypeScriptDeclarations` after successful TypeScript-backed emit and validation.
+
+Bundle mode is currently early and best suited for simple local `.d.ts` graphs.
 
 ### `tsconfigPath`
 
@@ -479,7 +626,9 @@ Declar preserves supported string runtime targets like `browser` in `runtimeCond
 }
 ```
 
-Declar can detect pattern entrypoints. Direct pattern validation is deferred until filesystem-aware pattern expansion exists.
+Declar can detect pattern entrypoints and validate pattern targets when the filesystem host can list files.
+
+Pattern targets are not supported by the early declaration bundle primitive yet, because bundling needs concrete declaration files.
 
 ## Diagnostics
 
@@ -498,7 +647,14 @@ export interface DeclarDiagnostic {
 
 Current diagnostic codes:
 
+- `DECLAR_BUNDLE_CYCLE`
+- `DECLAR_BUNDLE_ENTRYPOINT_MISSING`
+- `DECLAR_BUNDLE_PATTERN_TARGET_UNSUPPORTED`
+- `DECLAR_BUNDLE_READ_FAILED`
+- `DECLAR_BUNDLE_UNRESOLVED_LOCAL_IMPORT`
+- `DECLAR_BUNDLE_WRITE_FAILED`
 - `DECLAR_DECLARATION_TARGET_MISSING`
+- `DECLAR_DECLARATION_TARGET_NOT_EMITTED`
 - `DECLAR_EXPORT_CONDITION_UNSUPPORTED`
 - `DECLAR_EXPORT_MISSING_RUNTIME_TARGET`
 - `DECLAR_EXPORT_MISSING_TYPES`
@@ -517,7 +673,7 @@ Current diagnostic codes:
 
 Metadata and export-shape diagnostics usually use `severity: "warning"`.
 
-Filesystem, tsconfig, and compiler execution failures use `severity: "error"`.
+Filesystem, emitted-file, tsconfig, compiler execution, and bundle execution failures use `severity: "error"`.
 
 Example warning:
 
@@ -530,13 +686,35 @@ Example warning:
 }
 ```
 
-Example error:
+Example missing-file error:
 
 ```ts
 {
   code: "DECLAR_DECLARATION_TARGET_MISSING",
   message: "Export . declares types at ./dist/index.d.ts, but the declaration file does not exist.",
   path: ["package.json", "exports", "."],
+  severity: "error"
+}
+```
+
+Example emitted-file error:
+
+```ts
+{
+  code: "DECLAR_DECLARATION_TARGET_NOT_EMITTED",
+  message: "Export . declares types at ./dist/index.d.ts, but TypeScript did not emit that declaration file.",
+  path: ["package.json", "exports", "."],
+  severity: "error"
+}
+```
+
+Example bundle error:
+
+```ts
+{
+  code: "DECLAR_BUNDLE_UNRESOLVED_LOCAL_IMPORT",
+  message: "Declar could not resolve local declaration import \"./foo\" from /repo/packages/example/dist/index.d.ts.",
+  path: ["/repo/packages/example/dist/index.d.ts"],
   severity: "error"
 }
 ```
@@ -549,12 +727,15 @@ Declar's planned executable pipeline is:
 2. Load and resolve `tsconfig.json`.
 3. Discover public package entrypoints.
 4. Emit declarations through TypeScript.
-5. Validate export/type wiring.
-6. Optionally roll up declarations.
-7. Optionally update `package.json`.
-8. Return structured diagnostics and artifacts.
+5. Validate emitted declaration files against package exports.
+6. Validate export/type wiring on disk.
+7. Optionally roll up declarations.
+8. Optionally update `package.json`.
+9. Return structured diagnostics and artifacts.
 
-Milestone 1 implements the first executable pieces of this pipeline.
+Milestone 1 implemented the executable emit and validation pieces of this pipeline.
+
+Milestone 2 now implements the first bundle primitive, but the full semantic rollup story is still in progress.
 
 ## Milestone 0: entrypoint discovery and planning
 
@@ -576,40 +757,47 @@ Completed:
 
 ## Milestone 1: TypeScript-backed emit and validation
 
-Status: in progress.
+Status: done.
 
-Implemented:
+Completed:
 
 - load `tsconfig.json` through a TypeScript-compatible compiler adapter
 - force declaration-oriented compiler options
 - create a TypeScript program through the provided compiler adapter
 - emit declaration files through TypeScript
+- automatically load `typescript` when an explicit compiler adapter is not passed
 - validate declared declaration targets on disk
-- optionally validate runtime targets on disk
+- validate declared runtime targets on disk when requested
+- validate declared declaration targets against the actual TypeScript emitted files
+- validate pattern declaration targets when the filesystem host can list files
 - report error-level diagnostics for broken executable pipeline stages
-
-Remaining:
-
-- make the TypeScript adapter integration smoother for the package's chosen compiler dependency
-- add more end-to-end emit tests with temporary fixture packages
-- improve emitted-file to export-target validation
-- expand pattern target validation
-- decide how strict publish-oriented validation should be by default
-- integrate the executable pipeline into `dler build`
+- add end-to-end emit tests with temporary fixture packages
 
 ## Milestone 2: bundle mode
 
-After raw declaration emit works reliably, Declar should support bundled declarations per package entrypoint.
+Status: in progress.
 
-Goals:
+Implemented:
 
-- take emitted `.d.ts` files as input
-- roll up declarations per entrypoint
+- collect declaration bundle targets from discovered entrypoints
+- read concrete `.d.ts`, `.d.mts`, and `.d.cts` entrypoint files
+- inline local declaration imports and re-exports
+- keep external imports intact
+- detect bundle cycles
+- report unresolved local declaration imports
+- write bundled declaration output back to entrypoint declaration files
+- expose `bundleTypeScriptDeclarations`
+- run bundling from `emitTypeScriptDeclarations` when `rollup: true`
+
+Remaining:
+
+- semantic-safe rollup using a TypeScript symbol graph or a mature declaration bundling strategy
 - remove internal/private exports
-- normalize imports
-- generate files such as `dist/index.d.ts` and `dist/foo.d.ts`
-- update `package.json` with correct `types` conditions
-- keep output stable enough for publish-time diffs
+- normalize imports for complex namespace, type-only, and re-export cases
+- bundled output per concrete entrypoint for pattern exports
+- package metadata wiring after bundled output is finalized
+- more fixture tests for ESM/CJS split declarations
+- stable publish-time output suitable for diffs
 
 Declaration rollup should stay opt-in until raw emit and package wiring validation are reliable.
 
@@ -646,13 +834,14 @@ Fast mode is an optimization, not a semantic replacement for TypeScript.
 - delegate declaration generation to `@reliverse/declar`
 - surface Declar diagnostics in the same concise Dler report format
 - fail publish-oriented builds when package export/type wiring is invalid
+- optionally run declaration bundling when package configuration requests it
 - keep declaration-specific behavior out of the main build command
 
 This keeps Dler as the orchestrator and Declar as the declaration pipeline.
 
 ## Tests
 
-Just run all Declar tests (bun test is fast):
+Just run all Declar tests:
 
 ```bash
 bun test packages/declar

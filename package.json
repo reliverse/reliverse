@@ -234,11 +234,11 @@
     "@tanstack/eslint-plugin-query": "^5.100.6",
     "@tanstack/eslint-plugin-router": "^1.161.6",
     "eslint-plugin-react-hooks": "^7.1.1",
-    "eslint-plugin-turbo": "^2.9.6",
+    "eslint-plugin-turbo": "^2.9.7",
     "oxfmt": "^0.47.0",
     "oxlint": "^1.62.0",
     "oxlint-tsgolint": "^0.22.1",
-    "turbo": "^2.9.6"
+    "turbo": "^2.9.7"
   },
   "overrides": {
     "@polar-sh/sdk": "^0.43.1",
