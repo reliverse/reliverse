@@ -2,8 +2,13 @@
   "name": "@repo/blocks",
   "version": "0.1.0",
   "private": true,
+  "files": [
+    "dist",
+    "README.md"
+  ],
   "type": "module",
   "sideEffects": false,
+  "types": "./src/index.ts",
   "exports": {
     "./*": "./src/*.tsx",
     "./lib/*": "./src/lib/*.ts"
@@ -18,10 +23,10 @@
     "@tanstack/react-form": "catalog:",
     "@tanstack/react-form-start": "catalog:",
     "@tanstack/react-query": "^5.100.6",
-    "@tanstack/react-router": "^1.168.26",
+    "@tanstack/react-router": "^1.169.1",
     "@tanstack/react-router-ssr-query": "^1.166.12",
     "@tanstack/react-router-with-query": "catalog:",
-    "@tanstack/react-start": "^1.167.52",
+    "@tanstack/react-start": "^1.167.57",
     "@tanstack/router-plugin": "catalog:",
     "@vitejs/plugin-react": "^6.0.1",
     "ai": "catalog:",

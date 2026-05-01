@@ -4,8 +4,8 @@
   "private": true,
   "description": "Shared TypeScript configuration",
   "files": [
-    "./ts-only.json",
-    "./ts-tsx.json"
+    "dist",
+    "README.md"
   ],
   "type": "module",
   "sideEffects": false,

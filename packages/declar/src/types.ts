@@ -1,4 +1,5 @@
 export type DeclarDiagnosticCode =
+  | "DECLAR_DECLARATION_TARGET_MISSING"
   | "DECLAR_EXPORT_CONDITION_UNSUPPORTED"
   | "DECLAR_EXPORT_MISSING_RUNTIME_TARGET"
   | "DECLAR_EXPORT_MISSING_TYPES"
@@ -7,7 +8,13 @@ export type DeclarDiagnosticCode =
   | "DECLAR_EXPORT_TARGET_NOT_RELATIVE"
   | "DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST"
   | "DECLAR_EXPORT_UNSUPPORTED_SHAPE"
-  | "DECLAR_PACKAGE_MISSING_EXPORTS";
+  | "DECLAR_PACKAGE_MISSING_EXPORTS"
+  | "DECLAR_RUNTIME_TARGET_MISSING"
+  | "DECLAR_TARGET_OUTSIDE_PACKAGE"
+  | "DECLAR_TSCONFIG_PARSE_FAILED"
+  | "DECLAR_TSCONFIG_READ_FAILED"
+  | "DECLAR_TYPESCRIPT_COMPILER_UNAVAILABLE"
+  | "DECLAR_TYPESCRIPT_EMIT_FAILED";
 
 export type DeclarDiagnosticSeverity = "error" | "info" | "warning";
 
@@ -80,3 +87,13 @@ export type DeclarPipelinePhase =
   | "validate-package-types"
   | "warn"
   | "wire-package-types";
+
+export interface DeclarEntrypointDiscoveryResult {
+  readonly diagnostics: readonly DeclarDiagnostic[];
+  readonly entrypoints: readonly DeclarEntrypoint[];
+}
+
+export interface DeclarEntrypointDiscoveryValueResult {
+  readonly diagnostics: readonly DeclarDiagnostic[];
+  readonly entrypoint?: DeclarEntrypoint | undefined;
+}

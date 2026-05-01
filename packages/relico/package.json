@@ -3,11 +3,12 @@
   "version": "0.1.0",
   "private": false,
   "files": [
-    "src",
+    "dist",
     "README.md"
   ],
   "type": "module",
   "sideEffects": false,
+  "types": "./src/index.ts",
   "exports": {
     ".": {
       "types": "./src/index.ts",
