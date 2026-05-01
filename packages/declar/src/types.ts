@@ -17,6 +17,12 @@ export type DeclarDiagnosticCode =
   | "DECLAR_EXPORT_TARGET_NOT_RELATIVE"
   | "DECLAR_EXPORT_TYPES_CONDITION_NOT_FIRST"
   | "DECLAR_EXPORT_UNSUPPORTED_SHAPE"
+  | "DECLAR_FAST_PATH_EMITTER_UNAVAILABLE"
+  | "DECLAR_FAST_PATH_FALLBACK"
+  | "DECLAR_FAST_PATH_INVALID_OUTPUT"
+  | "DECLAR_FAST_PATH_SKIPPED"
+  | "DECLAR_FAST_PATH_UNSUPPORTED_SYNTAX"
+  | "DECLAR_FAST_PATH_USED"
   | "DECLAR_PACKAGE_JSON_WRITE_FAILED"
   | "DECLAR_PACKAGE_MISSING_EXPORTS"
   | "DECLAR_PACKAGE_WIRING_UNSUPPORTED"
@@ -68,8 +74,16 @@ export interface DeclarPackageJson {
   readonly typings?: string | undefined;
 }
 
+export type DeclarFastDeclarationMode = false | "auto" | "typescript";
+
+export type DeclarFastDeclarationOption = DeclarFastDeclarationMode | true;
+
+export type DeclarFastDeclarationFallback = "error" | "typescript";
+
 export interface DeclarPipelineOptions {
   readonly declarationMap?: boolean | undefined;
+  readonly fastDeclarationFallback?: DeclarFastDeclarationFallback | undefined;
+  readonly fastDeclarations?: DeclarFastDeclarationOption | undefined;
   readonly outDir?: string | undefined;
   readonly packageDir: string;
   readonly packageJson: DeclarPackageJson;
@@ -82,6 +96,8 @@ export interface DeclarPipelinePlan {
   readonly declarationMap: boolean;
   readonly diagnostics: readonly DeclarDiagnostic[];
   readonly entrypoints: readonly DeclarEntrypoint[];
+  readonly fastDeclarationFallback: DeclarFastDeclarationFallback;
+  readonly fastDeclarations: DeclarFastDeclarationMode;
   readonly outDir: string;
   readonly packageDir: string;
   readonly phases: readonly DeclarPipelinePhase[];
@@ -91,13 +107,14 @@ export interface DeclarPipelinePlan {
 }
 
 export type DeclarPipelinePhase =
-  | "bundle-declarations"
-  | "discover-entrypoints"
   | "read-tsconfig"
+  | "discover-entrypoints"
+  | "fast-isolated-declaration-emit"
   | "typescript-declaration-emit"
   | "validate-package-types"
-  | "warn"
-  | "wire-package-types";
+  | "bundle-declarations"
+  | "wire-package-types"
+  | "warn";
 
 export interface DeclarEntrypointDiscoveryResult {
   readonly diagnostics: readonly DeclarDiagnostic[];

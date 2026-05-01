@@ -1,5 +1,5 @@
 {
-  "name": "@reliverse/declar",
+  "name": "@reliverse/rspace-rse-plugin",
   "version": "0.1.0",
   "private": false,
   "files": [
@@ -18,18 +18,12 @@
   "publishConfig": {
     "access": "public"
   },
+  "dependencies": {
+    "@reliverse/rempts": "workspace:*"
+  },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
-    "@typescript/native-preview": "catalog:",
-    "typescript": "catalog:"
-  },
-  "peerDependencies": {
-    "typescript": ">=5.6"
-  },
-  "peerDependenciesMeta": {
-    "typescript": {
-      "optional": true
-    }
+    "@typescript/native-preview": "catalog:"
   }
 }

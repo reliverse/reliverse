@@ -206,7 +206,7 @@
         "typescript": "catalog:",
       },
       "peerDependencies": {
-        "typescript": ">=5.0",
+        "typescript": ">=5.6",
       },
       "optionalPeers": [
         "typescript",
@@ -352,6 +352,18 @@
     },
     "plugins/rempts": {
       "name": "@reliverse/rempts-rse-plugin",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reliverse/rempts": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "@typescript/native-preview": "catalog:",
+      },
+    },
+    "plugins/rspace": {
+      "name": "@reliverse/rspace-rse-plugin",
       "version": "0.1.0",
       "dependencies": {
         "@reliverse/rempts": "workspace:*",
@@ -1049,6 +1061,8 @@
     "@reliverse/rempts-rse-plugin": ["@reliverse/rempts-rse-plugin@workspace:plugins/rempts"],
 
     "@reliverse/rse": ["@reliverse/rse@workspace:apps/rse"],
+
+    "@reliverse/rspace-rse-plugin": ["@reliverse/rspace-rse-plugin@workspace:plugins/rspace"],
 
     "@reliverse/toolkit-rse-plugin": ["@reliverse/toolkit-rse-plugin@workspace:plugins/toolkit"],
 

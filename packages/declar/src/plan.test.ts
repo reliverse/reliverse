@@ -49,6 +49,8 @@ describe("createDeclarPipelinePlan", () => {
           typesPath: "./dist/index.d.ts",
         },
       ],
+      fastDeclarationFallback: "typescript",
+      fastDeclarations: false,
       outDir: "dist",
       packageDir: "/repo/packages/declar",
       phases: [
@@ -62,6 +64,37 @@ describe("createDeclarPipelinePlan", () => {
       tsconfigPath: "tsconfig.json",
       updatePackageJson: false,
     });
+  });
+
+  test("adds the fast isolated declaration phase when fast declarations are enabled", () => {
+    const plan = createDeclarPipelinePlan({
+      fastDeclarations: true,
+      packageDir: "/repo/packages/declar",
+      packageJson: createPackageJsonWithTypes(),
+    });
+
+    expect(plan.fastDeclarations).toBe("auto");
+    expect(plan.fastDeclarationFallback).toBe("typescript");
+    expect(plan.phases).toEqual([
+      "read-tsconfig",
+      "discover-entrypoints",
+      "fast-isolated-declaration-emit",
+      "typescript-declaration-emit",
+      "validate-package-types",
+      "warn",
+    ]);
+  });
+
+  test("keeps explicit fast declaration mode and fallback in the plan", () => {
+    const plan = createDeclarPipelinePlan({
+      fastDeclarationFallback: "error",
+      fastDeclarations: "typescript",
+      packageDir: "/repo/packages/declar",
+      packageJson: createPackageJsonWithTypes(),
+    });
+
+    expect(plan.fastDeclarations).toBe("typescript");
+    expect(plan.fastDeclarationFallback).toBe("error");
   });
 
   test("adds only bundle declaration phase when rollup is enabled", () => {
@@ -98,9 +131,10 @@ describe("createDeclarPipelinePlan", () => {
     ]);
   });
 
-  test("adds bundle and package wiring phases in order when both are enabled", () => {
+  test("adds fast, bundle, and package wiring phases in order when enabled", () => {
     const plan = createDeclarPipelinePlan({
       declarationMap: true,
+      fastDeclarations: "auto",
       outDir: "build",
       packageDir: "/repo/packages/declar",
       packageJson: {
@@ -117,6 +151,7 @@ describe("createDeclarPipelinePlan", () => {
     });
 
     expect(plan.declarationMap).toBe(true);
+    expect(plan.fastDeclarations).toBe("auto");
     expect(plan.outDir).toBe("build");
     expect(plan.rollup).toBe(true);
     expect(plan.tsconfigPath).toBe("tsconfig.build.json");
@@ -125,6 +160,7 @@ describe("createDeclarPipelinePlan", () => {
     expect(plan.phases).toEqual([
       "read-tsconfig",
       "discover-entrypoints",
+      "fast-isolated-declaration-emit",
       "typescript-declaration-emit",
       "validate-package-types",
       "bundle-declarations",

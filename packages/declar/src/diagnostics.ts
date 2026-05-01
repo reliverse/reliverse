@@ -22,6 +22,14 @@ export function createDeclarError(
   return createDeclarDiagnostic(code, message, path, "error");
 }
 
+export function createDeclarInfo(
+  code: DeclarDiagnosticCode,
+  message: string,
+  path: readonly string[],
+): DeclarDiagnostic {
+  return createDeclarDiagnostic(code, message, path, "info");
+}
+
 export function createDeclarWarning(
   code: DeclarDiagnosticCode,
   message: string,

@@ -5,9 +5,11 @@ export {
 export {
   createDeclarDiagnostic,
   createDeclarError,
+  createDeclarInfo,
   createDeclarWarning,
   hasDeclarErrors,
 } from "./diagnostics";
+export { emitIsolatedTypeScriptDeclarations } from "./isolated-declarations";
 export { discoverPackageEntrypoints } from "./package-exports";
 export { wireDeclarPackageTypes } from "./package-wiring";
 export { createDeclarPipelinePlan } from "./plan";
@@ -27,6 +29,9 @@ export type {
   DeclarEntrypointDiscoveryResult,
   DeclarEntrypointDiscoveryValueResult,
   DeclarEntrypointKind,
+  DeclarFastDeclarationFallback,
+  DeclarFastDeclarationMode,
+  DeclarFastDeclarationOption,
   DeclarPackageJson,
   DeclarPipelineOptions,
   DeclarPipelinePhase,
@@ -39,6 +44,14 @@ export type {
   DeclarDeclarationBundleResult,
   DeclarDeclarationBundleTarget,
 } from "./bundle-declarations";
+export type {
+  DeclarIsolatedDeclarationCompilerAdapter,
+  DeclarIsolatedDeclarationEmitOptions,
+  DeclarIsolatedDeclarationEmitResult,
+  DeclarIsolatedDeclarationHost,
+  DeclarTranspileDeclarationOptions,
+  DeclarTranspileDeclarationResult,
+} from "./isolated-declarations";
 export type {
   DeclarPackageTypesWiringHost,
   DeclarPackageTypesWiringOptions,

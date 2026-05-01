@@ -1,54 +1,54 @@
-# @reliverse/declar
+# `@reliverse/declar`
 
-Declaration tooling for TypeScript packages.
+Declaration safety tooling for TypeScript packages.
 
-Declar helps a build tool answer one boring but important question:
+Declar helps build tools answer one boring but important question:
 
-> "Do the declaration files I emit actually match what my package exports?"
+> Do the declaration files I emit actually match what my package exports?
 
-It does not replace TypeScript. It uses TypeScript for declaration emit, then adds package-aware checks around `package.json#exports`, `types` conditions, emitted files, and optional declaration bundling.
+It does **not** replace TypeScript. TypeScript remains the source of truth for declaration emit. Declar adds the package-publishing layer around it: entrypoint discovery, export/type validation, emitted-file checks, optional declaration bundling, and conservative package type metadata wiring.
+
+```txt
+package.json exports
+  -> entrypoint discovery
+  -> TypeScript declaration emit
+  -> emitted-file validation
+  -> package target validation
+  -> optional declaration bundling
+  -> optional package type metadata wiring
+```
 
 Declar is currently an early library used by Reliverse tooling. `dler build` is expected to use it as the declaration layer instead of keeping declaration-specific logic inside the build command.
 
-## What it does
+## Scope
 
-Declar can:
+### What Declar can do
 
-- read public entrypoints from `package.json#exports`
+- discover public entrypoints from `package.json#exports`
 - understand common `types`, `import`, `require`, `default`, and `types@...` export shapes
 - load `tsconfig.json` through a TypeScript-compatible compiler adapter
 - emit `.d.ts` files through TypeScript
-- verify that declared type targets exist on disk
-- verify that TypeScript actually emitted the declared type targets
+- validate declared declaration targets on disk
+- validate that exported declaration targets were emitted by the current TypeScript run
+- plan declaration pipeline phases without executing them
 - report structured diagnostics for build tools
-- optionally inline simple local `.d.ts` imports/re-exports with `rollup: true`
+- optionally bundle simple local declaration graphs with `rollup: true`
 - optionally strip declarations marked with `@internal` or `@private` during bundling
-- entrypoint discovery and planning
-- TypeScript-backed declaration emit
-- emitted-file validation
-- filesystem-aware package target validation
-- structured diagnostics
-- optional early declaration bundling
-- deterministic bundle target ordering
-- opt-in text-level stripping for `@internal` / `@private` declarations
-- pattern declaration target expansion to concrete bundle outputs
-- external import/re-export dedupe
-- identical declaration block dedupe
-- unsafe declaration name collision diagnostics
-- TypeScript-backed bundled output validation
-- conservative opt-in package type metadata wiring
+- expand pattern declaration targets into concrete bundle outputs
+- dedupe external import/re-export lines and identical declaration blocks
+- report unsafe declaration name collisions
+- validate bundled output with TypeScript
+- conservatively wire package type metadata when explicitly opted in
 
-Declar does not / does not yet:
+### Declar does not / Does not yet
 
-- rewrite `package.json` unless `updatePackageJson: true` or `wireDeclarPackageTypes({ write: true })` is used
-- provide an API Extractor-style semantic rollup
-- make declaration bundling safe for every complex package shape
 - replace TypeScript's type checker
-- full TypeScript symbol-graph declaration rollup
-- API Extractor-level trimming/release-tag analysis
-- broader package metadata rewriting for unusual export shapes
-- semantic-safe pattern-export bundling beyond filesystem expansion
-- fast isolated declaration mode with explicit fallback to the TypeScript-backed path
+- provide an API Extractor-style semantic symbol-graph rollup
+- make declaration bundling safe for every complex package shape
+- perform API Extractor-level trimming or release-tag analysis
+- broadly rewrite unusual export shapes
+- rewrite `package.json` unless explicitly opted in
+- provide fast isolated declaration mode with fallback to the TypeScript-backed path
 
 ## Install
 
@@ -81,10 +81,10 @@ For published packages, point exports at built files in `dist`, not raw source f
 }
 ```
 
-Keep both places:
+Keep both type metadata locations:
 
-- `exports["."].types` is the modern entrypoint-aware type target
-- top-level `types` acts as a compatibility fallback and package metadata signal for tools and registries such as npm
+- `exports["."].types` is the modern entrypoint-aware declaration target
+- top-level `types` is a compatibility fallback and package metadata signal for tools and registries
 
 Put `types` first in each export object. TypeScript checks conditions in order, and this avoids subtle package-resolution surprises.
 
@@ -130,9 +130,9 @@ The emit flow:
 8. checks bundled declaration output with TypeScript by default
 9. optionally writes package type metadata when `updatePackageJson: true`
 
-It only rewrites `package.json` when you explicitly opt in with `updatePackageJson: true`.
+Declar only rewrites `package.json` when you explicitly opt in with `updatePackageJson: true`.
 
-## Quick start: just inspect package exports
+## Quick start: inspect package exports
 
 Use this when a build tool only needs to understand the public type surface:
 
@@ -194,7 +194,7 @@ Possible phases are:
 - `wire-package-types` when `updatePackageJson: true`
 - `warn`
 
-`updatePackageJson: true` adds the planned phase. In the executable emit flow, it also opts into package type metadata writing after successful emit/validation.
+`updatePackageJson: true` adds the planned phase. In the executable emit flow, it also opts into package type metadata writing after successful emit, validation, and optional bundling.
 
 ## Optional: declaration bundling
 
@@ -231,9 +231,9 @@ The bundler:
 
 Use `write: false` to preview output. Use `banner: false` to skip the generated banner. Use `stripInternal: true` to remove declarations whose JSDoc contains `@internal` or `@private`.
 
-Bundle mode is intentionally opt-in. It is useful for simple local declaration graphs. It now has basic collision detection, output normalization, and a TypeScript-backed bundled-output check. It is still not a full TypeScript symbol-graph rollup.
+Bundle mode is intentionally opt-in. It is useful for simple local declaration graphs. It includes basic collision detection, output normalization, and a TypeScript-backed bundled-output check. It is still not a full TypeScript symbol-graph rollup.
 
-## Optional: package type wiring
+## Optional: package type metadata wiring
 
 Use `wireDeclarPackageTypes` when you want Declar to update package type metadata from discovered entrypoints.
 
@@ -291,6 +291,8 @@ const validation = validateDeclarEmittedFiles({
   entrypoints: discovery.entrypoints,
   emittedFiles: ["/repo/packages/example/dist/index.d.ts"],
 });
+
+console.log(validation.diagnostics);
 ```
 
 This catches stale `dist` files: a declaration file may exist, but the current TypeScript run may not have emitted it.
@@ -401,12 +403,27 @@ Common diagnostics include:
 - export targets outside the package directory
 - declaration files missing on disk
 - declaration targets not emitted by TypeScript
-- failed tsconfig loading or TypeScript emit
+- failed `tsconfig.json` loading
+- failed TypeScript declaration emit
 - bundle read/write/resolve errors
 - unsafe bundle declaration name collisions
 - bundled declaration output that TypeScript cannot check
 - unsupported package metadata wiring shapes
 - package metadata write failures
+
+A build tool can turn these diagnostics into user-facing output, for example:
+
+```txt
+@reliverse/declar found 2 declaration issues:
+
+error DECLAR_MISSING_EXPORTED_TYPES
+  exports["./cli"].types points to ./dist/cli.d.ts,
+  but the current TypeScript emit did not produce that file.
+
+warning DECLAR_TOP_LEVEL_TYPES_MISMATCH
+  package.json#types points to ./dist/index.d.ts,
+  but exports["."].types points to ./dist/main.d.ts.
+```
 
 ## Public API
 
@@ -423,7 +440,14 @@ Main functions:
 - `collectDeclarDeclarationBundleTargets(entrypoints)`
 - `bundleTypeScriptDeclarations(options)`
 
-Main types are exported from the package too, including `DeclarDiagnostic`, `DeclarEntrypoint`, `DeclarPipelinePlan`, declaration bundle types, tsconfig adapter types, and TypeScript emit adapter/result types.
+Main types are exported from the package too, including:
+
+- `DeclarDiagnostic`
+- `DeclarEntrypoint`
+- `DeclarPipelinePlan`
+- declaration bundle types
+- tsconfig adapter types
+- TypeScript emit adapter/result types
 
 ## Tests
 
