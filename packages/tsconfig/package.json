@@ -8,6 +8,7 @@
     "./ts-tsx.json"
   ],
   "type": "module",
+  "sideEffects": false,
   "exports": {
     "./ts-only.json": "./ts-only.json",
     "./ts-tsx.json": "./ts-tsx.json"

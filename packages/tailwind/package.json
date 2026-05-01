@@ -3,9 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "exports": {
     "./base.css": "./base.css",
-    "./postcss.config.mjs": "./postcss.config.mjs"
+    "./postcss": "./postcss.config.mjs"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "catalog:",

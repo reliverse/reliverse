@@ -66,6 +66,22 @@ function readDependencyCandidateListFromManifest(manifest: unknown): readonly st
   return [...names];
 }
 
+function resolvePackageFromHost(
+  hostRequire: NodeRequire,
+  hostPackageJson: string,
+  packageName: string,
+  options?: LoadPluginsFromHostManifestOptions,
+): string {
+  if (typeof Bun !== "undefined") {
+    return Bun.resolveSync(packageName, hostPackageJson);
+  }
+
+  return hostRequire.resolve(
+    packageName,
+    options?.resolvePaths ? { paths: [...options.resolvePaths] } : undefined,
+  );
+}
+
 export function parseHostPluginSpecifier(entry: string): {
   exportName?: string | undefined;
   packageName: string;
@@ -269,10 +285,7 @@ export async function inspectPluginsFromHostManifest(
       }
 
       try {
-        const resolved = hostRequire.resolve(
-          packageName,
-          options?.resolvePaths ? { paths: [...options.resolvePaths] } : undefined,
-        );
+        const resolved = resolvePackageFromHost(hostRequire, hostPackageJson, packageName, options);
 
         const pluginPackageJsonPath = await findNearestPackageJsonPath(resolved);
         if (!pluginPackageJsonPath) {

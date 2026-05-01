@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
-    ".": "./index.js",
     "./*": "./src/*.tsx",
     "./lib/*": "./src/lib/*.ts"
   },

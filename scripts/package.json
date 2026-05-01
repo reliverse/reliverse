@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": [
+    "./*.ts"
+  ],
   "dependencies": {
     "magic-string": "^0.30.21",
     "ts-morph": "catalog:"

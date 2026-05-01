@@ -179,6 +179,7 @@
     ]
   },
   "type": "module",
+  "sideEffects": false,
   "scripts": {
     "rse": "bun apps/rse/src/cli.ts",
     "build": "bun rse build --apply",

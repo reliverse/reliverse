@@ -1,333 +1,23 @@
-import { access, mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, extname, join, relative, resolve } from "node:path";
-
 import { defineCommand } from "@reliverse/rempts";
-import pMap from "p-map";
 
-interface FileMapping {
-  format: string;
-  patterns: string[];
-}
+import { formatEscapeActionMessage, runEscape } from "../../impl/escape";
 
-interface EscapeAction {
-  readonly action: "blocked" | "noop" | "planned" | "written";
-  readonly kind: "convert" | "unescape";
-  readonly inputPath: string;
-  readonly outputPath: string;
-  readonly reason?: string | undefined;
-}
+const COMMAND_NAME = "escape";
+const USAGE = "rse escape --input <path> [flags]";
+const HELP_HINT = 'Run "rse escape --help" for examples and flag details.';
 
-function escapeContent(content: string): string {
-  return content.replace(/\\/g, "\\\\").replace(/`/g, "\\`").replace(/\${/g, "\\${");
-}
-
-function unescapeContent(content: string): string {
-  return content.replace(/\\\${/g, "${").replace(/\\`/g, "`").replace(/\\\\/g, "\\");
-}
-
-function extractContentFromTs(tsContent: string): string {
-  const prefix = "export const content = `";
-  const prefixIndex = tsContent.indexOf(prefix);
-
-  if (prefixIndex === -1) {
-    throw new Error("Invalid escaped file format: expected 'export const content = `...`;'");
+class ReportedUsageError extends Error {
+  constructor() {
+    super("Usage error was already reported.");
+    this.name = "ReportedUsageError";
   }
-
-  const contentStart = prefixIndex + prefix.length;
-  let contentEnd = tsContent.length;
-
-  for (let i = contentEnd - 1; i >= contentStart; i--) {
-    if (tsContent[i] === "`") {
-      const beforeBacktick = tsContent[i - 1];
-
-      if (beforeBacktick !== "\\") {
-        contentEnd = i;
-        break;
-      }
-
-      let backslashCount = 0;
-
-      for (let j = i - 1; j >= contentStart && tsContent[j] === "\\"; j--) {
-        backslashCount++;
-      }
-
-      if (backslashCount % 2 === 0) {
-        contentEnd = i;
-        break;
-      }
-    }
-  }
-
-  if (contentEnd === tsContent.length) {
-    throw new Error("Invalid escaped file format: could not find closing backtick");
-  }
-
-  return tsContent.slice(contentStart, contentEnd);
-}
-
-function parseMap(mapString: string): FileMapping[] {
-  const mappings: FileMapping[] = [];
-  const parts = mapString.trim().split(/\s+/);
-
-  for (const part of parts) {
-    const [format, files] = part.split(":", 2);
-
-    if (!format || !files) {
-      continue;
-    }
-
-    const patterns = files
-      .split(",")
-      .map((pattern) => pattern.trim())
-      .filter(Boolean);
-
-    mappings.push({ format, patterns });
-  }
-
-  return mappings;
-}
-
-async function findFiles(
-  inputPath: string,
-  mappings: FileMapping[] | null,
-  recursive: boolean,
-): Promise<string[]> {
-  const files: string[] = [];
-  const inputStat = await stat(inputPath);
-
-  if (inputStat.isFile()) {
-    return [inputPath];
-  }
-
-  if (!inputStat.isDirectory()) {
-    throw new Error(`Input path is neither a file nor a directory: ${inputPath}`);
-  }
-
-  const defaultExtensions = [".md", ".mdc", ".mdx", ".json", ".jsonc", ".toml"];
-
-  async function walkDir(dir: string, baseDir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (recursive) {
-          await walkDir(fullPath, baseDir);
-        }
-
-        continue;
-      }
-
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      let shouldInclude = false;
-      const ext = extname(entry.name);
-
-      if (defaultExtensions.includes(ext)) {
-        shouldInclude = true;
-      }
-
-      if (mappings) {
-        for (const mapping of mappings) {
-          for (const pattern of mapping.patterns) {
-            if (pattern === "*") {
-              const expectedExt = mapping.format.startsWith(".")
-                ? mapping.format
-                : `.${mapping.format}`;
-
-              if (ext === expectedExt) {
-                shouldInclude = true;
-                break;
-              }
-            } else if (pattern.startsWith("*.")) {
-              const patternExt = pattern.slice(1);
-              const expectedExt = patternExt.startsWith(".") ? patternExt : `.${patternExt}`;
-
-              if (ext === expectedExt) {
-                shouldInclude = true;
-                break;
-              }
-            } else {
-              const patternPath = join(baseDir, pattern);
-              const normalizedPattern = resolve(patternPath);
-              const normalizedFull = resolve(fullPath);
-
-              if (normalizedFull === normalizedPattern) {
-                shouldInclude = true;
-                break;
-              }
-            }
-          }
-
-          if (shouldInclude) {
-            break;
-          }
-        }
-      }
-
-      if (shouldInclude) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  await walkDir(inputPath, inputPath);
-
-  return files;
-}
-
-function isDeclarationFile(filename: string): boolean {
-  return filename.endsWith(".d.ts") || filename.endsWith(".d.mts") || filename.endsWith(".d.cts");
-}
-
-async function findEscapedFiles(inputPath: string, recursive: boolean): Promise<string[]> {
-  const files: string[] = [];
-  const inputStat = await stat(inputPath);
-
-  if (inputStat.isFile()) {
-    const ext = extname(inputPath);
-    const fileName = basename(inputPath);
-
-    if ((ext === ".ts" || ext === ".js") && !isDeclarationFile(fileName)) {
-      return [inputPath];
-    }
-
-    return [];
-  }
-
-  if (!inputStat.isDirectory()) {
-    throw new Error(`Input path is neither a file nor a directory: ${inputPath}`);
-  }
-
-  async function walkDir(dir: string): Promise<void> {
-    const entries = await readdir(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        if (recursive) {
-          await walkDir(fullPath);
-        }
-
-        continue;
-      }
-
-      if (!entry.isFile()) {
-        continue;
-      }
-
-      const ext = extname(entry.name);
-
-      if ((ext === ".ts" || ext === ".js") && !isDeclarationFile(entry.name)) {
-        files.push(fullPath);
-      }
-    }
-  }
-
-  await walkDir(inputPath);
-
-  return files;
-}
-
-function getOutputPath(inputPath: string, filePath: string, isDirectory: boolean): string {
-  if (isDirectory) {
-    const inputDir = dirname(inputPath);
-    const inputName = basename(inputPath);
-    const outputDir = join(inputDir, `${inputName}-escaped`);
-    const relPath = relative(inputPath, filePath);
-    const outputFile = join(outputDir, relPath);
-
-    return `${outputFile}.ts`;
-  }
-
-  return `${inputPath}.ts`;
-}
-
-function getUnescapeOutputPath(inputPath: string, filePath: string, isDirectory: boolean): string {
-  if (isDirectory) {
-    const inputName = basename(inputPath);
-    const inputDir = dirname(inputPath);
-    const outputDirName = inputName.endsWith("-escaped")
-      ? `${inputName.slice(0, -8)}-unescaped`
-      : `${inputName}-unescaped`;
-    const outputDir = join(inputDir, outputDirName);
-    const relPath = relative(inputPath, filePath);
-    const outputFile = join(outputDir, relPath);
-    const ext = extname(outputFile);
-
-    if (ext === ".ts" || ext === ".js") {
-      return outputFile.slice(0, -ext.length);
-    }
-
-    return outputFile;
-  }
-
-  const ext = extname(inputPath);
-  const outputName =
-    ext === ".ts" || ext === ".js" ? basename(inputPath, ext) : basename(inputPath, ".ts");
-
-  return join(dirname(inputPath), outputName);
-}
-
-function createEscapedModuleContent(content: string): string {
-  const escaped = escapeContent(content);
-  return `export const content = \`${escaped}\`;\n`;
-}
-
-async function buildConvertedFileContent(inputPath: string): Promise<string> {
-  const content = await readFile(inputPath, "utf-8");
-  return createEscapedModuleContent(content);
-}
-
-async function buildUnconvertedFileContent(inputPath: string): Promise<string> {
-  const tsContent = await readFile(inputPath, "utf-8");
-  const escapedContent = extractContentFromTs(tsContent);
-  return unescapeContent(escapedContent);
-}
-
-async function readOptionalTextFile(path: string): Promise<string | undefined> {
-  try {
-    return await readFile(path, "utf-8");
-  } catch (error) {
-    if (error instanceof Error && "code" in error && error.code === "ENOENT") {
-      return undefined;
-    }
-
-    throw error;
-  }
-}
-
-async function writeOutputFile(outputPath: string, content: string): Promise<void> {
-  const outputDir = dirname(outputPath);
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(outputPath, content, "utf-8");
-}
-
-function buildActionSummary(actions: readonly EscapeAction[]) {
-  const blocked = actions.filter((action) => action.action === "blocked").length;
-  const noop = actions.filter((action) => action.action === "noop").length;
-  const planned = actions.filter((action) => action.action === "planned").length;
-  const written = actions.filter((action) => action.action === "written").length;
-
-  return {
-    actions,
-    blocked,
-    noop,
-    planned,
-    total: actions.length,
-    written,
-  };
 }
 
 export default defineCommand({
   meta: {
-    name: "escape",
+    name: COMMAND_NAME,
     description:
-      "Convert files (.md, .mdc, .mdx, .json, .jsonc, .toml) to TypeScript with proper escaping",
+      "Convert text files to escaped TypeScript modules, or unescape generated modules back to plain files.",
   },
   agent: {
     notes:
@@ -380,184 +70,147 @@ export default defineCommand({
     },
     unescape: {
       type: "boolean",
-      description: "Reverse the escape operation (convert .ts files back to original format)",
+      description:
+        "Reverse the escape operation, converting escaped .ts/.js modules back to plain files",
       inputSources: ["flag"],
     },
   },
   async handler(ctx) {
-    const infoLabel = (text: string) => ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
-    const okLabel = (text: string) => ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
-    const warnLabel = (text: string) => ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
+    const emitUsageError = (message: string): never => {
+      ctx.output.problem({
+        code: "REMPTS_USAGE",
+        hint: HELP_HINT,
+        kind: "usage",
+        message,
+        ok: false,
+        relatedCommand: COMMAND_NAME,
+        remptsError: 1,
+        schemaVersion: 1,
+        usage: USAGE,
+      });
 
-    const inputPath = resolve(ctx.options.input);
-    const apply = ctx.safety.apply;
-    const preview = !apply;
-    const overwrite = ctx.options.overwrite === true;
-    const kind: EscapeAction["kind"] = ctx.options.unescape ? "unescape" : "convert";
-
-    try {
-      await access(inputPath);
-    } catch {
-      ctx.exit(1, `Input path does not exist: ${inputPath}`);
-    }
-
-    const inputStat = await stat(inputPath);
-    const isDirectory = inputStat.isDirectory();
-    const recursive = ctx.options.recursive;
-    const actions: EscapeAction[] = [];
-    const isJsonOutput = ctx.output.mode === "json";
-    const files = ctx.options.unescape
-      ? await findEscapedFiles(inputPath, recursive)
-      : await findFiles(inputPath, ctx.options.map ? parseMap(ctx.options.map) : null, recursive);
-
-    if (files.length === 0) {
-      ctx.exit(
-        1,
-        ctx.options.unescape ? "No escaped files found to process." : "No files found to process.",
-      );
-    }
-
-    if (!isJsonOutput) {
-      ctx.out(`${infoLabel("Processing:")} ${files.length} file(s)...`);
-    }
-
-    const fileResults = await pMap(
-      files,
-      async (file) => {
-        const outputPath = ctx.options.unescape
-          ? getUnescapeOutputPath(inputPath, file, isDirectory)
-          : getOutputPath(inputPath, file, isDirectory);
-        const nextContent = ctx.options.unescape
-          ? await buildUnconvertedFileContent(file)
-          : await buildConvertedFileContent(file);
-        const existingOutput = await readOptionalTextFile(outputPath);
-
-        if (existingOutput === nextContent) {
-          return {
-            action: {
-              action: "noop" as const,
-              inputPath: file,
-              kind,
-              outputPath,
-              reason: "output already up to date",
-            },
-            messages: isJsonOutput ? [] : [`No-op: ${outputPath} is already up to date`],
-          };
-        }
-
-        if (existingOutput !== undefined && !overwrite) {
-          return {
-            action: {
-              action: "blocked" as const,
-              inputPath: file,
-              kind,
-              outputPath,
-              reason: "existing output differs; re-run with --overwrite to overwrite",
-            },
-            messages: isJsonOutput
-              ? []
-              : [`Blocked: ${outputPath} already exists. Re-run with --overwrite to overwrite.`],
-          };
-        }
-
-        if (preview) {
-          return {
-            action: {
-              action: "planned" as const,
-              inputPath: file,
-              kind,
-              outputPath,
-              reason:
-                existingOutput === undefined
-                  ? "would create output file"
-                  : "would overwrite output file",
-            },
-            messages: isJsonOutput
-              ? []
-              : [
-                  existingOutput === undefined
-                    ? `Preview: would write ${outputPath}`
-                    : `Preview: would overwrite ${outputPath}`,
-                ],
-          };
-        }
-
-        ctx.safety.assertApplied("fs.write");
-        await writeOutputFile(outputPath, nextContent);
-        return {
-          action: {
-            action: "written" as const,
-            inputPath: file,
-            kind,
-            outputPath,
-            reason:
-              existingOutput === undefined
-                ? "created output file"
-                : "overwrote existing output file",
-          },
-          messages: isJsonOutput
-            ? []
-            : [
-                kind === "unescape"
-                  ? `Unescaped: ${file} -> ${outputPath}`
-                  : `Converted: ${file} -> ${outputPath}`,
-              ],
-        };
-      },
-      { concurrency: 8 },
-    );
-
-    for (const result of fileResults) {
-      actions.push(result.action);
-      if (!isJsonOutput) {
-        for (const message of result.messages) {
-          ctx.out(message);
-        }
-      }
-    }
-
-    const summary = buildActionSummary(actions);
-    const resultPayload = {
-      actions,
-      blocked: summary.blocked,
-      command: "escape",
-      apply,
-      preview,
-      overwrite,
-      kind,
-      noop: summary.noop,
-      planned: summary.planned,
-      total: summary.total,
-      written: summary.written,
+      ctx.exit(1);
+      throw new ReportedUsageError();
     };
 
-    if (!isJsonOutput) {
-      ctx.out(
-        `${infoLabel("Summary:")} ${summary.written} written, ${summary.planned} planned, ${summary.noop} no-op, ${summary.blocked} blocked.`,
-      );
-      ctx.out(
-        preview
-          ? okLabel("Preview complete!")
-          : kind === "unescape"
-            ? okLabel("Unescape complete!")
-            : okLabel("Conversion complete!"),
-      );
-    }
+    try {
+      const inputPath =
+        toRequiredString(ctx.options.input) ??
+        emitUsageError("Missing required option: --input <path>.");
 
-    if (summary.blocked > 0) {
-      if (isJsonOutput) {
-        ctx.output.data({
-          ...resultPayload,
-          ok: false,
-          remptsPreview: 1,
-        });
+      const apply = ctx.safety.apply === true;
+      const overwrite = ctx.options.overwrite === true;
+      const unescape = ctx.options.unescape === true;
+      const recursive = ctx.options.recursive !== false;
+      const map = toOptionalString(ctx.options.map);
+      const isJsonOutput = ctx.output.mode === "json";
+
+      if (apply) {
+        ctx.safety.assertApplied("fs.write");
       }
 
-      ctx.exit(1, `${warnLabel("Blocked outputs:")} Re-run with --overwrite to overwrite them.`);
-    }
+      if (unescape && map) {
+        emitUsageError("--map can only be used when converting files, not when unescaping.");
+      }
 
-    if (isJsonOutput) {
-      ctx.output.result(resultPayload, "escape");
+      const result = await runEscape({
+        inputPath, // Type 'string | undefined' is not assignable to type 'string'. The expected type comes from property 'inputPath' which is declared here on type 'EscapeRunOptions'
+        apply,
+        overwrite,
+        recursive,
+        unescape,
+        map,
+      });
+
+      if (!isJsonOutput) {
+        const { stdout } = ctx.colors;
+        const infoLabel = (text: string) => stdout.cyan(stdout.bold(text));
+        const okLabel = (text: string) => stdout.green(stdout.bold(text));
+        const warnLabel = (text: string) => stdout.yellow(stdout.bold(text));
+
+        ctx.out(`${infoLabel("Processing:")} ${result.fileCount} file(s)...`);
+
+        for (const action of result.actions) {
+          ctx.out(formatEscapeActionMessage(action));
+        }
+
+        ctx.out(
+          `${infoLabel("Summary:")} ${result.written} written, ${result.planned} planned, ${result.noop} no-op, ${result.blocked} blocked.`,
+        );
+
+        ctx.out(
+          result.preview
+            ? okLabel("Preview complete!")
+            : result.kind === "unescape"
+              ? okLabel("Unescape complete!")
+              : okLabel("Conversion complete!"),
+        );
+
+        if (result.blocked > 0) {
+          ctx.exit(
+            1,
+            `${warnLabel("Blocked outputs:")} Re-run with --overwrite to overwrite them.`,
+          );
+          return;
+        }
+      }
+
+      if (result.blocked > 0) {
+        if (isJsonOutput) {
+          ctx.output.data({
+            ...result,
+            ok: false,
+            remptsPreview: 1,
+          });
+        }
+
+        ctx.exit(1, "Blocked outputs: re-run with --overwrite to overwrite them.");
+        return;
+      }
+
+      if (isJsonOutput) {
+        ctx.output.result(result, COMMAND_NAME);
+      }
+    } catch (error) {
+      if (error instanceof ReportedUsageError) {
+        return;
+      }
+
+      const message = error instanceof Error ? error.message : String(error);
+
+      if (isEscapeUsageErrorMessage(message)) {
+        emitUsageError(message);
+      }
+
+      ctx.exit(1, message);
     }
   },
 });
+
+function toRequiredString(value: unknown): string | undefined {
+  const text = toOptionalString(value);
+  return text?.trim() || undefined;
+}
+
+function toOptionalString(value: unknown): string | undefined {
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return undefined;
+}
+
+function isEscapeUsageErrorMessage(message: string): boolean {
+  return (
+    message.includes("Missing required option") ||
+    message.includes("--map can only be used") ||
+    message.includes("No escaped files found to process") ||
+    message.includes("No files found to process") ||
+    message.includes("Input path does not exist") ||
+    message.includes("Input path is neither a file nor a directory")
+  );
+}

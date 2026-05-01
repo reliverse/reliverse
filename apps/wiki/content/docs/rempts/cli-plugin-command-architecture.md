@@ -170,7 +170,7 @@ Examples:
 
 These should be modeled as **inherited options**, not as another flavor of global flag.
 
-That distinction keeps the term “global flag” clean and avoids confusing users.
+That distinction keeps the term "global flag” clean and avoids confusing users.
 
 ---
 
@@ -397,7 +397,7 @@ where target resolution may support:
 - global resolution
 - explicit `--global` / `--no-global`
 
-This should be modeled through inherited options, not through a new “plugin-global flags” abstraction.
+This should be modeled through inherited options, not through a new "plugin-global flags” abstraction.
 
 ---
 
@@ -469,7 +469,7 @@ Not required in the first pass:
 - full explain UI for option inheritance
 - cross-CLI execution of arbitrary foreign commands
 - namespace-level parser rewrites beyond what inherited options require
-- reuse of the term “global flags” for inherited plugin/CLI options
+- reuse of the term "global flags” for inherited plugin/CLI options
 
 ---
 
@@ -494,4 +494,4 @@ And with command conflict resolution kept separate through:
 plugins.conflictPriority
 ```
 
-This preserves a clean mental model, avoids duplication, improves diagnostics, and gives plugin namespaces a natural way to define shared options without pretending they are “global flags”.
+This preserves a clean mental model, avoids duplication, improves diagnostics, and gives plugin namespaces a natural way to define shared options without pretending they are "global flags”.

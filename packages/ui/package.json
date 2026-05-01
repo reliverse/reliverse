@@ -3,10 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "sideEffects": false,
   "exports": {
     "./*": "./src/*.tsx",
     "./icons": "./src/icons/index.ts",
-    "./icons/*": "./src/icons/*.tsx",
     "./utils/*": "./src/utils/*.ts"
   },
   "dependencies": {

@@ -7,6 +7,9 @@
     "rse": "./src/cli.ts"
   },
   "type": "module",
+  "sideEffects": [
+    "./src/cli.ts"
+  ],
   "publishConfig": {
     "access": "public"
   },

@@ -1,5 +1,3 @@
-import { pathToFileURL } from "node:url";
-
 import { resolvePackageBuildCommand } from "./package-build-command";
 
 function readFlag(name: string): string | null {
