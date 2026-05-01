@@ -9,6 +9,7 @@ export {
   hasDeclarErrors,
 } from "./diagnostics";
 export { discoverPackageEntrypoints } from "./package-exports";
+export { wireDeclarPackageTypes } from "./package-wiring";
 export { createDeclarPipelinePlan } from "./plan";
 export { loadDeclarTsconfig } from "./tsconfig";
 export { emitTypeScriptDeclarations } from "./typescript-emit";
@@ -38,6 +39,11 @@ export type {
   DeclarDeclarationBundleResult,
   DeclarDeclarationBundleTarget,
 } from "./bundle-declarations";
+export type {
+  DeclarPackageTypesWiringHost,
+  DeclarPackageTypesWiringOptions,
+  DeclarPackageTypesWiringResult,
+} from "./package-wiring";
 export type {
   DeclarParsedCommandLine,
   DeclarReadConfigFileResult,

@@ -32,18 +32,14 @@ export interface DeclarTypeScriptConfigHost {
 }
 
 export interface DeclarTypeScriptConfigAdapter {
-  readonly flattenDiagnosticMessageText?: (messageText: unknown, newLine: string) => string;
-  readonly parseJsonConfigFileContent: (
-    config: unknown,
-    host: DeclarTypeScriptConfigHost,
-    basePath: string,
-    existingOptions?: Record<string, unknown>,
-    configFileName?: string,
-  ) => DeclarParsedCommandLine;
-  readonly readConfigFile: (
-    configFileName: string,
-    readFile: (path: string) => string | undefined,
-  ) => DeclarReadConfigFileResult;
+  // any[] is intentional here because this is a boundary to the external TypeScript compiler API.
+  // Different TypeScript versions expose compatible functions, but not always with the same TS-level shape.
+  readonly flattenDiagnosticMessageText?: (...args: any[]) => string;
+
+  readonly parseJsonConfigFileContent: (...args: any[]) => DeclarParsedCommandLine;
+
+  readonly readConfigFile: (...args: any[]) => DeclarReadConfigFileResult;
+
   readonly sys?: DeclarTypeScriptSys | undefined;
 }
 

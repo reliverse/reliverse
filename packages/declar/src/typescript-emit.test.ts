@@ -1,11 +1,21 @@
 import { describe, expect, test } from "bun:test";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 
 import ts from "typescript";
 
+import type { DeclarDeclarationBundleHost } from "./bundle-declarations";
 import { emitTypeScriptDeclarations } from "./typescript-emit";
+
+const rootExportPackageJson = {
+  exports: {
+    ".": {
+      types: "./dist/index.d.ts",
+      import: "./dist/index.js",
+    },
+  },
+};
 
 async function createFixturePackage(): Promise<string> {
   const packageDir = await mkdtemp(join(tmpdir(), "declar-emit-"));
@@ -31,6 +41,23 @@ async function createFixturePackage(): Promise<string> {
   return packageDir;
 }
 
+async function writePackageJson(packageDir: string, packageJson: Record<string, unknown>) {
+  await writeFile(join(packageDir, "package.json"), JSON.stringify(packageJson, null, 2));
+}
+
+function createBrokenBundleHost(packageDir: string): DeclarDeclarationBundleHost {
+  const declarationPath = resolve(packageDir, "dist", "index.d.ts");
+
+  return {
+    fileExists: async (path) => path === declarationPath,
+    readDirectory: async () => [declarationPath],
+    readFile: async () => "export type Broken = MissingBundledSymbol;\n",
+    writeFile: async (path, contents) => {
+      await writeFile(path, contents);
+    },
+  };
+}
+
 describe("emitTypeScriptDeclarations", () => {
   test("emits declarations with a real TypeScript compiler adapter", async () => {
     const packageDir = await createFixturePackage();
@@ -51,14 +78,7 @@ describe("emitTypeScriptDeclarations", () => {
       const result = await emitTypeScriptDeclarations({
         compiler: ts,
         packageDir,
-        packageJson: {
-          exports: {
-            ".": {
-              types: "./dist/index.d.ts",
-              import: "./dist/index.js",
-            },
-          },
-        },
+        packageJson: rootExportPackageJson,
       });
 
       expect(result.emitSkipped).toBe(false);
@@ -126,14 +146,7 @@ describe("emitTypeScriptDeclarations", () => {
       const result = await emitTypeScriptDeclarations({
         compiler: ts,
         packageDir,
-        packageJson: {
-          exports: {
-            ".": {
-              types: "./dist/index.d.ts",
-              import: "./dist/index.js",
-            },
-          },
-        },
+        packageJson: rootExportPackageJson,
         rollup: true,
       });
 
@@ -146,6 +159,138 @@ describe("emitTypeScriptDeclarations", () => {
       expect(declaration).toContain("export interface Answer");
       expect(declaration).toContain("export declare function createAnswer(): Answer;");
       expect(declaration).not.toContain('from "./answer"');
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("checks bundled declaration output with TypeScript", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.ts"), "export const value = 1;\n");
+
+      const result = await emitTypeScriptDeclarations({
+        bundleHost: createBrokenBundleHost(packageDir),
+        compiler: ts,
+        packageDir,
+        packageJson: rootExportPackageJson,
+        rollup: true,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.bundledFiles.some((file) => file.endsWith("dist/index.d.ts"))).toBe(true);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_BUNDLE_TYPESCRIPT_CHECK_FAILED",
+      ]);
+      expect(result.diagnostics[0]?.message).toContain("MissingBundledSymbol");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("can skip bundled declaration TypeScript validation explicitly", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.ts"), "export const value = 1;\n");
+
+      const result = await emitTypeScriptDeclarations({
+        bundleHost: createBrokenBundleHost(packageDir),
+        compiler: ts,
+        packageDir,
+        packageJson: rootExportPackageJson,
+        rollup: true,
+        validateBundledFiles: false,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.bundledFiles.some((file) => file.endsWith("dist/index.d.ts"))).toBe(true);
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("does not update package metadata when bundled declaration validation fails", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.ts"), "export const value = 1;\n");
+      await writePackageJson(packageDir, {
+        exports: {
+          ".": {
+            import: "./dist/index.js",
+          },
+        },
+      });
+
+      const result = await emitTypeScriptDeclarations({
+        bundleHost: createBrokenBundleHost(packageDir),
+        compiler: ts,
+        packageDir,
+        packageJson: rootExportPackageJson,
+        rollup: true,
+        updatePackageJson: true,
+      });
+
+      expect(result.packageJsonUpdated).toBe(false);
+      expect(result.packageJson).toBeUndefined();
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_BUNDLE_TYPESCRIPT_CHECK_FAILED",
+      ]);
+
+      const packageJson = JSON.parse(await readFile(join(packageDir, "package.json"), "utf8"));
+
+      expect(packageJson).toEqual({
+        exports: {
+          ".": {
+            import: "./dist/index.js",
+          },
+        },
+      });
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("can wire package types after a successful declaration emit", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.ts"), "export const value = 1;\n");
+      await writePackageJson(packageDir, {
+        exports: {
+          ".": {
+            import: "./dist/index.js",
+          },
+        },
+      });
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        packageDir,
+        packageJson: rootExportPackageJson,
+        updatePackageJson: true,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.packageJsonUpdated).toBe(true);
+      expect(result.packageJsonPath).toBe(join(packageDir, "package.json"));
+      expect(result.packageJson?.types).toBe("./dist/index.d.ts");
+
+      const packageJson = JSON.parse(await readFile(join(packageDir, "package.json"), "utf8"));
+
+      expect(packageJson).toEqual({
+        exports: {
+          ".": {
+            types: "./dist/index.d.ts",
+            import: "./dist/index.js",
+          },
+        },
+        types: "./dist/index.d.ts",
+      });
     } finally {
       await rm(packageDir, { force: true, recursive: true });
     }
