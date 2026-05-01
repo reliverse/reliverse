@@ -36,7 +36,7 @@ async function createCreatePlan(options: RspaceCreateOptions): Promise<RspaceCre
   const source = await createSourcePlan(options);
   const state = createRspaceState({
     name: options.name,
-    team: options.team,
+    ...(options.team ? { team: options.team } : {}),
     entryFile: options.entryFile,
     platform: options.platform,
     source,
@@ -62,7 +62,7 @@ async function writeRspace(plan: RspaceCreatePlan): Promise<void> {
   const copiedSourceFiles = await copySourceIfNeeded(plan);
   const state = createRspaceState({
     name: plan.options.name,
-    team: plan.options.team,
+    ...(plan.options.team ? { team: plan.options.team } : {}),
     entryFile: plan.options.entryFile,
     platform: plan.options.platform,
     source: {
@@ -79,17 +79,19 @@ async function writeRspace(plan: RspaceCreatePlan): Promise<void> {
 }
 
 async function createSourcePlan(options: RspaceCreateOptions): Promise<RspaceImportedSource> {
-  const targetPath = options.customPath ?? createTeamTargetPath({
-    team: options.team ?? "default",
-    name: options.name,
-  });
+  const targetPath =
+    options.customPath ??
+    createTeamTargetPath({
+      team: options.team ?? "default",
+      name: options.name,
+    });
 
   if (!options.input) {
     return {
       kind: "none",
       name: options.name,
-      team: options.team,
-      customPath: options.customPath,
+      ...(options.team ? { team: options.team } : {}),
+      ...(options.customPath ? { customPath: options.customPath } : {}),
       targetPath,
       fileCount: 0,
     };
@@ -102,8 +104,8 @@ async function createSourcePlan(options: RspaceCreateOptions): Promise<RspaceImp
     name: toSafeName(path.basename(options.input) || options.name),
     originalPath: options.input,
     targetPath,
-    team: options.team,
-    customPath: options.customPath,
+    ...(options.team ? { team: options.team } : {}),
+    ...(options.customPath ? { customPath: options.customPath } : {}),
     fileCount: 0,
   };
 }
@@ -135,7 +137,9 @@ function formatCreatePreview(plan: RspaceCreatePlan): string {
     `Import target: ${plan.source.targetPath ?? "none"}`,
     "",
     "Generated files:",
-    ...[...plan.generatedFiles.keys()].sort((a, b) => a.localeCompare(b)).map((file) => `- ${file}`),
+    ...[...plan.generatedFiles.keys()]
+      .sort((a, b) => a.localeCompare(b))
+      .map((file) => `- ${file}`),
     "",
     "No files were written. Pass --apply to create the Rspace.",
   ];

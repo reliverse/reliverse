@@ -65,7 +65,11 @@ export async function assertCanWriteOutput(targetPath: string, overwrite: boolea
   });
 }
 
-export async function writeTextFile(root: string, relativePath: string, content: string): Promise<void> {
+export async function writeTextFile(
+  root: string,
+  relativePath: string,
+  content: string,
+): Promise<void> {
   const absolutePath = path.join(root, relativePath);
 
   await mkdir(path.dirname(absolutePath), {
@@ -90,10 +94,7 @@ export async function readJsonFile<T>(targetPath: string): Promise<T> {
   }
 }
 
-export async function copyDirectorySafe(input: {
-  from: string;
-  to: string;
-}): Promise<string[]> {
+export async function copyDirectorySafe(input: { from: string; to: string }): Promise<string[]> {
   const copied: string[] = [];
 
   await copyDirectoryRecursive({

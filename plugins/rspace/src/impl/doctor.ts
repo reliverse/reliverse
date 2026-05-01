@@ -57,7 +57,9 @@ async function checkDirectory(
     return {
       name,
       ok: Boolean(options.optional),
-      detail: options.optional ? `optional path not found: ${directoryPath}` : `path not found: ${directoryPath}`,
+      detail: options.optional
+        ? `optional path not found: ${directoryPath}`
+        : `path not found: ${directoryPath}`,
     };
   }
 }

@@ -24,7 +24,7 @@ export default defineCommand({
     text: "Check local Rspace tooling and environment assumptions",
   },
   options: {},
-  async handler(ctx) {
+  async handler(ctx: unknown) {
     return await runRspaceDoctorCommand(ctx);
   },
 });

@@ -1,10 +1,14 @@
 import path from "node:path";
 
-import { extractTarGzToTemporaryDirectory, removeTemporaryWorkspace, verifyTarGzArchive } from "./archive";
+import {
+  extractTarGzToTemporaryDirectory,
+  removeTemporaryWorkspace,
+  verifyTarGzArchive,
+} from "./archive";
+import { ARCHIVE_MANIFEST_PATH, RSPACE_PROTOCOL, RSPACE_STATE_PATH } from "./constants";
 import { logInfo, readVerifyOptions } from "./context";
 import { assertDirectory, pathExists, readJsonFile } from "./files";
 import { isTarGzPath } from "./paths";
-import { ARCHIVE_MANIFEST_PATH, RSPACE_PROTOCOL, RSPACE_STATE_PATH } from "./constants";
 import type { RspaceState, RspaceVerificationResult } from "./types";
 
 export async function runRspaceVerifyCommand(ctx: unknown): Promise<string> {

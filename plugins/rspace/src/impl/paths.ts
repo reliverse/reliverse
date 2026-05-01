@@ -43,17 +43,11 @@ export function getDirectoryName(inputPath: string): string {
   return path.basename(path.resolve(inputPath));
 }
 
-export function createDefaultOutputPath(input: {
-  cwd: string;
-  name: string;
-}): string {
+export function createDefaultOutputPath(input: { cwd: string; name: string }): string {
   return path.resolve(input.cwd, `./${toSafeName(input.name)}${DEFAULT_RSPACE_EXTENSION}`);
 }
 
-export function createTeamTargetPath(input: {
-  team: string;
-  name: string;
-}): string {
+export function createTeamTargetPath(input: { team: string; name: string }): string {
   return toPosixPath(path.posix.join(TEAMS_DIR, toSafeName(input.team), toSafeName(input.name)));
 }
 

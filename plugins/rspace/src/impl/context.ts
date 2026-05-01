@@ -20,8 +20,10 @@ export function readCreateOptions(ctx: unknown): RspaceCreateOptions {
 
   const rawName = readRequiredString(source, "name", "Pass --name <agent-name>.");
   const name = toSafeName(rawName);
-  const team = readOptionalString(source, "team")?.trim();
+  const rawTeam = readOptionalString(source, "team");
+  const team = rawTeam ? toSafeName(rawTeam) : undefined;
   const customPath = readCustomPath(source, name);
+  const input = readOptionalString(source, "input");
 
   if (!team && !customPath) {
     throw new Error("Pass --team <team-name> or --custom-path <relative-target-path>.");
@@ -46,13 +48,11 @@ export function readCreateOptions(ctx: unknown): RspaceCreateOptions {
   );
 
   return {
-    input: readOptionalString(source, "input")
-      ? resolveUserPath(readRequiredString(source, "input"), cwd)
-      : undefined,
+    ...(input ? { input: resolveUserPath(input, cwd) } : {}),
     output,
     name,
-    team: team ? toSafeName(team) : undefined,
-    customPath,
+    ...(team ? { team } : {}),
+    ...(customPath ? { customPath } : {}),
     entryFile,
     platform: normalizePlatform(platformInput),
     overwrite: readBoolean(source, "overwrite"),

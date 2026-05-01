@@ -53,7 +53,8 @@ export default defineCommand({
     team: {
       type: "string",
       short: "t",
-      description: "Team name used for .rse/teams/<team>/<agent>. Required unless --custom-path is provided.",
+      description:
+        "Team name used for .rse/teams/<team>/<agent>. Required unless --custom-path is provided.",
       inputSources: ["flag"],
     },
     "custom-path": {
@@ -83,7 +84,7 @@ export default defineCommand({
       inputSources: ["flag"],
     },
   },
-  async handler(ctx) {
+  async handler(ctx: unknown) {
     return await runRspaceCreateCommand(ctx);
   },
 });

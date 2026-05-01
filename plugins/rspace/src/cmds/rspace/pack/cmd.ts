@@ -46,7 +46,7 @@ export default defineCommand({
       inputSources: ["flag"],
     },
   },
-  async handler(ctx) {
+  async handler(ctx: unknown) {
     return await runRspacePackCommand(ctx);
   },
 });

@@ -36,7 +36,7 @@ export function createRspaceState(input: {
     protocol: RSPACE_PROTOCOL,
     kind: "rse-agent-space",
     name: input.name,
-    team: input.team,
+    ...(input.team ? { team: input.team } : {}),
     entryFile: input.entryFile,
     platform: input.platform,
     optimizedFor: input.platform === "generic" ? ["generic"] : ["generic", input.platform],

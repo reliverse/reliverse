@@ -24,6 +24,7 @@
     "@reliverse/os-rse-plugin": "workspace:*",
     "@reliverse/pm-rse-plugin": "workspace:*",
     "@reliverse/rempts-rse-plugin": "workspace:*",
+    "@reliverse/rspace-rse-plugin": "workspace:*",
     "@reliverse/toolkit-rse-plugin": "workspace:*",
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",

@@ -1,10 +1,10 @@
 import path from "node:path";
 
 import { createTarGzArchive } from "./archive";
+import { RSPACE_STATE_PATH } from "./constants";
 import { logInfo, readPackOptions } from "./context";
 import { assertDirectory, pathExists } from "./files";
 import { normalizeArchivePath } from "./paths";
-import { RSPACE_STATE_PATH } from "./constants";
 
 export async function runRspacePackCommand(ctx: unknown): Promise<string> {
   const options = readPackOptions(ctx);

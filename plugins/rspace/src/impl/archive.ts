@@ -121,7 +121,12 @@ function decodeLines(buffer: Uint8Array): string[] {
     .filter(Boolean);
 }
 
-function formatProcessError(message: string, result: Bun.SpawnSyncReturns<Uint8Array>): string {
+type ProcessResult = {
+  stdout: Uint8Array;
+  stderr: Uint8Array;
+};
+
+function formatProcessError(message: string, result: ProcessResult): string {
   const stderr = new TextDecoder().decode(result.stderr).trim();
   const stdout = new TextDecoder().decode(result.stdout).trim();
   const details = [stderr, stdout].filter(Boolean).join("\n");

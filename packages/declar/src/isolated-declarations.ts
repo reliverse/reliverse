@@ -22,9 +22,11 @@ export interface DeclarTranspileDeclarationResult {
 
 export interface DeclarIsolatedDeclarationCompilerAdapter {
   readonly flattenDiagnosticMessageText?: (messageText: unknown, newLine: string) => string;
-  readonly sys?: {
-    readonly newLine?: string | undefined;
-  } | undefined;
+  readonly sys?:
+    | {
+        readonly newLine?: string | undefined;
+      }
+    | undefined;
   readonly transpileDeclaration?: (
     sourceText: string,
     options: DeclarTranspileDeclarationOptions,
@@ -239,7 +241,9 @@ function createFastPathInvalidOutputDiagnostic(
   );
 }
 
-function createCompilerOptions(options: DeclarIsolatedDeclarationEmitOptions): Record<string, unknown> {
+function createCompilerOptions(
+  options: DeclarIsolatedDeclarationEmitOptions,
+): Record<string, unknown> {
   return {
     ...options.compilerOptions,
     declaration: true,
@@ -289,11 +293,7 @@ export async function emitIsolatedTypeScriptDeclarations(
       sourceText = await host.readFile(sourceFilePath);
     } catch {
       diagnostics.push(
-        createFastPathFallbackDiagnostic(
-          sourceFilePath,
-          "source file could not be read",
-          fallback,
-        ),
+        createFastPathFallbackDiagnostic(sourceFilePath, "source file could not be read", fallback),
       );
       skippedFiles.push(sourceFilePath);
       continue;

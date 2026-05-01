@@ -34,7 +34,7 @@ export default defineCommand({
       inputSources: ["flag"],
     },
   },
-  async handler(ctx) {
+  async handler(ctx: unknown) {
     return await runRspaceVerifyCommand(ctx);
   },
 });
