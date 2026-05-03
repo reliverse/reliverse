@@ -21,16 +21,18 @@ export interface DeclarTranspileDeclarationResult {
 }
 
 export interface DeclarIsolatedDeclarationCompilerAdapter {
-  readonly flattenDiagnosticMessageText?: (messageText: unknown, newLine: string) => string;
+  readonly flattenDiagnosticMessageText?: (...args: any[]) => string;
   readonly sys?:
     | {
         readonly newLine?: string | undefined;
       }
     | undefined;
-  readonly transpileDeclaration?: (
-    sourceText: string,
-    options: DeclarTranspileDeclarationOptions,
-  ) => DeclarTranspileDeclarationResult;
+
+  // any[] is intentional here because this is a boundary to TypeScript's public API.
+  // TypeScript 5.5+ exposes `transpileDeclaration` with a concrete TranspileOptions type,
+  // and keeping that exact shape here would make `typeof ts` fail assignment under
+  // `exactOptionalPropertyTypes`.
+  readonly transpileDeclaration?: (...args: any[]) => DeclarTranspileDeclarationResult;
 }
 
 export interface DeclarIsolatedDeclarationHost {
@@ -71,6 +73,8 @@ interface DeclarOutputPathResult {
   readonly path?: string | undefined;
 }
 
+const supportedSourceExtensions = new Set([".ts", ".tsx", ".mts", ".cts"]);
+
 function createDefaultHost(
   host: DeclarIsolatedDeclarationHost | undefined,
 ): RequiredDeclarIsolatedDeclarationHost {
@@ -106,27 +110,42 @@ function getDeclarationExtension(filePath: string): string {
   return ".d.ts";
 }
 
+function isDeclarationFile(filePath: string): boolean {
+  return filePath.endsWith(".d.ts") || filePath.endsWith(".d.mts") || filePath.endsWith(".d.cts");
+}
+
+function isSupportedSourceFile(filePath: string): boolean {
+  return supportedSourceExtensions.has(extname(filePath)) && !isDeclarationFile(filePath);
+}
+
+function getCompilerStringOption(
+  options: Record<string, unknown> | undefined,
+  key: "outDir" | "rootDir",
+): string | undefined {
+  const value = options?.[key];
+  return typeof value === "string" ? value : undefined;
+}
+
 function getConfiguredRootDir(options: DeclarIsolatedDeclarationEmitOptions): string {
-  if (options.rootDir) {
-    return normalizePackagePath(options.packageDir, options.rootDir);
-  }
+  const rootDir = options.rootDir ?? getCompilerStringOption(options.compilerOptions, "rootDir");
 
-  const compilerRootDir = options.compilerOptions?.rootDir;
+  return rootDir ? normalizePackagePath(options.packageDir, rootDir) : resolve(options.packageDir);
+}
 
-  if (typeof compilerRootDir === "string") {
-    return normalizePackagePath(options.packageDir, compilerRootDir);
-  }
+function getConfiguredOutDir(options: DeclarIsolatedDeclarationEmitOptions): string {
+  const outDir =
+    options.outDir ?? getCompilerStringOption(options.compilerOptions, "outDir") ?? "dist";
 
-  return resolve(options.packageDir);
+  return normalizePackagePath(options.packageDir, outDir);
 }
 
 function getOutputPath(
   options: DeclarIsolatedDeclarationEmitOptions,
   sourceFilePath: string,
+  fallback: DeclarFastDeclarationFallback,
 ): DeclarOutputPathResult {
-  const packageDir = resolve(options.packageDir);
   const rootDir = getConfiguredRootDir(options);
-  const outDir = normalizePackagePath(packageDir, options.outDir ?? "dist");
+  const outDir = getConfiguredOutDir(options);
   const relativeSourcePath = normalizeSlashes(relative(rootDir, sourceFilePath));
 
   if (relativeSourcePath.startsWith("../") || relativeSourcePath === "..") {
@@ -136,7 +155,7 @@ function getOutputPath(
           "DECLAR_FAST_PATH_INVALID_OUTPUT",
           `Fast declaration emit cannot map ${sourceFilePath} because it is outside rootDir ${rootDir}.`,
           [sourceFilePath],
-          "error",
+          getFallbackSeverity(fallback),
         ),
       ],
     };
@@ -176,6 +195,7 @@ function formatCompilerDiagnostics(
 
       return "TypeScript isolated declaration emit reported an unsupported diagnostic.";
     })
+    .filter(Boolean)
     .join(newLine);
 }
 
@@ -202,6 +222,19 @@ function createFastPathFallbackDiagnostic(
   return createDeclarDiagnostic(
     "DECLAR_FAST_PATH_FALLBACK",
     `Fast isolated declaration emit was skipped for ${path}. Reason: ${reason}.`,
+    [path],
+    getFallbackSeverity(fallback),
+  );
+}
+
+function createFastPathSkippedDiagnostic(
+  path: string,
+  reason: string,
+  fallback: DeclarFastDeclarationFallback,
+): DeclarDiagnostic {
+  return createDeclarDiagnostic(
+    "DECLAR_FAST_PATH_SKIPPED",
+    `Fast isolated declaration emit skipped ${path}. Reason: ${reason}.`,
     [path],
     getFallbackSeverity(fallback),
   );
@@ -254,6 +287,12 @@ function createCompilerOptions(
   };
 }
 
+export function collectDeclarIsolatedDeclarationSourceFiles(
+  files: readonly string[],
+): readonly string[] {
+  return files.filter(isSupportedSourceFile);
+}
+
 export async function emitIsolatedTypeScriptDeclarations(
   options: DeclarIsolatedDeclarationEmitOptions,
 ): Promise<DeclarIsolatedDeclarationEmitResult> {
@@ -276,9 +315,30 @@ export async function emitIsolatedTypeScriptDeclarations(
     };
   }
 
+  const sourceFiles = collectDeclarIsolatedDeclarationSourceFiles(options.files);
+
   for (const file of options.files) {
+    if (sourceFiles.includes(file)) continue;
+
+    diagnostics.push(
+      createFastPathSkippedDiagnostic(file, "file extension is not supported", fallback),
+    );
+    skippedFiles.push(file);
+  }
+
+  if (sourceFiles.length === 0) {
+    return {
+      diagnostics,
+      emittedFiles,
+      fallbackToTypeScript: fallback === "typescript",
+      skippedFiles,
+      usedFastPath: false,
+    };
+  }
+
+  for (const file of sourceFiles) {
     const sourceFilePath = normalizePackagePath(options.packageDir, file);
-    const outputPathResult = getOutputPath(options, sourceFilePath);
+    const outputPathResult = getOutputPath(options, sourceFilePath, fallback);
 
     diagnostics.push(...outputPathResult.diagnostics);
 
@@ -319,7 +379,7 @@ export async function emitIsolatedTypeScriptDeclarations(
       continue;
     }
 
-    if (typeof result.outputText !== "string" || result.outputText.length === 0) {
+    if (typeof result.outputText !== "string") {
       diagnostics.push(createFastPathInvalidOutputDiagnostic(sourceFilePath, fallback));
       skippedFiles.push(sourceFilePath);
       continue;
@@ -328,9 +388,14 @@ export async function emitIsolatedTypeScriptDeclarations(
     if (options.write !== false) {
       await host.mkdir(dirname(outputPathResult.path));
       await host.writeFile(outputPathResult.path, result.outputText);
+
+      if (result.sourceMapText) {
+        await host.writeFile(`${outputPathResult.path}.map`, result.sourceMapText);
+      }
     }
 
     emittedFiles.push(outputPathResult.path);
+    if (result.sourceMapText) emittedFiles.push(`${outputPathResult.path}.map`);
     diagnostics.push(createFastPathUsedDiagnostic(sourceFilePath, outputPathResult.path));
   }
 

@@ -107,14 +107,14 @@ export interface DeclarPipelinePlan {
 }
 
 export type DeclarPipelinePhase =
-  | "read-tsconfig"
+  | "bundle-declarations"
   | "discover-entrypoints"
   | "fast-isolated-declaration-emit"
+  | "read-tsconfig"
   | "typescript-declaration-emit"
   | "validate-package-types"
-  | "bundle-declarations"
-  | "wire-package-types"
-  | "warn";
+  | "warn"
+  | "wire-package-types";
 
 export interface DeclarEntrypointDiscoveryResult {
   readonly diagnostics: readonly DeclarDiagnostic[];

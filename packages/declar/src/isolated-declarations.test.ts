@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { emitIsolatedTypeScriptDeclarations } from "./isolated-declarations";
+import {
+  collectDeclarIsolatedDeclarationSourceFiles,
+  emitIsolatedTypeScriptDeclarations,
+} from "./isolated-declarations";
 import type { DeclarIsolatedDeclarationCompilerAdapter } from "./isolated-declarations";
 
 function createMemoryHost(files: Record<string, string>) {
@@ -29,6 +32,26 @@ function createMemoryHost(files: Record<string, string>) {
     writes,
   };
 }
+
+describe("collectDeclarIsolatedDeclarationSourceFiles", () => {
+  test("keeps supported source files and skips declaration/runtime files", () => {
+    expect(
+      collectDeclarIsolatedDeclarationSourceFiles([
+        "/repo/src/index.ts",
+        "/repo/src/view.tsx",
+        "/repo/src/esm.mts",
+        "/repo/src/cjs.cts",
+        "/repo/src/index.d.ts",
+        "/repo/src/runtime.js",
+      ]),
+    ).toEqual([
+      "/repo/src/index.ts",
+      "/repo/src/view.tsx",
+      "/repo/src/esm.mts",
+      "/repo/src/cjs.cts",
+    ]);
+  });
+});
 
 describe("emitIsolatedTypeScriptDeclarations", () => {
   test("emits declarations through TypeScript transpileDeclaration", async () => {
@@ -102,6 +125,37 @@ describe("emitIsolatedTypeScriptDeclarations", () => {
     ]);
     expect(result.usedFastPath).toBe(true);
     expect(result.fallbackToTypeScript).toBe(false);
+  });
+
+  test("writes declaration maps when the fast emitter returns one", async () => {
+    const packageDir = "/repo/packages/declar";
+    const sourcePath = `${packageDir}/src/index.ts`;
+    const { host, writes } = createMemoryHost({
+      [sourcePath]: "export const value: number = 1;\n",
+    });
+
+    const compiler: DeclarIsolatedDeclarationCompilerAdapter = {
+      transpileDeclaration: () => ({
+        diagnostics: [],
+        outputText: "export declare const value: number;\n",
+        sourceMapText: "{}",
+      }),
+    };
+
+    const result = await emitIsolatedTypeScriptDeclarations({
+      compiler,
+      declarationMap: true,
+      files: ["src/index.ts"],
+      host,
+      packageDir,
+      rootDir: "src",
+    });
+
+    expect(result.emittedFiles).toEqual([
+      `${packageDir}/dist/index.d.ts`,
+      `${packageDir}/dist/index.d.ts.map`,
+    ]);
+    expect(writes.get(`${packageDir}/dist/index.d.ts.map`)).toBe("{}");
   });
 
   test("reports explicit TypeScript fallback when transpileDeclaration is unavailable", async () => {
@@ -187,7 +241,6 @@ describe("emitIsolatedTypeScriptDeclarations", () => {
     const compiler: DeclarIsolatedDeclarationCompilerAdapter = {
       transpileDeclaration: () => ({
         diagnostics: [],
-        outputText: "",
       }),
     };
 

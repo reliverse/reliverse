@@ -4,7 +4,11 @@ import {
   type DeclarDeclarationBundleHost,
   bundleTypeScriptDeclarations,
 } from "./bundle-declarations";
-import { createDeclarError, hasDeclarErrors } from "./diagnostics";
+import { createDeclarDiagnostic, createDeclarError, hasDeclarErrors } from "./diagnostics";
+import {
+  collectDeclarIsolatedDeclarationSourceFiles,
+  emitIsolatedTypeScriptDeclarations,
+} from "./isolated-declarations";
 import { discoverPackageEntrypoints } from "./package-exports";
 import { type DeclarPackageTypesWiringHost, wireDeclarPackageTypes } from "./package-wiring";
 import {
@@ -13,7 +17,13 @@ import {
   type DeclarTypeScriptConfigAdapter,
   loadDeclarTsconfig,
 } from "./tsconfig";
-import type { DeclarDiagnostic, DeclarPackageJson } from "./types";
+import type {
+  DeclarDiagnostic,
+  DeclarFastDeclarationFallback,
+  DeclarFastDeclarationMode,
+  DeclarFastDeclarationOption,
+  DeclarPackageJson,
+} from "./types";
 import { validateDeclarEmittedFiles, validateDeclarEntrypointFiles } from "./validate";
 
 export interface DeclarTypeScriptEmitAdapter extends DeclarTypeScriptConfigAdapter {
@@ -29,6 +39,16 @@ export interface DeclarTypeScriptEmitAdapter extends DeclarTypeScriptConfigAdapt
 
   // any is intentional here because the real TypeScript Program type is much wider than Declar needs.
   readonly getPreEmitDiagnostics: (program: any) => readonly unknown[];
+
+  // any[] is intentional here because this is a boundary to TypeScript's public API.
+  // TypeScript 5.5+ exposes `transpileDeclaration` with a concrete TranspileOptions type,
+  // and keeping that exact shape here would make `typeof ts` fail assignment under
+  // `exactOptionalPropertyTypes`.
+  readonly transpileDeclaration?: (...args: any[]) => {
+    readonly diagnostics?: readonly unknown[] | undefined;
+    readonly outputText?: string | undefined;
+    readonly sourceMapText?: string | undefined;
+  };
 }
 
 export interface DeclarTypeScriptProgram {
@@ -59,6 +79,8 @@ export interface DeclarTypeScriptDeclarationEmitOptions {
   readonly checkRuntimeTargets?: boolean | undefined;
   readonly compiler?: DeclarTypeScriptEmitAdapter | undefined;
   readonly declarationMap?: boolean | undefined;
+  readonly fastDeclarationFallback?: DeclarFastDeclarationFallback | undefined;
+  readonly fastDeclarations?: DeclarFastDeclarationOption | undefined;
   readonly outDir?: string | undefined;
   readonly packageDir: string;
   readonly packageJson: DeclarPackageJson;
@@ -93,6 +115,15 @@ interface DeclarTypeScriptDeclarationContext {
   readonly compiler: DeclarTypeScriptEmitAdapter;
   readonly diagnostics: DeclarDiagnostic[];
   readonly discovery: ReturnType<typeof discoverPackageEntrypoints>;
+  readonly options: DeclarTypeScriptDeclarationEmitOptions;
+  readonly tsconfig: DeclarTsconfigLoadResult & {
+    readonly parsedCommandLine: DeclarParsedCommandLine;
+  };
+}
+
+interface DeclarResolvedEmitContext {
+  readonly compiler: DeclarTypeScriptEmitAdapter;
+  readonly diagnostics: DeclarDiagnostic[];
   readonly options: DeclarTypeScriptDeclarationEmitOptions;
   readonly tsconfig: DeclarTsconfigLoadResult & {
     readonly parsedCommandLine: DeclarParsedCommandLine;
@@ -219,6 +250,22 @@ function createCompilerUnavailableDiagnostic(): DeclarDiagnostic {
   );
 }
 
+function normalizeFastDeclarationMode(
+  mode: DeclarFastDeclarationOption | undefined,
+): DeclarFastDeclarationMode {
+  if (mode === true) {
+    return "auto";
+  }
+
+  return mode ?? false;
+}
+
+function normalizeFastDeclarationFallback(
+  fallback: DeclarFastDeclarationFallback | undefined,
+): DeclarFastDeclarationFallback {
+  return fallback ?? "typescript";
+}
+
 function createCompilerOptions(
   parsedCommandLine: DeclarParsedCommandLine,
   options: DeclarTypeScriptDeclarationEmitOptions,
@@ -282,7 +329,7 @@ function createEmitFailureResult(
 ): DeclarTypeScriptDeclarationEmitResult {
   return {
     bundledFiles: options.bundledFiles ?? [],
-    diagnostics: options.diagnostics,
+    diagnostics: dedupeDiagnostics(options.diagnostics),
     emittedFiles: options.emittedFiles ?? [],
     emitSkipped: true,
     packageJsonUpdated: false,
@@ -382,6 +429,193 @@ async function wirePackageJsonTypes(
   };
 }
 
+async function finishDeclarationPipeline(
+  context: DeclarTypeScriptDeclarationContext,
+  emittedFiles: readonly string[],
+  emitSkipped: boolean,
+): Promise<DeclarTypeScriptDeclarationEmitResult> {
+  const bundledFiles = await bundleDeclarations(context);
+  const packageJsonResult = await wirePackageJsonTypes(context);
+
+  return {
+    bundledFiles,
+    diagnostics: dedupeDiagnostics(context.diagnostics),
+    emittedFiles,
+    emitSkipped,
+    ...packageJsonResult,
+    tsconfig: context.tsconfig,
+  };
+}
+
+async function emitWithTypeScript(
+  context: DeclarResolvedEmitContext,
+): Promise<DeclarTypeScriptDeclarationEmitResult> {
+  const compilerOptions = createCompilerOptions(
+    context.tsconfig.parsedCommandLine,
+    context.options,
+  );
+  const program = context.compiler.createProgram(
+    context.tsconfig.parsedCommandLine.fileNames,
+    compilerOptions,
+  );
+  const preEmitDiagnostics = context.compiler.getPreEmitDiagnostics(program);
+
+  if (preEmitDiagnostics.length > 0) {
+    context.diagnostics.push(createTypeScriptEmitDiagnostic(context.compiler, preEmitDiagnostics));
+
+    return createEmitFailureResult({
+      diagnostics: context.diagnostics,
+      tsconfig: context.tsconfig,
+    });
+  }
+
+  const emitResult = program.emit(undefined, undefined, undefined, true);
+  const emittedFiles = emitResult.emittedFiles ?? [];
+  const emitDiagnostics = emitResult.diagnostics ?? [];
+
+  if (emitDiagnostics.length > 0 || emitResult.emitSkipped) {
+    context.diagnostics.push(createTypeScriptEmitDiagnostic(context.compiler, emitDiagnostics));
+
+    return createEmitFailureResult({
+      diagnostics: context.diagnostics,
+      emittedFiles,
+      tsconfig: context.tsconfig,
+    });
+  }
+
+  const discovery = discoverPackageEntrypoints(context.options.packageJson);
+  context.diagnostics.push(...discovery.diagnostics);
+
+  if (context.options.validateEmittedFiles ?? true) {
+    context.diagnostics.push(
+      ...(await validateEmittedDeclarationTargets(
+        context.options,
+        discovery.entrypoints,
+        emittedFiles,
+      )),
+    );
+  }
+
+  return finishDeclarationPipeline(
+    {
+      compiler: context.compiler,
+      diagnostics: context.diagnostics,
+      discovery,
+      options: context.options,
+      tsconfig: context.tsconfig,
+    },
+    emittedFiles,
+    emitResult.emitSkipped ?? false,
+  );
+}
+
+function createFastPathValidationFallbackDiagnostic(
+  fallback: DeclarFastDeclarationFallback,
+): DeclarDiagnostic {
+  return createDeclarDiagnostic(
+    "DECLAR_FAST_PATH_FALLBACK",
+    "Fast isolated declaration emit output failed Declar package validation. Falling back to the TypeScript-backed declaration path.",
+    ["typescript", "transpileDeclaration"],
+    fallback === "error" ? "error" : "warning",
+  );
+}
+
+function createFastPathNoSourcesDiagnostic(
+  fallback: DeclarFastDeclarationFallback,
+): DeclarDiagnostic {
+  return createDeclarDiagnostic(
+    "DECLAR_FAST_PATH_SKIPPED",
+    "Fast isolated declaration emit found no supported source files in the parsed tsconfig file list.",
+    ["tsconfig", "fileNames"],
+    fallback === "error" ? "error" : "warning",
+  );
+}
+
+async function tryEmitWithFastDeclarations(
+  context: DeclarResolvedEmitContext,
+  fallback: DeclarFastDeclarationFallback,
+): Promise<DeclarTypeScriptDeclarationEmitResult | undefined> {
+  const sourceFiles = collectDeclarIsolatedDeclarationSourceFiles(
+    context.tsconfig.parsedCommandLine.fileNames,
+  );
+
+  if (sourceFiles.length === 0) {
+    context.diagnostics.push(createFastPathNoSourcesDiagnostic(fallback));
+
+    return fallback === "error"
+      ? createEmitFailureResult({ diagnostics: context.diagnostics, tsconfig: context.tsconfig })
+      : undefined;
+  }
+
+  const compilerOptions = createCompilerOptions(
+    context.tsconfig.parsedCommandLine,
+    context.options,
+  );
+  const fastResult = await emitIsolatedTypeScriptDeclarations({
+    compiler: context.compiler,
+    compilerOptions,
+    declarationMap: context.options.declarationMap,
+    fallback,
+    files: sourceFiles,
+    outDir: context.options.outDir,
+    packageDir: context.options.packageDir,
+    write: true,
+  });
+
+  context.diagnostics.push(...fastResult.diagnostics);
+
+  if (fastResult.fallbackToTypeScript) {
+    return undefined;
+  }
+
+  if (!fastResult.usedFastPath || hasDeclarErrors(context.diagnostics)) {
+    return createEmitFailureResult({
+      diagnostics: context.diagnostics,
+      emittedFiles: fastResult.emittedFiles,
+      tsconfig: context.tsconfig,
+    });
+  }
+
+  const discovery = discoverPackageEntrypoints(context.options.packageJson);
+  context.diagnostics.push(...discovery.diagnostics);
+
+  if (context.options.validateEmittedFiles ?? true) {
+    const validationDiagnostics = await validateEmittedDeclarationTargets(
+      context.options,
+      discovery.entrypoints,
+      fastResult.emittedFiles,
+    );
+
+    if (validationDiagnostics.length > 0) {
+      context.diagnostics.push(createFastPathValidationFallbackDiagnostic(fallback));
+
+      if (fallback === "typescript") {
+        return undefined;
+      }
+
+      context.diagnostics.push(...validationDiagnostics);
+
+      return createEmitFailureResult({
+        diagnostics: context.diagnostics,
+        emittedFiles: fastResult.emittedFiles,
+        tsconfig: context.tsconfig,
+      });
+    }
+  }
+
+  return finishDeclarationPipeline(
+    {
+      compiler: context.compiler,
+      diagnostics: context.diagnostics,
+      discovery,
+      options: context.options,
+      tsconfig: context.tsconfig,
+    },
+    fastResult.emittedFiles,
+    false,
+  );
+}
+
 export async function emitTypeScriptDeclarations(
   options: DeclarTypeScriptDeclarationEmitOptions,
 ): Promise<DeclarTypeScriptDeclarationEmitResult> {
@@ -413,58 +647,22 @@ export async function emitTypeScriptDeclarations(
     });
   }
 
-  const compilerOptions = createCompilerOptions(tsconfig.parsedCommandLine, options);
-  const program = compiler.createProgram(tsconfig.parsedCommandLine.fileNames, compilerOptions);
-  const preEmitDiagnostics = compiler.getPreEmitDiagnostics(program);
-
-  if (preEmitDiagnostics.length > 0) {
-    diagnostics.push(createTypeScriptEmitDiagnostic(compiler, preEmitDiagnostics));
-
-    return createEmitFailureResult({
-      diagnostics,
-      tsconfig,
-    });
-  }
-
-  const emitResult = program.emit(undefined, undefined, undefined, true);
-  const emittedFiles = emitResult.emittedFiles ?? [];
-  const emitDiagnostics = emitResult.diagnostics ?? [];
-
-  if (emitDiagnostics.length > 0 || emitResult.emitSkipped) {
-    diagnostics.push(createTypeScriptEmitDiagnostic(compiler, emitDiagnostics));
-
-    return createEmitFailureResult({
-      diagnostics: dedupeDiagnostics(diagnostics),
-      emittedFiles,
-      tsconfig,
-    });
-  }
-
-  const discovery = discoverPackageEntrypoints(options.packageJson);
-  diagnostics.push(...discovery.diagnostics);
-
-  if (options.validateEmittedFiles ?? true) {
-    diagnostics.push(
-      ...(await validateEmittedDeclarationTargets(options, discovery.entrypoints, emittedFiles)),
-    );
-  }
-
-  const context: DeclarTypeScriptDeclarationContext = {
+  const context: DeclarResolvedEmitContext = {
     compiler,
     diagnostics,
-    discovery,
     options,
     tsconfig: { ...tsconfig, parsedCommandLine: tsconfig.parsedCommandLine },
   };
-  const bundledFiles = await bundleDeclarations(context);
-  const packageJsonResult = await wirePackageJsonTypes(context);
+  const fastDeclarations = normalizeFastDeclarationMode(options.fastDeclarations);
+  const fastDeclarationFallback = normalizeFastDeclarationFallback(options.fastDeclarationFallback);
 
-  return {
-    bundledFiles,
-    diagnostics: dedupeDiagnostics(diagnostics),
-    emittedFiles,
-    emitSkipped: emitResult.emitSkipped ?? false,
-    ...packageJsonResult,
-    tsconfig,
-  };
+  if (fastDeclarations) {
+    const fastResult = await tryEmitWithFastDeclarations(context, fastDeclarationFallback);
+
+    if (fastResult) {
+      return fastResult;
+    }
+  }
+
+  return emitWithTypeScript(context);
 }

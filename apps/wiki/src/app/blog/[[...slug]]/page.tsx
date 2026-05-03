@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { LLMCopyButton, ViewOptions } from "~/components/ai/page-actions";
 import { gitConfig } from "~/lib/layout.shared";
-import { blogSource, getPageImage } from "~/lib/source";
+import { blogSource, getPageImage, isRenderablePageData } from "~/lib/source";
 import { createRelativeMdxLink, getMDXComponents } from "~/mdx-components";
 
 type BlogPageProps = {
@@ -15,6 +15,7 @@ export default async function Page(props: BlogPageProps) {
   const params = await props.params;
   const page = blogSource.getPage(params.slug);
   if (!page) notFound();
+  if (!isRenderablePageData(page.data)) notFound();
 
   const MDX = page.data.body;
 

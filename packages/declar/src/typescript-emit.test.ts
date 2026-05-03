@@ -295,4 +295,100 @@ describe("emitTypeScriptDeclarations", () => {
       await rm(packageDir, { force: true, recursive: true });
     }
   });
+
+  test("can emit declarations through the opt-in fast isolated path", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(
+        join(packageDir, "src", "index.ts"),
+        [
+          "export interface FastFixture {",
+          "  readonly value: number;",
+          "}",
+          "export function createFastFixture(value: number): FastFixture {",
+          "  return { value };",
+          "}",
+        ].join("\n"),
+      );
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        fastDeclarations: true,
+        packageDir,
+        packageJson: rootExportPackageJson,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_FAST_PATH_USED",
+      ]);
+      expect(result.emittedFiles).toEqual([join(packageDir, "dist", "index.d.ts")]);
+
+      const declaration = await readFile(join(packageDir, "dist", "index.d.ts"), "utf8");
+
+      expect(declaration).toContain("export interface FastFixture");
+      expect(declaration).toContain("export declare function createFastFixture");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("falls back to TypeScript emit when isolated declaration emit is unsafe", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(
+        join(packageDir, "src", "index.ts"),
+        ["export function identity<T>(value: T) {", "  return value;", "}"].join("\n"),
+      );
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        fastDeclarations: true,
+        packageDir,
+        packageJson: rootExportPackageJson,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_FAST_PATH_UNSUPPORTED_SYNTAX",
+      ]);
+      expect(result.emittedFiles.some((file) => file.endsWith("dist/index.d.ts"))).toBe(true);
+
+      const declaration = await readFile(join(packageDir, "dist", "index.d.ts"), "utf8");
+
+      expect(declaration).toContain("export declare function identity<T>(value: T): T;");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("can make isolated declaration fallback diagnostics fatal", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(
+        join(packageDir, "src", "index.ts"),
+        ["export function identity<T>(value: T) {", "  return value;", "}"].join("\n"),
+      );
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        fastDeclarationFallback: "error",
+        fastDeclarations: true,
+        packageDir,
+        packageJson: rootExportPackageJson,
+      });
+
+      expect(result.emitSkipped).toBe(true);
+      expect(result.emittedFiles).toEqual([]);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_FAST_PATH_UNSUPPORTED_SYNTAX",
+      ]);
+      expect(result.diagnostics[0]?.severity).toBe("error");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
 });

@@ -9,7 +9,10 @@ export {
   createDeclarWarning,
   hasDeclarErrors,
 } from "./diagnostics";
-export { emitIsolatedTypeScriptDeclarations } from "./isolated-declarations";
+export {
+  collectDeclarIsolatedDeclarationSourceFiles,
+  emitIsolatedTypeScriptDeclarations,
+} from "./isolated-declarations";
 export { discoverPackageEntrypoints } from "./package-exports";
 export { wireDeclarPackageTypes } from "./package-wiring";
 export { createDeclarPipelinePlan } from "./plan";
