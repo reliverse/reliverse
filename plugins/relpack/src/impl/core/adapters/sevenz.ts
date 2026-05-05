@@ -1,6 +1,7 @@
 import path from "node:path";
 
 import { assertInputsExist, assertOutputArchiveCanBeWritten, ensureDirectory } from "../fs";
+import { toArchiveExcludePatterns } from "../ignore";
 import { toArchiveInputPath } from "../path-safety";
 import { findExecutable, runProcess } from "../spawn";
 import type {
@@ -57,9 +58,14 @@ export const sevenzAdapter: ArchiveAdapter = {
     const output = path.resolve(request.cwd, request.output);
     const resolvedInputs = request.inputs.map((input) => path.resolve(request.cwd, input));
     await assertInputsExist(resolvedInputs);
-    await assertOutputArchiveCanBeWritten(output, request.overwrite);
+    await assertOutputArchiveCanBeWritten(output, request.overwrite, {
+      createParentDirectory: !request.dryRun,
+    });
     const entries = request.inputs.map((input) => toArchiveInputPath(request.cwd, input));
-    const args = ["a", "-t7z", output, ...entries];
+    const excludeArgs = toArchiveExcludePatterns(request.ignoredNames ?? []).map(
+      (pattern) => `-xr!${pattern}`,
+    );
+    const args = ["a", "-t7z", output, ...entries, ...excludeArgs];
     if (request.dryRun) return { command, args, exitCode: 0, stdout: "", stderr: "" };
     return runProcess(command, args, { cwd: ctx.cwd, env: ctx.env });
   },
@@ -84,10 +90,10 @@ export const sevenzAdapter: ArchiveAdapter = {
       throw new Error("7z backend is unavailable. Install 7zz, 7z, or 7za.");
     const archive = path.resolve(request.cwd, request.archive);
     const outputDir = path.resolve(request.cwd, request.outputDir);
-    await ensureDirectory(outputDir);
-    const overwriteMode = request.overwrite === "always" ? "-aoa" : "-aos";
+    const overwriteMode = request.overwrite === "files" ? "-aoa" : "-aos";
     const args = ["x", archive, `-o${outputDir}`, overwriteMode, "-y"];
     if (request.dryRun) return { command, args, exitCode: 0, stdout: "", stderr: "" };
+    await ensureDirectory(outputDir);
     return runProcess(command, args, { cwd: ctx.cwd, env: ctx.env });
   },
 

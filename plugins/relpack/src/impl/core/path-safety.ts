@@ -113,5 +113,9 @@ export function toArchiveInputPath(cwd: string, inputPath: string): string {
   }
 
   const relative = path.relative(resolvedCwd, resolvedInput).replaceAll(path.sep, "/");
+  if (relative.length === 0) {
+    return ".";
+  }
+
   return assertSafeArchiveEntryPath(relative);
 }

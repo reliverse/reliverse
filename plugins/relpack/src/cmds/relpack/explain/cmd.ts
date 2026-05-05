@@ -1,7 +1,7 @@
 import { defineCommand } from "@reliverse/rempts";
 
 import { explainCommand } from "../../../impl/core/explain";
-import { handleRelpackError, isJsonOutput, normalizeArgs, printJson } from "../_shared";
+import { formatExplainOutput, handleRelpackError, isJsonOutput, normalizeArgs, printJson } from "../_shared";
 
 const COMMAND_NAME = "explain";
 
@@ -35,11 +35,10 @@ export default defineCommand({
 
       if (isJsonOutput(ctx)) {
         printJson(ctx, { ok: true, command: COMMAND_NAME, explanation });
-      } else {
-        ctx.out?.(
-          [explanation.summary, ...explanation.notes.map((note) => `- ${note}`)].join("\n"),
-        );
+        return;
       }
+
+      ctx.out?.(formatExplainOutput(explanation.summary, explanation.notes));
     } catch (error) {
       handleRelpackError(ctx, COMMAND_NAME, error);
     }

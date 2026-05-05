@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { assertSafeArchiveEntryPath } from "./path-safety";
+import { assertSafeArchiveEntryPath, toArchiveInputPath } from "./path-safety";
 
 describe("archive path safety", () => {
   test("accepts normal relative paths", () => {
@@ -19,5 +19,9 @@ describe("archive path safety", () => {
 
   test("rejects reserved Windows device names", () => {
     expect(() => assertSafeArchiveEntryPath("src/CON.txt")).toThrow();
+  });
+
+  test("allows current directory as an input path for packing", () => {
+    expect(toArchiveInputPath("/tmp/project", ".")).toBe(".");
   });
 });

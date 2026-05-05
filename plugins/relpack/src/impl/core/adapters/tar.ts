@@ -2,6 +2,7 @@ import path from "node:path";
 
 import { normalizeArchiveFormat } from "../format";
 import { assertInputsExist, assertOutputArchiveCanBeWritten, ensureDirectory } from "../fs";
+import { toArchiveExcludePatterns } from "../ignore";
 import { toArchiveInputPath } from "../path-safety";
 import { canRun, runProcess } from "../spawn";
 import type {
@@ -41,13 +42,27 @@ function parseTarList(stdout: string): readonly ArchiveEntry[] {
   return stdout
     .split(/\r?\n/)
     .map((line) => line.trim())
-    .filter(Boolean)
-    .map(
-      (entryPath): ArchiveEntry => ({
-        path: entryPath.replace(/\/$/, ""),
-        kind: entryPath.endsWith("/") ? "directory" : "unknown",
-      }),
-    );
+    .filter((line) => line.length > 0)
+    .map((line): ArchiveEntry | undefined => {
+      const verboseMatch = /^([dlh-])\S*\s+\S+\s+(\d+)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/.exec(line);
+      if (verboseMatch !== null) {
+        const marker = verboseMatch[1];
+        const entryPath = verboseMatch[3]?.replace(/\/$/, "") ?? "";
+        if (entryPath.length === 0 || entryPath === "." || entryPath === "./") return undefined;
+        return {
+          path: entryPath,
+          kind: marker === "d" ? "directory" : marker === "l" ? "symlink" : marker === "h" ? "hardlink" : "file",
+          size: Number(verboseMatch[2]),
+        };
+      }
+
+      if (line === "." || line === "./") return undefined;
+      return {
+        path: line.replace(/\/$/, ""),
+        kind: line.endsWith("/") ? "directory" : "unknown",
+      };
+    })
+    .filter((entry): entry is ArchiveEntry => entry !== undefined);
 }
 
 export const tarAdapter: ArchiveAdapter = {
@@ -66,17 +81,22 @@ export const tarAdapter: ArchiveAdapter = {
     const output = path.resolve(request.cwd, request.output);
     const resolvedInputs = request.inputs.map((input) => path.resolve(request.cwd, input));
     await assertInputsExist(resolvedInputs);
-    await assertOutputArchiveCanBeWritten(output, request.overwrite);
+    await assertOutputArchiveCanBeWritten(output, request.overwrite, {
+      createParentDirectory: !request.dryRun,
+    });
     const entries = request.inputs.map((input) => toArchiveInputPath(request.cwd, input));
+    const excludeArgs = toArchiveExcludePatterns(request.ignoredNames ?? []).map(
+      (pattern) => `--exclude=${pattern}`,
+    );
     const format = request.format ?? "tar";
-    const args = [...tarCreateArgs(format, output), ...entries];
+    const args = [...excludeArgs, ...tarCreateArgs(format, output), ...entries];
     if (request.dryRun) return { command: "tar", args, exitCode: 0, stdout: "", stderr: "" };
     return runProcess("tar", args, { cwd: ctx.cwd, env: ctx.env });
   },
 
   async list(request: ListRequest, ctx: CommandContext): Promise<readonly ArchiveEntry[]> {
     const archive = path.resolve(request.cwd, request.archive);
-    const result = await runProcess("tar", ["-tf", archive], { cwd: ctx.cwd, env: ctx.env });
+    const result = await runProcess("tar", ["-tvf", archive], { cwd: ctx.cwd, env: ctx.env });
     if (result.exitCode !== 0)
       throw new Error(result.stderr || `tar failed to list archive: ${archive}`);
     return parseTarList(result.stdout);
@@ -85,9 +105,9 @@ export const tarAdapter: ArchiveAdapter = {
   async unpack(request: UnpackRequest, ctx: CommandContext): Promise<ProcessResult> {
     const archive = path.resolve(request.cwd, request.archive);
     const outputDir = path.resolve(request.cwd, request.outputDir);
-    await ensureDirectory(outputDir);
     const args = ["-xf", archive, "-C", outputDir];
     if (request.dryRun) return { command: "tar", args, exitCode: 0, stdout: "", stderr: "" };
+    await ensureDirectory(outputDir);
     return runProcess("tar", args, { cwd: ctx.cwd, env: ctx.env });
   },
 

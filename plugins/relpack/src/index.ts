@@ -6,6 +6,6 @@ export default definePlugin({
   entry: import.meta.url,
   name: "relpack-rse-plugin",
   description:
-    "Modern archive CLI for packing, unpacking, listing, testing, and explaining archive operations.",
+    "Modern archive CLI for packing, unpacking, listing, testing, verifying, diffing, and explaining archive operations.",
   provides: ["relpack"],
 });

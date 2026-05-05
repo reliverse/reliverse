@@ -26,7 +26,7 @@
     "@tanstack/react-router": "^1.169.1",
     "@tanstack/react-router-ssr-query": "^1.166.12",
     "@tanstack/react-router-with-query": "catalog:",
-    "@tanstack/react-start": "^1.167.61",
+    "@tanstack/react-start": "catalog:",
     "@tanstack/router-plugin": "catalog:",
     "@vitejs/plugin-react": "^6.0.1",
     "ai": "catalog:",

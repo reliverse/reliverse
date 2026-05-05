@@ -17,7 +17,7 @@ interface ExplainArgs {
   readonly dryRun: boolean;
 }
 
-const COMMANDS = new Set(["doctor", "pack", "unpack", "list", "test", "explain"]);
+const COMMANDS = new Set(["doctor", "pack", "unpack", "list", "test", "verify", "diff", "explain"]);
 
 export function explainCommand(argv: readonly string[]): ExplainReport {
   const parsed = parseExplainArgs(argv);
@@ -30,7 +30,7 @@ export function explainCommand(argv: readonly string[]): ExplainReport {
       summary: `Create a ${format} archive at ${parsed.output ?? "<missing-output>"}.`,
       notes: [
         `Inputs: ${parsed.inputs.length > 0 ? parsed.inputs.join(", ") : "<none>"}`,
-        parsed.overwrite === "always"
+        parsed.overwrite === "files"
           ? "Existing output archive may be replaced."
           : "Existing output archive will be refused.",
         parsed.dryRun
@@ -48,7 +48,7 @@ export function explainCommand(argv: readonly string[]): ExplainReport {
       summary: `Extract a ${format} archive into ${parsed.outputDir ?? "."}.`,
       notes: [
         `Archive: ${parsed.archive ?? "<missing-archive>"}`,
-        parsed.overwrite === "always"
+        parsed.overwrite === "files"
           ? "Existing files may be replaced."
           : "Existing files will be refused before extraction.",
         "Archive entries are validated before extraction.",
@@ -62,6 +62,14 @@ export function explainCommand(argv: readonly string[]): ExplainReport {
 
   if (parsed.command === "test") {
     return { summary: `Test readability of ${parsed.archive ?? "<missing-archive>"}.`, notes: [] };
+  }
+
+  if (parsed.command === "verify") {
+    return { summary: `Verify relpack manifest in ${parsed.archive ?? "<missing-archive>"}.`, notes: [] };
+  }
+
+  if (parsed.command === "diff") {
+    return { summary: `Compare ${parsed.archive ?? "<missing-archive>"} with ${parsed.outputDir ?? parsed.output ?? "<missing-output>"}.`, notes: [] };
   }
 
   if (parsed.command === "doctor") {
@@ -100,7 +108,7 @@ function parseExplainArgs(argv: readonly string[]): ExplainArgs {
     }
 
     if (token === "--overwrite") {
-      overwrite = "always";
+      overwrite = "files";
       continue;
     }
 
@@ -171,7 +179,7 @@ function parseExplainArgs(argv: readonly string[]): ExplainArgs {
     return format === undefined ? { ...base, archive } : { ...base, archive, format };
   }
 
-  if (command === "list" || command === "test") {
+  if (command === "list" || command === "test" || command === "verify" || command === "diff") {
     const base = {
       command,
       inputs: [],

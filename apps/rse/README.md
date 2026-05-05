@@ -152,9 +152,27 @@ apps/rse/src/cli.ts
 The current CLI metadata is:
 
 - name: `rse`
-- description: `CLI for automating developer and sysadmin routine tasks.`
+- description: `Reliverse developer CLI that aggregates Rempts plugins`
 
 ## Related docs
 
 - Root repo docs: [`../../README.md`](../../README.md)
 - Rempts docs: [`../../packages/rempts/README.md`](../../packages/rempts/README.md)
+
+
+## Relpack batch update example
+
+When both `rse` and `relpack` are shipped as local zip updates, `rse` can run the relpack plugin update as one safe batch:
+
+```bash
+bun apps/rse/src/cli.ts relpack unpack './rse-*.zip' './relpack-*.zip' \
+  -o ./apps/rse ./plugins/relpack \
+  --overwrite-mode clean \
+  --backup \
+  --rollback-on-fail \
+  --post-check-command 'bun test apps/rse plugins/relpack' \
+  --delete-archive \
+  --apply
+```
+
+`rse` anchors plugin discovery to the CLI package root, not the caller's shell directory, so `bun rse ...` from the monorepo root resolves workspace plugins predictably.

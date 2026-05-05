@@ -1,6 +1,6 @@
 {
   "name": "@reliverse/rse",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": false,
   "author": "reliverse",
   "bin": {
@@ -14,7 +14,8 @@
     "access": "public"
   },
   "scripts": {
-    "dev": "bun ./src/cli.ts"
+    "dev": "bun ./src/cli.ts",
+    "check": "bun ./src/cli.ts --help"
   },
   "dependencies": {
     "@reliverse/rempts": "workspace:*"
@@ -23,6 +24,7 @@
     "@reliverse/dler-rse-plugin": "workspace:*",
     "@reliverse/os-rse-plugin": "workspace:*",
     "@reliverse/pm-rse-plugin": "workspace:*",
+    "@reliverse/relpack-rse-plugin": "workspace:*",
     "@reliverse/rempts-rse-plugin": "workspace:*",
     "@reliverse/rspace-rse-plugin": "workspace:*",
     "@reliverse/toolkit-rse-plugin": "workspace:*",

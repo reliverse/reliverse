@@ -6,7 +6,6 @@ import {
   getCommandContext,
   handleRelpackError,
   isJsonOutput,
-  printDiagnostics,
   printJson,
 } from "../_shared";
 
@@ -28,7 +27,7 @@ export default defineCommand({
   },
   help: {
     examples: ["rse relpack doctor", "rse relpack doctor --json"],
-    text: "Check whether tar, zip/unzip, and 7z-compatible tools are available for relpack.",
+    text: "Check whether tar, zip/unzip, and 7z-compatible tools are available for relpack, then print actionable next steps.",
   },
   options: {},
   async handler(ctx) {
@@ -38,13 +37,12 @@ export default defineCommand({
 
       if (isJsonOutput(ctx)) {
         printJson(ctx, {
-          ok: true,
+          ok: doctor.backends.some((backend) => backend.available),
           command: COMMAND_NAME,
           diagnostics: doctor.diagnostics,
           backends: doctor.backends,
         });
       } else {
-        printDiagnostics(ctx, doctor.diagnostics);
         ctx.out?.(formatDoctorSummary(doctor.backends));
       }
     } catch (error) {

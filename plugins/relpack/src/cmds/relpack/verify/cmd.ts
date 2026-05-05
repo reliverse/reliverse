@@ -1,9 +1,8 @@
 import { defineCommand } from "@reliverse/rempts";
 
-import { testArchive } from "../../../impl/core/commands/test";
-import { detectArchiveFormat, normalizeArchiveFormat } from "../../../impl/core/format";
+import { verifyArchive } from "../../../impl/core/commands/verify";
 import {
-  formatTestOutput,
+  formatVerifyOutput,
   getCommandContext,
   handleRelpackError,
   isJsonOutput,
@@ -11,17 +10,16 @@ import {
   RELPACK_FORMATS,
   resolveArchiveArgs,
   REPORTED_USAGE_ERROR,
-  toBackendCommand,
   toOptionalArchiveFormat,
 } from "../_shared";
 
-const COMMAND_NAME = "test";
-const USAGE = "rse relpack test <archive> [flags]";
+const COMMAND_NAME = "verify";
+const USAGE = "rse relpack verify <archive> [flags]";
 
 export default defineCommand({
   meta: {
     name: COMMAND_NAME,
-    description: "Validate that an archive can be read by the selected backend.",
+    description: "Verify a relpack manifest embedded in an archive.",
   },
   conventions: {
     idempotent: true,
@@ -34,12 +32,12 @@ export default defineCommand({
   },
   help: {
     examples: [
-      "rse relpack test dist.tar.zst",
-      "rse relpack test dist.zip --json",
-      "rse relpack test './relpack-*.zip'",
-      "rse relpack test dist.7z --format 7z",
+      "rse relpack verify relpack-0.1.0.zip",
+      "rse relpack verify './relpack-*.zip'",
+      "rse relpack verify dist.tar.zst --format tar.zst",
+      "rse relpack verify dist.zip --json",
     ],
-    text: `Test archive readability. Archive globs like ./relpack-*.zip are supported. This command is read-only and does not need --apply. Supported formats: ${RELPACK_FORMATS}.`,
+    text: `Verify that archive entries match .relpack/manifest.json. Supported formats: ${RELPACK_FORMATS}.`,
   },
   options: {
     format: {
@@ -54,8 +52,7 @@ export default defineCommand({
       const archiveResolution = await resolveArchiveArgs(ctx, COMMAND_NAME, USAGE, commandContext.cwd);
       const archive = archiveResolution.archive;
       const format = toOptionalArchiveFormat(ctx.options?.format);
-
-      const result = await testArchive(
+      const result = await verifyArchive(
         {
           cwd: commandContext.cwd,
           archive,
@@ -64,27 +61,22 @@ export default defineCommand({
         commandContext,
       );
 
-      const normalizedFormat = normalizeArchiveFormat(format ?? detectArchiveFormat(archive));
       if (isJsonOutput(ctx)) {
         printJson(ctx, {
-          ok: true,
+          ok: result.ok,
           command: COMMAND_NAME,
-          format: normalizedFormat,
+          format: result.format,
           diagnostics: [],
-          executed: [result.command, ...result.args],
           archiveResolution,
+          result,
         });
         return;
       }
 
-      ctx.out?.(
-        formatTestOutput({
-          archive,
-          archiveResolution,
-          format: normalizedFormat,
-          backendCommand: toBackendCommand(result),
-        }),
-      );
+      ctx.out?.(formatVerifyOutput(result, archiveResolution));
+      if (!result.ok) {
+        ctx.exit(1);
+      }
     } catch (error) {
       if (error === REPORTED_USAGE_ERROR) {
         return;

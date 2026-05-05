@@ -2,17 +2,21 @@ import { defineCommand } from "@reliverse/rempts";
 
 import { packArchive } from "../../../impl/core/commands/pack";
 import { detectArchiveFormat, normalizeArchiveFormat } from "../../../impl/core/format";
+import { buildIgnoredNames, parseIgnoredNameInput } from "../../../impl/core/ignore";
 import {
+  buildRelpackCommand,
   emitUsageError,
+  formatPackOutput,
   getCommandContext,
   handleRelpackError,
-  isJsonOutput,
   isDryRun,
+  isExplicitDryRun,
+  isJsonOutput,
   normalizeArgs,
-  printExecuted,
   printJson,
   RELPACK_FORMATS,
   REPORTED_USAGE_ERROR,
+  toBackendCommand,
   toOptionalArchiveFormat,
   toOptionalString,
   toOverwritePolicy,
@@ -47,29 +51,51 @@ export default defineCommand({
       "rse relpack pack ./dist ./README.md -o release.tar.gz --overwrite --apply",
       "rse relpack pack ./dist -o dist.tar.zst --dry-run",
       "rse relpack pack ./dist -o dist.tar.zst --json",
+      "rse relpack pack . -o repo.zip --show-skipped",
+      "rse relpack pack ./dist -o dist.zip --no-manifest --apply",
     ],
-    text: `Create an archive. Supported formats: ${RELPACK_FORMATS}.`,
+    text: `Create an archive. Preview is the default; pass --apply to write. Supported formats: ${RELPACK_FORMATS}.`,
   },
   options: {
     output: {
       type: "string",
       short: "o",
-      description: "Output archive path",
+      description: "Output archive path. Required for pack.",
       inputSources: ["flag"],
     },
     format: {
       type: "string",
-      description: `Archive format override: ${RELPACK_FORMATS}`,
+      description: `Archive format override. Usually inferred from -o. Values: ${RELPACK_FORMATS}`,
       inputSources: ["flag"],
     },
     overwrite: {
       type: "boolean",
-      description: "Allow replacing an existing output archive",
+      description: "Allow replacing an existing output archive. Still requires --apply to write.",
       inputSources: ["flag"],
     },
     dryRun: {
       type: "boolean",
-      description: "Print the backend command without creating an archive",
+      description: "Force preview mode and print what would happen without creating an archive.",
+      inputSources: ["flag"],
+    },
+    ignore: {
+      type: "string",
+      description: "Comma-separated extra file or directory names to skip while packing.",
+      inputSources: ["flag"],
+    },
+    includeIgnored: {
+      type: "boolean",
+      description: "Disable relpack's default junk/secret ignore list and include ignored names intentionally.",
+      inputSources: ["flag"],
+    },
+    showSkipped: {
+      type: "boolean",
+      description: "Print skipped path examples from default/custom ignore rules.",
+      inputSources: ["flag"],
+    },
+    noManifest: {
+      type: "boolean",
+      description: "Do not embed .relpack/manifest.json into the archive.",
       inputSources: ["flag"],
     },
   },
@@ -80,6 +106,15 @@ export default defineCommand({
       const output = toOptionalString(ctx.options?.output);
       const format = toOptionalArchiveFormat(ctx.options?.format);
       const dryRun = isDryRun(ctx);
+      const overwrite = ctx.options?.overwrite === true;
+      const includeIgnored = ctx.options?.includeIgnored === true;
+      const showSkipped = ctx.options?.showSkipped === true;
+      const manifestEnabled = ctx.options?.noManifest !== true;
+      const extraIgnoredNames = parseIgnoredNameInput(ctx.options?.ignore);
+      const ignoredNames = buildIgnoredNames({
+        includeDefaultIgnores: !includeIgnored,
+        extraIgnoredNames,
+      });
 
       if (inputs.length === 0) {
         emitUsageError(ctx, COMMAND_NAME, USAGE, "Pack command requires at least one input path.");
@@ -101,6 +136,8 @@ export default defineCommand({
           ...(format === undefined ? {} : { format }),
           overwrite: toOverwritePolicy(ctx.options?.overwrite),
           dryRun,
+          ignoredNames,
+          manifest: manifestEnabled,
         },
         commandContext,
       );
@@ -113,12 +150,66 @@ export default defineCommand({
           format: normalizedFormat,
           diagnostics: [],
           executed: [result.command, ...result.args],
+          dryRun,
+          skipped: result.skipped,
+          manifest: result.manifest,
         });
-      } else if (dryRun) {
-        printExecuted(ctx, result.command, result.args);
-      } else {
-        ctx.out?.(`created: ${output}`);
+        return;
       }
+
+      const formatFlag = format === undefined ? [] : ["--format", format];
+      const overwriteFlag = overwrite ? ["--overwrite"] : [];
+      const ignoreFlag = extraIgnoredNames.length > 0 ? ["--ignore", extraIgnoredNames.join(",")] : [];
+      const includeIgnoredFlag = includeIgnored ? ["--include-ignored"] : [];
+      const showSkippedFlag = showSkipped ? ["--show-skipped"] : [];
+      const noManifestFlag = manifestEnabled ? [] : ["--no-manifest"];
+      const baseParts = [
+        "pack",
+        ...inputs,
+        "-o",
+        output,
+        ...formatFlag,
+        ...overwriteFlag,
+        ...ignoreFlag,
+        ...includeIgnoredFlag,
+        ...showSkippedFlag,
+        ...noManifestFlag,
+      ];
+      const applyCommand = buildRelpackCommand([...baseParts, "--apply"]);
+      const overwriteApplyCommand = buildRelpackCommand([
+        "pack",
+        ...inputs,
+        "-o",
+        output,
+        ...formatFlag,
+        ...ignoreFlag,
+        ...includeIgnoredFlag,
+        ...showSkippedFlag,
+        ...noManifestFlag,
+        "--overwrite",
+        "--apply",
+      ]);
+
+      ctx.out?.(
+        formatPackOutput({
+          inputs,
+          output,
+          format: normalizedFormat,
+          overwrite,
+          dryRun,
+          explicitDryRun: isExplicitDryRun(ctx),
+          backendCommand: toBackendCommand(result),
+          ignoredNames,
+          includeDefaultIgnores: !includeIgnored,
+          extraIgnoredNames,
+          applyCommand,
+          overwriteApplyCommand,
+          skipped: result.skipped,
+          showSkipped,
+          manifest: result.manifest,
+          manifestEnabled,
+        }),
+      );
     } catch (error) {
       if (error === REPORTED_USAGE_ERROR) {
         return;

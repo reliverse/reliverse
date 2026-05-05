@@ -7,11 +7,34 @@ export interface RunProcessOptions {
   readonly env: Readonly<Record<string, string | undefined>>;
 }
 
+export interface ProcessBufferResult {
+  readonly command: string;
+  readonly args: readonly string[];
+  readonly exitCode: number;
+  readonly stdout: Buffer;
+  readonly stderr: string;
+}
+
 export async function runProcess(
   command: string,
   args: readonly string[],
   options: RunProcessOptions,
 ): Promise<ProcessResult> {
+  const result = await runProcessBuffer(command, args, options);
+  return {
+    command: result.command,
+    args: result.args,
+    exitCode: result.exitCode,
+    stdout: result.stdout.toString("utf8"),
+    stderr: result.stderr,
+  };
+}
+
+export async function runProcessBuffer(
+  command: string,
+  args: readonly string[],
+  options: RunProcessOptions,
+): Promise<ProcessBufferResult> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, [...args], {
       cwd: options.cwd,
@@ -31,7 +54,7 @@ export async function runProcess(
         command,
         args,
         exitCode: exitCode ?? 1,
-        stdout: Buffer.concat(stdoutChunks).toString("utf8"),
+        stdout: Buffer.concat(stdoutChunks),
         stderr: Buffer.concat(stderrChunks).toString("utf8"),
       });
     });

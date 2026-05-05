@@ -35,7 +35,21 @@ Thumbs.db
 .turbo/
 
 # Temporary
+.relpack/
 *-context.**
+*.tar.zst
+*.tar.bz2
+*.tar.gz
+*.tar.xz
+*.zip
+*.tar
+*.rar
+*.iso
+*.dmg
+*.pkg
+*.deb
+*.rpm
+*.7z
 temp
 *~
 
