@@ -1,10 +1,5 @@
 const UNSAFE_SPECIFIER_PREFIXES = ["workspace:", "catalog:", "link:", "file:"] as const;
-const DEPENDENCY_FIELDS = [
-  "dependencies",
-  "devDependencies",
-  "peerDependencies",
-  "optionalDependencies",
-] as const;
+const DEPENDENCY_FIELDS = ["dependencies", "peerDependencies", "optionalDependencies"] as const;
 
 export interface UnsafeDependencySpecifier {
   readonly field: (typeof DEPENDENCY_FIELDS)[number];

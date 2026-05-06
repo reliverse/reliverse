@@ -19,8 +19,13 @@
     "access": "public"
   },
   "dependencies": {
+    "@reliverse/declar": "workspace:*",
     "@reliverse/rempts": "workspace:*",
-    "jsonc-parser": "catalog:"
+    "jsonc-parser": "catalog:",
+    "typescript": "catalog:"
+  },
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

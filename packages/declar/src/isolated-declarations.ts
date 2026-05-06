@@ -301,6 +301,7 @@ export async function emitIsolatedTypeScriptDeclarations(
   const diagnostics: DeclarDiagnostic[] = [];
   const emittedFiles: string[] = [];
   const skippedFiles: string[] = [];
+  const pendingOutputs: { readonly path: string; readonly sourceMapText?: string; readonly text: string }[] = [];
   const transpileDeclaration = options.compiler.transpileDeclaration;
 
   if (!transpileDeclaration) {
@@ -385,25 +386,38 @@ export async function emitIsolatedTypeScriptDeclarations(
       continue;
     }
 
-    if (options.write !== false) {
-      await host.mkdir(dirname(outputPathResult.path));
-      await host.writeFile(outputPathResult.path, result.outputText);
-
-      if (result.sourceMapText) {
-        await host.writeFile(`${outputPathResult.path}.map`, result.sourceMapText);
-      }
-    }
-
-    emittedFiles.push(outputPathResult.path);
-    if (result.sourceMapText) emittedFiles.push(`${outputPathResult.path}.map`);
+    pendingOutputs.push({
+      path: outputPathResult.path,
+      ...(result.sourceMapText === undefined ? {} : { sourceMapText: result.sourceMapText }),
+      text: result.outputText,
+    });
     diagnostics.push(createFastPathUsedDiagnostic(sourceFilePath, outputPathResult.path));
+  }
+
+  const fallbackToTypeScript = fallback === "typescript" && skippedFiles.length > 0;
+  const usedFastPath = pendingOutputs.length > 0 && !fallbackToTypeScript;
+
+  if (usedFastPath) {
+    for (const output of pendingOutputs) {
+      if (options.write !== false) {
+        await host.mkdir(dirname(output.path));
+        await host.writeFile(output.path, output.text);
+
+        if (output.sourceMapText) {
+          await host.writeFile(`${output.path}.map`, output.sourceMapText);
+        }
+      }
+
+      emittedFiles.push(output.path);
+      if (output.sourceMapText) emittedFiles.push(`${output.path}.map`);
+    }
   }
 
   return {
     diagnostics,
     emittedFiles,
-    fallbackToTypeScript: fallback === "typescript" && skippedFiles.length > 0,
+    fallbackToTypeScript,
     skippedFiles,
-    usedFastPath: emittedFiles.length > 0,
+    usedFastPath,
   };
 }

@@ -31,7 +31,7 @@ async function createFixturePackage(): Promise<string> {
           rootDir: "src",
           target: "ES2022",
         },
-        include: ["src/**/*.ts"],
+        include: ["src/**/*.ts", "src/**/*.mts", "src/**/*.cts"],
       },
       null,
       2,
@@ -89,6 +89,28 @@ describe("emitTypeScriptDeclarations", () => {
 
       expect(declaration).toContain("export interface DeclarFixture");
       expect(declaration).toContain("export declare function createFixture");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("can limit declaration emit to explicit source files", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.ts"), "export const publicValue = 1;\n");
+      await writeFile(join(packageDir, "src", "index.test.ts"), "export const testValue = 1;\n");
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        files: [join(packageDir, "src", "index.ts")],
+        packageDir,
+        packageJson: rootExportPackageJson,
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics).toEqual([]);
+      expect(result.emittedFiles).toEqual([join(packageDir, "dist", "index.d.ts")]);
     } finally {
       await rm(packageDir, { force: true, recursive: true });
     }
@@ -359,6 +381,79 @@ describe("emitTypeScriptDeclarations", () => {
       const declaration = await readFile(join(packageDir, "dist", "index.d.ts"), "utf8");
 
       expect(declaration).toContain("export declare function identity<T>(value: T): T;");
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("fast isolated path validates package exports before accepting output", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(
+        join(packageDir, "src", "index.ts"),
+        "export const value: number = 1;\n",
+      );
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        fastDeclarations: true,
+        packageDir,
+        packageJson: {
+          exports: {
+            ".": {
+              types: "./dist/missing.d.ts",
+              import: "./dist/index.js",
+            },
+          },
+        },
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics.map((diagnostic) => diagnostic.code)).toEqual([
+        "DECLAR_FAST_PATH_USED",
+        "DECLAR_FAST_PATH_FALLBACK",
+        "DECLAR_DECLARATION_TARGET_NOT_EMITTED",
+        "DECLAR_DECLARATION_TARGET_MISSING",
+      ]);
+      expect(result.emittedFiles).toEqual([join(packageDir, "dist", "index.d.ts")]);
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("can emit .mts and .cts declarations through the opt-in fast isolated path", async () => {
+    const packageDir = await createFixturePackage();
+
+    try {
+      await writeFile(join(packageDir, "src", "index.mts"), "export const esm: number = 1;\n");
+      await writeFile(join(packageDir, "src", "index.cts"), "export const cjs: number = 1;\n");
+
+      const result = await emitTypeScriptDeclarations({
+        compiler: ts,
+        fastDeclarations: true,
+        packageDir,
+        packageJson: {
+          exports: {
+            ".": {
+              types: "./dist/index.d.mts",
+              import: "./dist/index.mjs",
+            },
+            "./cjs": {
+              types: "./dist/index.d.cts",
+              require: "./dist/index.cjs",
+            },
+          },
+        },
+      });
+
+      expect(result.emitSkipped).toBe(false);
+      expect(result.diagnostics.every((diagnostic) => diagnostic.code === "DECLAR_FAST_PATH_USED"))
+        .toBe(true);
+      expect(result.emittedFiles).toEqual([
+        join(packageDir, "dist", "index.d.mts"),
+        join(packageDir, "dist", "index.d.cts"),
+      ]);
     } finally {
       await rm(packageDir, { force: true, recursive: true });
     }

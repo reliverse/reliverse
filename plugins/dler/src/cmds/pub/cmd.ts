@@ -326,7 +326,7 @@ export default defineCommand({
         if (apply) {
           ctx.safety.assertApplied("fs.write");
         }
-        const staging = await createPublishStaging(packageRoot, publishFrom);
+        const staging = await createPublishStaging(packageRoot, publishFrom, target.packageRecord);
         try {
           const publishStartedAt = performance.now();
           if (apply) {

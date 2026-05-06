@@ -16,6 +16,7 @@ export {
 export { discoverPackageEntrypoints } from "./package-exports";
 export { wireDeclarPackageTypes } from "./package-wiring";
 export { createDeclarPipelinePlan } from "./plan";
+export { assessDeclarDeclarationRollupStrategy } from "./rollup-strategy";
 export { loadDeclarTsconfig } from "./tsconfig";
 export { emitTypeScriptDeclarations } from "./typescript-emit";
 export {
@@ -60,6 +61,12 @@ export type {
   DeclarPackageTypesWiringOptions,
   DeclarPackageTypesWiringResult,
 } from "./package-wiring";
+export type {
+  DeclarDeclarationRollupRecommendation,
+  DeclarDeclarationRollupRisk,
+  DeclarDeclarationRollupStrategyOptions,
+  DeclarDeclarationRollupStrategyResult,
+} from "./rollup-strategy";
 export type {
   DeclarParsedCommandLine,
   DeclarReadConfigFileResult,

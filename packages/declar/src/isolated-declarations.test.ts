@@ -127,6 +127,43 @@ describe("emitIsolatedTypeScriptDeclarations", () => {
     expect(result.fallbackToTypeScript).toBe(false);
   });
 
+  test("does not write partial fast output before falling back", async () => {
+    const packageDir = "/repo/packages/declar";
+    const goodPath = `${packageDir}/src/good.ts`;
+    const unsafePath = `${packageDir}/src/unsafe.ts`;
+    const { host, writes } = createMemoryHost({
+      [goodPath]: "export const good: number = 1;\n",
+      [unsafePath]: "export function unsafe() { return 1; }\n",
+    });
+
+    const compiler: DeclarIsolatedDeclarationCompilerAdapter = {
+      flattenDiagnosticMessageText: (messageText) => String(messageText),
+      transpileDeclaration: (sourceText: string) =>
+        sourceText.includes("unsafe")
+          ? {
+              diagnostics: [{ messageText: "Function must have an explicit return type." }],
+              outputText: "",
+            }
+          : {
+              diagnostics: [],
+              outputText: "export declare const good: number;\n",
+            },
+    };
+
+    const result = await emitIsolatedTypeScriptDeclarations({
+      compiler,
+      files: ["src/good.ts", "src/unsafe.ts"],
+      host,
+      packageDir,
+      rootDir: "src",
+    });
+
+    expect(result.fallbackToTypeScript).toBe(true);
+    expect(result.emittedFiles).toEqual([]);
+    expect(result.usedFastPath).toBe(false);
+    expect(writes.size).toBe(0);
+  });
+
   test("writes declaration maps when the fast emitter returns one", async () => {
     const packageDir = "/repo/packages/declar";
     const sourcePath = `${packageDir}/src/index.ts`;

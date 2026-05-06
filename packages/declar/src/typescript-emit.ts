@@ -81,12 +81,14 @@ export interface DeclarTypeScriptDeclarationEmitOptions {
   readonly declarationMap?: boolean | undefined;
   readonly fastDeclarationFallback?: DeclarFastDeclarationFallback | undefined;
   readonly fastDeclarations?: DeclarFastDeclarationOption | undefined;
+  readonly files?: readonly string[] | undefined;
   readonly outDir?: string | undefined;
   readonly packageDir: string;
   readonly packageJson: DeclarPackageJson;
   readonly packageJsonHost?: DeclarPackageTypesWiringHost | undefined;
   readonly packageJsonPath?: string | undefined;
   readonly rollup?: boolean | undefined;
+  readonly rootDir?: string | undefined;
   readonly tsconfigPath?: string | undefined;
   readonly updatePackageJson?: boolean | undefined;
   readonly validateBundledFiles?: boolean | undefined;
@@ -278,6 +280,7 @@ function createCompilerOptions(
     listEmittedFiles: true,
     noEmit: false,
     outDir: resolve(options.packageDir, options.outDir ?? "dist"),
+    ...(options.rootDir ? { rootDir: resolve(options.packageDir, options.rootDir) } : {}),
   };
 }
 
@@ -455,7 +458,7 @@ async function emitWithTypeScript(
     context.options,
   );
   const program = context.compiler.createProgram(
-    context.tsconfig.parsedCommandLine.fileNames,
+    context.options.files ?? context.tsconfig.parsedCommandLine.fileNames,
     compilerOptions,
   );
   const preEmitDiagnostics = context.compiler.getPreEmitDiagnostics(program);
@@ -536,7 +539,7 @@ async function tryEmitWithFastDeclarations(
   fallback: DeclarFastDeclarationFallback,
 ): Promise<DeclarTypeScriptDeclarationEmitResult | undefined> {
   const sourceFiles = collectDeclarIsolatedDeclarationSourceFiles(
-    context.tsconfig.parsedCommandLine.fileNames,
+    context.options.files ?? context.tsconfig.parsedCommandLine.fileNames,
   );
 
   if (sourceFiles.length === 0) {
@@ -559,6 +562,7 @@ async function tryEmitWithFastDeclarations(
     files: sourceFiles,
     outDir: context.options.outDir,
     packageDir: context.options.packageDir,
+    rootDir: context.options.rootDir,
     write: true,
   });
 

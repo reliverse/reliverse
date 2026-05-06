@@ -11,7 +11,7 @@ It does **not** replace TypeScript. TypeScript remains the source of truth for d
 ```txt
 package.json exports
   -> entrypoint discovery
-  -> TypeScript declaration emit
+  -> TypeScript declaration emit, or opt-in fast isolated emit with TypeScript fallback
   -> emitted-file validation
   -> package target validation
   -> optional declaration bundling
@@ -28,6 +28,7 @@ Declar is currently an early library used by Reliverse tooling. `dler build` is 
 - understand common `types`, `import`, `require`, `default`, and `types@...` export shapes
 - load `tsconfig.json` through a TypeScript-compatible compiler adapter
 - emit `.d.ts` files through TypeScript
+- optionally emit simple isolated declarations through TypeScript's `transpileDeclaration` fast path
 - validate declared declaration targets on disk
 - validate that exported declaration targets were emitted by the current TypeScript run
 - plan declaration pipeline phases without executing them
@@ -39,6 +40,7 @@ Declar is currently an early library used by Reliverse tooling. `dler build` is 
 - report unsafe declaration name collisions
 - validate bundled output with TypeScript
 - conservatively wire package type metadata when explicitly opted in
+- keep fast isolated declaration mode opt-in and inspectable through diagnostics
 
 ### Declar does not / Does not yet
 
@@ -48,7 +50,8 @@ Declar is currently an early library used by Reliverse tooling. `dler build` is 
 - perform API Extractor-level trimming or release-tag analysis
 - broadly rewrite unusual export shapes
 - rewrite `package.json` unless explicitly opted in
-- provide fast isolated declaration mode with fallback to the TypeScript-backed path
+- make fast isolated declaration mode the default
+- accept fast isolated output that failed Declar package/export validation
 
 ## Install
 
@@ -107,6 +110,7 @@ const result = await emitTypeScriptDeclarations({
   packageDir: process.cwd(),
   packageJson,
   compiler: ts,
+  files: ["./src/index.ts"],
   outDir: "dist",
   tsconfigPath: "tsconfig.json",
 });
@@ -122,7 +126,7 @@ The emit flow:
 
 1. loads `tsconfig.json`
 2. forces declaration-oriented compiler options
-3. runs TypeScript with `emitDeclarationOnly`
+3. runs TypeScript with `emitDeclarationOnly`, optionally limited to explicit `files`
 4. discovers package entrypoints from `package.json#exports`
 5. checks that exported declaration targets were emitted
 6. checks that declaration targets exist on disk
@@ -131,6 +135,49 @@ The emit flow:
 9. optionally writes package type metadata when `updatePackageJson: true`
 
 Declar only rewrites `package.json` when you explicitly opt in with `updatePackageJson: true`.
+
+## Optional: fast isolated declaration emit
+
+M3 adds an opt-in fast path for packages that satisfy TypeScript's `isolatedDeclarations` constraints.
+
+```ts
+const result = await emitTypeScriptDeclarations({
+  packageDir: process.cwd(),
+  packageJson,
+  compiler: ts,
+  fastDeclarations: true,
+});
+```
+
+`fastDeclarations` accepts:
+
+- `false` / omitted — use the TypeScript-backed declaration emit path only
+- `true` or `"auto"` — try isolated declaration emit first, then fall back to TypeScript when unsafe
+- `"typescript"` — explicit spelling for the TypeScript-backed mode
+
+`fastDeclarationFallback` controls what happens when fast emit is unavailable or unsafe:
+
+- `"typescript"` / omitted — report a warning diagnostic and continue through the TypeScript-backed path
+- `"error"` — treat the fast-path failure as fatal and skip TypeScript fallback
+
+The fast path uses TypeScript 5.5+ `transpileDeclaration`. It is intentionally conservative:
+
+- source files must be `.ts`, `.tsx`, `.mts`, or `.cts` and not existing declaration files
+- exported declarations must be explicit enough for isolated declaration emit
+- unsupported syntax or TypeScript isolated-declaration diagnostics trigger fallback
+- fast output is validated against package exports before Declar accepts it
+- fast output is not written incrementally when Declar already knows it must fall back
+
+Fast-path diagnostics are structured and user-facing:
+
+- `DECLAR_FAST_PATH_USED`
+- `DECLAR_FAST_PATH_SKIPPED`
+- `DECLAR_FAST_PATH_FALLBACK`
+- `DECLAR_FAST_PATH_UNSUPPORTED_SYNTAX`
+- `DECLAR_FAST_PATH_INVALID_OUTPUT`
+- `DECLAR_FAST_PATH_EMITTER_UNAVAILABLE`
+
+Fast mode is **opt-in experimental complete** for M3. It is suitable for simple isolated packages, but TypeScript remains the correctness baseline.
 
 ## Quick start: inspect package exports
 
@@ -232,6 +279,48 @@ The bundler:
 Use `write: false` to preview output. Use `banner: false` to skip the generated banner. Use `stripInternal: true` to remove declarations whose JSDoc contains `@internal` or `@private`.
 
 Bundle mode is intentionally opt-in. It is useful for simple local declaration graphs. It includes basic collision detection, output normalization, and a TypeScript-backed bundled-output check. It is still not a full TypeScript symbol-graph rollup.
+
+## M4: declaration rollup strategy
+
+M4 closes Declar's rollup direction: **do not build an API Extractor clone inside Declar by default**.
+
+Declar now treats declaration rollup as three tiers:
+
+1. **Keep declarations unbundled** — default recommendation. Per-entrypoint `.d.ts` files are easiest to reason about and safest for package publishing.
+2. **Use Declar's current text-level bundler** — acceptable only for simple concrete declaration graphs, with `rollup: true` and TypeScript validation after bundling.
+3. **Delegate semantic rollup** — recommended for complex package shapes such as pattern entrypoints, split import/require type surfaces, release-tag trimming, symbol graph normalization, or API Extractor-style output.
+
+Build tools can inspect the default recommendation before choosing a rollup path:
+
+```ts
+import {
+  assessDeclarDeclarationRollupStrategy,
+  discoverPackageEntrypoints,
+} from "@reliverse/declar";
+
+const discovery = discoverPackageEntrypoints(packageJson);
+const strategy = assessDeclarDeclarationRollupStrategy({
+  entrypoints: discovery.entrypoints,
+  preferBundledDeclarations: true,
+});
+
+console.log(strategy.recommendation);
+console.log(strategy.risks);
+```
+
+Recommendations:
+
+- `keep-unbundled-declarations`
+- `use-current-text-bundler`
+- `delegate-semantic-rollup`
+
+Known risk flags include:
+
+- `pattern-entrypoints`
+- `split-import-require-types`
+- `unknown-entrypoint-shape`
+
+M4 is intentionally a strategy/API milestone, not a semantic rollup implementation milestone. The current bundler remains conservative, opt-in, and validation-backed.
 
 ## Optional: package type metadata wiring
 
@@ -410,6 +499,7 @@ Common diagnostics include:
 - bundled declaration output that TypeScript cannot check
 - unsupported package metadata wiring shapes
 - package metadata write failures
+- fast isolated declaration emit used, skipped, unavailable, unsafe, or invalid
 
 A build tool can turn these diagnostics into user-facing output, for example:
 
@@ -448,6 +538,18 @@ Main types are exported from the package too, including:
 - declaration bundle types
 - tsconfig adapter types
 - TypeScript emit adapter/result types
+
+## M3 exit criteria
+
+M3 is closed as **opt-in experimental complete**:
+
+- Declar can detect fast isolated declaration eligibility through TypeScript `transpileDeclaration` support and per-file isolated-declaration diagnostics.
+- Declar can generate `.d.ts`, `.d.mts`, `.d.cts`, and declaration map outputs for supported simple files.
+- Declar falls back to the TypeScript-backed emit path for unavailable emitters, unsupported syntax, invalid output, and package/export validation failures.
+- Fast-path decisions are exposed through structured diagnostics.
+- Fast-path output is validated against package exports before it is accepted.
+- Existing TypeScript-backed behavior remains the correctness baseline.
+- Fast mode remains opt-in and documented as experimental.
 
 ## Tests
 

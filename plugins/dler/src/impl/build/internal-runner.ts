@@ -1,3 +1,4 @@
+import { formatDeclarDiagnostics, runDeclarDeclarationLayer } from "./declaration-layer";
 import { resolvePackageBuildCommand } from "./package-build-command";
 
 function readFlag(name: string): string | null {
@@ -30,4 +31,25 @@ const processHandle = Bun.spawn([...command.argv], {
 });
 
 const exitCode = await processHandle.exited;
-process.exit(exitCode);
+
+if (exitCode !== 0) {
+  process.exit(exitCode);
+}
+
+const declarationResult = await runDeclarDeclarationLayer({ cwd, label: label ?? cwd });
+
+if (declarationResult.skippedReason) {
+  console.log(`Declar declarations skipped: ${declarationResult.skippedReason}.`);
+  process.exit(0);
+}
+
+if (declarationResult.diagnostics.length > 0) {
+  console.log(formatDeclarDiagnostics(declarationResult.diagnostics));
+}
+
+if (!declarationResult.ok) {
+  process.exit(1);
+}
+
+console.log(`Declar declarations emitted: ${declarationResult.emittedFiles.length} file(s).`);
+process.exit(0);
