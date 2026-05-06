@@ -11,6 +11,7 @@ interface DlerDeclarationPackageJson {
   readonly module?: string | undefined;
   readonly name?: string | undefined;
   readonly private?: boolean | undefined;
+  readonly bin?: string | Record<string, string> | undefined;
   readonly type?: string | undefined;
   readonly types?: string | undefined;
 }
@@ -132,6 +133,8 @@ function createDeclarPackagePlan(pkg: DlerDeclarationPackageJson): DlerDeclarPac
   if (pkg.types) collectSourceEntrypoints(pkg.types, sourceEntrypoints);
   if (pkg.main) collectSourceEntrypoints(pkg.main, sourceEntrypoints);
   if (pkg.module) collectSourceEntrypoints(pkg.module, sourceEntrypoints);
+  if (typeof pkg.bin === "string") collectSourceEntrypoints(pkg.bin, sourceEntrypoints);
+  if (pkg.bin && typeof pkg.bin === "object") collectSourceEntrypoints(pkg.bin, sourceEntrypoints);
 
   if (sourceEntrypoints.size === 0) {
     return undefined;

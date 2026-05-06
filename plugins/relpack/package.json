@@ -32,5 +32,8 @@
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

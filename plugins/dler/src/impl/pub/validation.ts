@@ -72,6 +72,10 @@ function toPublishRuntimePath(sourcePath: string, publishFrom: string): string {
   return `./${publishFrom.replace(/^\.\//, "").replace(/\/$/, "")}/${basePath.replace(/^\.\//, "")}${runtimeExtension}`;
 }
 
+function toPublishBinPath(sourcePath: string, publishFrom: string): string {
+  return toPublishRuntimePath(sourcePath, publishFrom).replace(/^\.\//, "");
+}
+
 function toPublishDeclarationPath(sourcePath: string, publishFrom: string): string {
   const withoutSourcePrefix = stripSourcePrefix(sourcePath);
   const extension = sourceExtensions.find((candidate) => withoutSourcePrefix.endsWith(candidate));
@@ -166,6 +170,33 @@ export function preparePublishPackageMetadata(
       : rewriteExportForPublish(exportsValue, publishFrom);
   } else if (nextPackageRecord.exports) {
     nextPackageRecord.exports = rewriteExportForPublish(nextPackageRecord.exports, publishFrom);
+  }
+
+  for (const field of ["main", "module"] as const) {
+    if (typeof nextPackageRecord[field] === "string" && isSourceEntrypoint(nextPackageRecord[field])) {
+      nextPackageRecord[field] = toPublishRuntimePath(nextPackageRecord[field], publishFrom);
+    }
+  }
+
+  if (typeof nextPackageRecord.bin === "string" && isSourceEntrypoint(nextPackageRecord.bin)) {
+    nextPackageRecord.bin = toPublishBinPath(nextPackageRecord.bin, publishFrom);
+  } else if (isRecord(nextPackageRecord.bin)) {
+    nextPackageRecord.bin = Object.fromEntries(
+      Object.entries(nextPackageRecord.bin).map(([name, value]) => [
+        name,
+        typeof value === "string" && isSourceEntrypoint(value)
+          ? toPublishBinPath(value, publishFrom)
+          : value,
+      ]),
+    );
+  }
+
+  if (Array.isArray(nextPackageRecord.sideEffects)) {
+    nextPackageRecord.sideEffects = nextPackageRecord.sideEffects.map((value) =>
+      typeof value === "string" && isSourceEntrypoint(value)
+        ? toPublishRuntimePath(value, publishFrom)
+        : value,
+    );
   }
 
   return nextPackageRecord;

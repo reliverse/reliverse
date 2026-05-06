@@ -143,6 +143,8 @@ describe("publish validation", () => {
       JSON.stringify({
         ...basePackageJson,
         name: "typed-source-types",
+        bin: { typed: "./src/index.ts" },
+        sideEffects: ["./src/index.ts"],
         devDependencies: { "@types/bun": "catalog:", typescript: "catalog:" },
         exports: { ".": { types: "./src/index.ts", import: "./dist/index.js" } },
       }),
@@ -166,6 +168,8 @@ describe("publish validation", () => {
         packageName: "typed-source-types",
         packageRecord: {
           exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
+          bin: { typed: "dist/index.js" },
+          sideEffects: ["./dist/index.js"],
           types: "./dist/index.d.ts",
         },
       },

@@ -155,9 +155,13 @@ function createBunBuildInvocation(
   entrypoints: readonly string[],
   targetRuntime: "bun" | "node",
 ): BuildCommandInvocation {
+  const rootArgs = entrypoints.length > 1 && entrypoints.every((entrypoint) => entrypoint.startsWith("./src/"))
+    ? ["--root", "./src"]
+    : [];
+
   return {
-    argv: ["bun", "build", ...entrypoints, "--outdir", "./dist", "--target", targetRuntime],
-    display: `bun build ${entrypoints.join(" ")} --outdir ./dist --target ${targetRuntime}`,
+    argv: ["bun", "build", ...entrypoints, "--outdir", "./dist", "--target", targetRuntime, ...rootArgs],
+    display: `bun build ${entrypoints.join(" ")} --outdir ./dist --target ${targetRuntime}${rootArgs.length > 0 ? " --root ./src" : ""}`,
   };
 }
 

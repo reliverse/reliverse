@@ -1,5 +1,7 @@
 import { formatDeclarDiagnostics, runDeclarDeclarationLayer } from "./declaration-layer";
 import { resolvePackageBuildCommand } from "./package-build-command";
+import { rm } from "node:fs/promises";
+import { join } from "node:path";
 
 function readFlag(name: string): string | null {
   const index = process.argv.indexOf(name);
@@ -23,6 +25,8 @@ if (!command) {
   console.error(`No generated build command matched ${label ?? cwd}.`);
   process.exit(1);
 }
+
+await rm(join(cwd, "dist"), { force: true, recursive: true });
 
 const processHandle = Bun.spawn([...command.argv], {
   cwd,

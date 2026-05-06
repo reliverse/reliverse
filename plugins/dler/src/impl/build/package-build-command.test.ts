@@ -58,8 +58,10 @@ describe("package build command", () => {
         "./dist",
         "--target",
         "bun",
+        "--root",
+        "./src",
       ],
-      display: "bun build ./src/index.ts ./src/cmds/demo/sub/cmd.ts --outdir ./dist --target bun",
+      display: "bun build ./src/index.ts ./src/cmds/demo/sub/cmd.ts --outdir ./dist --target bun --root ./src",
     });
   });
 
@@ -113,8 +115,10 @@ describe("package build command", () => {
         "./dist",
         "--target",
         "node",
+        "--root",
+        "./src",
       ],
-      display: "bun build ./src/api.ts ./src/vite.ts --outdir ./dist --target node",
+      display: "bun build ./src/api.ts ./src/vite.ts --outdir ./dist --target node --root ./src",
     });
   });
 

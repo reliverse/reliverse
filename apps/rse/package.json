@@ -7,6 +7,13 @@
     "rse": "./src/cli.ts"
   },
   "type": "module",
+  "types": "./src/cli.ts",
+  "exports": {
+    ".": {
+      "types": "./src/cli.ts",
+      "import": "./src/cli.ts"
+    }
+  },
   "sideEffects": [
     "./src/cli.ts"
   ],

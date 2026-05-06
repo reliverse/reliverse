@@ -1,4 +1,6 @@
 import { defineCommand } from "@reliverse/rempts";
+import { readdir, readFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 
 import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
 import {
@@ -10,7 +12,10 @@ import { runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
 import { createPublishStaging } from "../../impl/pub/staging";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
-import { findUnsafeDependencySpecifiers } from "../../impl/pub/workspace-deps";
+import {
+  findUnsafeDependencySpecifiers,
+  normalizePublishDependencySpecifiers,
+} from "../../impl/pub/workspace-deps";
 import { createPublishExecutedTargets, createTargetSets } from "../../impl/report-helpers";
 import { createPublishSummary, createPublishSummaryFromResults } from "../../impl/result-contract";
 import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
@@ -75,6 +80,176 @@ function formatNpmCommand(options: {
   }
 
   return parts.join(" ");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+async function findWorkspaceRoot(start: string): Promise<string> {
+  let current = resolve(start);
+
+  while (true) {
+    try {
+      const pkg = JSON.parse(await readFile(resolve(current, "package.json"), "utf8")) as Record<
+        string,
+        unknown
+      >;
+      if (isRecord(pkg.workspaces)) return current;
+    } catch {
+      // Keep walking up until filesystem root.
+    }
+
+    const parent = dirname(current);
+    if (parent === current) return resolve(start);
+    current = parent;
+  }
+}
+
+async function readPublishDependencyResolutionContext(options: {
+  readonly cwd: string;
+  readonly targets: readonly { readonly cwd: string }[];
+}): Promise<{
+  readonly catalog: ReadonlyMap<string, string>;
+  readonly workspaceVersions: ReadonlyMap<string, string>;
+}> {
+  const workspaceRoot = await findWorkspaceRoot(options.cwd);
+  const workspaceVersions = new Map<string, string>();
+  const catalog = new Map<string, string>();
+  const workspacePackageDirs = new Set<string>(options.targets.map((target) => target.cwd));
+
+  try {
+    const rootPackageJson = JSON.parse(
+      await readFile(resolve(workspaceRoot, "package.json"), "utf8"),
+    ) as Record<string, unknown>;
+    const workspaces = rootPackageJson.workspaces;
+    const catalogRecord = isRecord(workspaces) && isRecord(workspaces.catalog)
+      ? workspaces.catalog
+      : undefined;
+
+    if (catalogRecord) {
+      for (const [name, version] of Object.entries(catalogRecord)) {
+        if (typeof version === "string") catalog.set(name, version);
+      }
+    }
+
+    const packagePatterns = isRecord(workspaces) && Array.isArray(workspaces.packages)
+      ? workspaces.packages
+      : [];
+    for (const pattern of packagePatterns) {
+      if (typeof pattern !== "string" || !pattern.endsWith("/*")) continue;
+
+      const parentDir = resolve(workspaceRoot, pattern.slice(0, -2));
+      try {
+        const entries = await readdir(parentDir, { withFileTypes: true });
+        for (const entry of entries) {
+          if (entry.isDirectory()) workspacePackageDirs.add(resolve(parentDir, entry.name));
+        }
+      } catch {
+        // Missing workspace pattern directories are handled by target discovery elsewhere.
+      }
+    }
+  } catch {
+    // Missing catalog context is non-fatal; unresolved catalog specifiers remain blocked later.
+  }
+
+  await Promise.all(
+    [...workspacePackageDirs].map(async (packageDir) => {
+      try {
+        const pkg = JSON.parse(await readFile(resolve(packageDir, "package.json"), "utf8")) as Record<
+          string,
+          unknown
+        >;
+        if (typeof pkg.name === "string" && typeof pkg.version === "string") {
+          workspaceVersions.set(pkg.name, pkg.version);
+        }
+      } catch {
+        // Target validation reports manifest issues later.
+      }
+    }),
+  );
+
+  return { catalog, workspaceVersions };
+}
+
+function parseVersion(value: string): [number, number, number] | undefined {
+  const match = value.trim().match(/^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/);
+  if (!match) return undefined;
+
+  return [Number(match[1]), Number(match[2]), Number(match[3])];
+}
+
+function compareVersions(a: string, b: string): number {
+  const left = parseVersion(a);
+  const right = parseVersion(b);
+  if (!left || !right) return a.localeCompare(b);
+
+  for (let index = 0; index < left.length; index += 1) {
+    const diff = left[index]! - right[index]!;
+    if (diff !== 0) return diff;
+  }
+
+  return 0;
+}
+
+function nextPatchVersion(version: string): string | undefined {
+  const parsed = parseVersion(version);
+  if (!parsed) return undefined;
+
+  return `${parsed[0]}.${parsed[1]}.${parsed[2] + 1}`;
+}
+
+async function readNpmLatestVersion(packageName: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+  const processHandle = Bun.spawn(["npm", "view", packageName, "version", "--json"], {
+    env,
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  const [stdout, exitCode] = await Promise.all([
+    new Response(processHandle.stdout).text(),
+    processHandle.exited,
+  ]);
+
+  if (exitCode !== 0) return undefined;
+
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    return typeof parsed === "string" ? parsed : undefined;
+  } catch {
+    return stdout.trim().replace(/^"|"$/g, "") || undefined;
+  }
+}
+
+async function resolvePublishVersions(options: {
+  readonly env: NodeJS.ProcessEnv;
+  readonly latestTag: boolean;
+  readonly targets: readonly { readonly packageName: string; readonly packageRecord: Record<string, unknown> }[];
+}): Promise<ReadonlyMap<string, string>> {
+  const versions = new Map<string, string>();
+
+  await Promise.all(
+    options.targets.map(async (target) => {
+      const sourceVersion = typeof target.packageRecord.version === "string"
+        ? target.packageRecord.version
+        : undefined;
+      if (!sourceVersion) return;
+
+      if (!options.latestTag) {
+        versions.set(target.packageName, sourceVersion);
+        return;
+      }
+
+      const latestVersion = await readNpmLatestVersion(target.packageName, options.env);
+      if (!latestVersion || compareVersions(sourceVersion, latestVersion) > 0) {
+        versions.set(target.packageName, sourceVersion);
+        return;
+      }
+
+      versions.set(target.packageName, nextPatchVersion(latestVersion) ?? sourceVersion);
+    }),
+  );
+
+  return versions;
 }
 
 function pushNpmOutput(
@@ -287,6 +462,19 @@ export default defineCommand({
       ...requestedTargets.resolution.skipped,
       ...validation.skipped,
     ];
+    const dependencyResolutionContext = await readPublishDependencyResolutionContext({
+      cwd: ctx.cwd,
+      targets: requestedTargets.resolution.resolved,
+    });
+    const publishVersions = await resolvePublishVersions({
+      env: ctx.env,
+      latestTag: ctx.options.tag === "latest",
+      targets: validation.publishable,
+    });
+    const workspaceVersions = new Map(dependencyResolutionContext.workspaceVersions);
+    for (const [name, version] of publishVersions) {
+      workspaceVersions.set(name, version);
+    }
 
     type PublishResult = {
       cwd: string;
@@ -302,7 +490,13 @@ export default defineCommand({
       async (target) => {
         const label = target.label;
         const packageRoot = target.cwd;
-        const pkgRecord = target.packageRecord;
+        const pkgRecord = normalizePublishDependencySpecifiers(
+          {
+            ...target.packageRecord,
+            version: publishVersions.get(target.packageName) ?? target.packageRecord.version,
+          },
+          { ...dependencyResolutionContext, workspaceVersions },
+        );
 
         const unsafeSpecifiers = findUnsafeDependencySpecifiers(pkgRecord);
         if (unsafeSpecifiers.length > 0) {
@@ -326,7 +520,7 @@ export default defineCommand({
         if (apply) {
           ctx.safety.assertApplied("fs.write");
         }
-        const staging = await createPublishStaging(packageRoot, publishFrom, target.packageRecord);
+        const staging = await createPublishStaging(packageRoot, publishFrom, pkgRecord);
         try {
           const publishStartedAt = performance.now();
           if (apply) {
