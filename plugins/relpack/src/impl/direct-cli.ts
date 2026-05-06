@@ -1,20 +1,3 @@
-import { runDoctor } from "./core/doctor";
-import { detectArchiveFormat, normalizeArchiveFormat } from "./core/format";
-import { buildIgnoredNames, parseIgnoredNameInput } from "./core/ignore";
-import { explainCommand } from "./core/explain";
-import { diffArchiveWithOutput } from "./core/commands/diff";
-import { listArchive } from "./core/commands/list";
-import { packArchive } from "./core/commands/pack";
-import { testArchive } from "./core/commands/test";
-import { deleteBatchSourceArchives, unpackArchiveBatch } from "./core/commands/unpack-batch";
-import { verifyArchive } from "./core/commands/verify";
-import {
-  looksLikeArchiveInput,
-  resolveArchiveInput,
-  resolveArchiveInputs,
-  type ArchiveInputResolution,
-} from "./core/glob";
-import type { ArchiveFormat, BatchUnpackItem, CommandContext, RelpackCommandName, UnpackOverwriteMode } from "./core/types";
 import {
   buildRelpackCommand,
   formatBatchUnpackOutput,
@@ -30,7 +13,30 @@ import {
   printJson,
   toBackendCommand,
 } from "../cmds/relpack/_shared";
+import { diffArchiveWithOutput } from "./core/commands/diff";
+import { listArchive } from "./core/commands/list";
+import { packArchive } from "./core/commands/pack";
+import { testArchive } from "./core/commands/test";
+import { deleteBatchSourceArchives, unpackArchiveBatch } from "./core/commands/unpack-batch";
+import { verifyArchive } from "./core/commands/verify";
+import { runDoctor } from "./core/doctor";
 import { toDiagnostic } from "./core/error";
+import { explainCommand } from "./core/explain";
+import { detectArchiveFormat, normalizeArchiveFormat } from "./core/format";
+import {
+  looksLikeArchiveInput,
+  resolveArchiveInput,
+  resolveArchiveInputs,
+  type ArchiveInputResolution,
+} from "./core/glob";
+import { buildIgnoredNames, parseIgnoredNameInput } from "./core/ignore";
+import type {
+  ArchiveFormat,
+  BatchUnpackItem,
+  CommandContext,
+  RelpackCommandName,
+  UnpackOverwriteMode,
+} from "./core/types";
 import { formatDirectCommandHelp, formatDirectRootHelp } from "./direct-help";
 
 export interface RelpackCliOptions {
@@ -70,14 +76,20 @@ const VALUE_FLAGS = new Set([
   "postCheckCommand",
 ]);
 
-export async function runRelpackCli(argv: readonly string[], options: RelpackCliOptions = {}): Promise<number> {
+export async function runRelpackCli(
+  argv: readonly string[],
+  options: RelpackCliOptions = {},
+): Promise<number> {
   const io = createIo(options);
   const previousCommandPrefix = process.env.RELPACK_COMMAND_PREFIX;
   process.env.RELPACK_COMMAND_PREFIX = "relpack";
 
   try {
     const parsed = parseRelpackArgv(argv);
-    const ctx: CommandContext = { cwd: options.cwd ?? process.cwd(), env: options.env ?? process.env };
+    const ctx: CommandContext = {
+      cwd: options.cwd ?? process.cwd(),
+      env: options.env ?? process.env,
+    };
 
     switch (parsed.command) {
       case "help":
@@ -103,6 +115,8 @@ export async function runRelpackCli(argv: readonly string[], options: RelpackCli
       case "explain":
         return await runExplainCommand(parsed, io);
     }
+
+    throw new Error(`Unknown relpack command: ${parsed.command}`);
   } catch (error) {
     const diagnostic = toDiagnostic(error);
     if (argv.includes("--json")) {
@@ -228,7 +242,11 @@ function isRelpackCommand(command: string | undefined): command is RelpackComman
   return command !== undefined && COMMANDS.has(command as RelpackCommandName);
 }
 
-async function runDoctorCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo): Promise<number> {
+async function runDoctorCommand(
+  ctx: CommandContext,
+  parsed: ParsedArgv,
+  io: CliIo,
+): Promise<number> {
   const doctor = await runDoctor(ctx);
 
   if (isJson(parsed)) {
@@ -255,7 +273,10 @@ async function runPackCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo
   const showSkipped = parsed.options.showSkipped === true;
   const manifestEnabled = parsed.options.noManifest !== true;
   const extraIgnoredNames = parseIgnoredNameInput(parsed.options.ignore);
-  const ignoredNames = buildIgnoredNames({ includeDefaultIgnores: !includeIgnored, extraIgnoredNames });
+  const ignoredNames = buildIgnoredNames({
+    includeDefaultIgnores: !includeIgnored,
+    extraIgnoredNames,
+  });
 
   if (inputs.length === 0) throw new Error("Pack command requires at least one input path.");
   if (output === undefined) throw new Error("Pack command requires -o or --output.");
@@ -334,7 +355,11 @@ async function runPackCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo
   return 0;
 }
 
-async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo): Promise<number> {
+async function runUnpackCommand(
+  ctx: CommandContext,
+  parsed: ParsedArgv,
+  io: CliIo,
+): Promise<number> {
   const format = toOptionalArchiveFormat(parsed.options.format);
   const dryRun = isDryRun(parsed.options);
   const deleteArchive = parsed.options.deleteArchive === true;
@@ -345,12 +370,23 @@ async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: Cli
   const postCheckCommand = toOptionalString(parsed.options.postCheckCommand);
   const targets = await resolveUnpackTargets(parsed, ctx.cwd, format);
 
-  validateUnpackOptions({ cleanOutput, overwriteMode, backup, rollbackOnFail, hasExplicitOutput: targets.every((target) => target.outputDir !== "."), format });
+  validateUnpackOptions({
+    cleanOutput,
+    overwriteMode,
+    backup,
+    rollbackOnFail,
+    hasExplicitOutput: targets.every((target) => target.outputDir !== "."),
+    format,
+  });
 
   const result = await unpackArchiveBatch(
     {
       cwd: ctx.cwd,
-      items: targets.map(({ archive, outputDir, format }) => ({ archive, outputDir, ...(format === undefined ? {} : { format }) })),
+      items: targets.map(({ archive, outputDir, format }) => ({
+        archive,
+        outputDir,
+        ...(format === undefined ? {} : { format }),
+      })),
       overwrite: cleanOutput || overwriteMode === "files" ? "files" : "never",
       dryRun,
       cleanOutput,
@@ -361,7 +397,8 @@ async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: Cli
     ctx,
   );
 
-  const deletedArchivePaths = deleteArchive && !dryRun ? await deleteBatchSourceArchives(result.items, ctx.cwd) : [];
+  const deletedArchivePaths =
+    deleteArchive && !dryRun ? await deleteBatchSourceArchives(result.items, ctx.cwd) : [];
 
   if (isJson(parsed)) {
     printJson({ out: io.out } as never, {
@@ -384,8 +421,30 @@ async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: Cli
   if (targets.length === 1) {
     const target = targets[0]!;
     const itemResult = result.items[0]!;
-    const applyCommand = buildRelpackCommand([...buildSingleUnpackCommandParts(target, { format, overwriteMode, deleteArchive, cleanOutput: parsed.options.cleanOutput === true, backup, rollbackOnFail, postCheckCommand }), "--apply"]);
-    const overwriteApplyCommand = buildRelpackCommand([...buildSingleUnpackCommandParts(target, { format, overwriteMode: "files", deleteArchive, cleanOutput: false, backup, rollbackOnFail, postCheckCommand }), "--apply"]);
+    const applyCommand = buildRelpackCommand([
+      ...buildSingleUnpackCommandParts(target, {
+        format,
+        overwriteMode,
+        deleteArchive,
+        cleanOutput: parsed.options.cleanOutput === true,
+        backup,
+        rollbackOnFail,
+        postCheckCommand,
+      }),
+      "--apply",
+    ]);
+    const overwriteApplyCommand = buildRelpackCommand([
+      ...buildSingleUnpackCommandParts(target, {
+        format,
+        overwriteMode: "files",
+        deleteArchive,
+        cleanOutput: false,
+        backup,
+        rollbackOnFail,
+        postCheckCommand,
+      }),
+      "--apply",
+    ]);
 
     io.out(
       formatUnpackOutput({
@@ -420,7 +479,9 @@ async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: Cli
       targets: targets.map((target, index) => ({
         archive: target.archive,
         outputDir: target.outputDir,
-        format: result.items[index]?.format ?? normalizeArchiveFormat(format ?? detectArchiveFormat(target.archive)),
+        format:
+          result.items[index]?.format ??
+          normalizeArchiveFormat(format ?? detectArchiveFormat(target.archive)),
         archiveResolution: target.archiveResolution,
         backendCommand: toBackendCommand(result.items[index]!.result),
       })),
@@ -434,7 +495,18 @@ async function runUnpackCommand(ctx: CommandContext, parsed: ParsedArgv, io: Cli
       dryRun,
       explicitDryRun: parsed.options.dryRun === true,
       result,
-      applyCommand: buildRelpackCommand([...buildBatchUnpackCommandParts(targets, { format, overwriteMode, deleteArchive, cleanOutput: parsed.options.cleanOutput === true, backup, rollbackOnFail, postCheckCommand }), "--apply"]),
+      applyCommand: buildRelpackCommand([
+        ...buildBatchUnpackCommandParts(targets, {
+          format,
+          overwriteMode,
+          deleteArchive,
+          cleanOutput: parsed.options.cleanOutput === true,
+          backup,
+          rollbackOnFail,
+          postCheckCommand,
+        }),
+        "--apply",
+      ]),
     }),
   );
 
@@ -448,21 +520,42 @@ async function runListCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo
   const tree = parsed.options.tree === true;
   const maxDepthValue = toOptionalString(parsed.options.maxDepth);
   const maxDepth = maxDepthValue === undefined ? undefined : Number(maxDepthValue);
-  if (maxDepthValue !== undefined && (!Number.isInteger(maxDepth) || maxDepth < 1)) {
+  if (maxDepth !== undefined && (!Number.isInteger(maxDepth) || maxDepth < 1)) {
     throw new Error("--max-depth must be a positive integer.");
   }
 
-  const entries = await listArchive({ cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) }, ctx);
+  const entries = await listArchive(
+    { cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) },
+    ctx,
+  );
   const normalizedFormat = normalizeArchiveFormat(format ?? detectArchiveFormat(archive));
   const { tryReadManifestFromArchive } = await import("./core/manifest");
   const manifest = await tryReadManifestFromArchive(archive, normalizedFormat, ctx);
 
   if (isJson(parsed)) {
-    printJson({ out: io.out } as never, { ok: true, command: "list", format: normalizedFormat, diagnostics: [], archiveResolution, entries, manifest });
+    printJson({ out: io.out } as never, {
+      ok: true,
+      command: "list",
+      format: normalizedFormat,
+      diagnostics: [],
+      archiveResolution,
+      entries,
+      manifest,
+    });
     return 0;
   }
 
-  io.out(formatListOutput({ archive, archiveResolution, format: normalizedFormat, entries, ...(manifest === undefined ? {} : { manifest }), tree, ...(maxDepth === undefined ? {} : { maxDepth }) }));
+  io.out(
+    formatListOutput({
+      archive,
+      archiveResolution,
+      format: normalizedFormat,
+      entries,
+      ...(manifest === undefined ? {} : { manifest }),
+      tree,
+      ...(maxDepth === undefined ? {} : { maxDepth }),
+    }),
+  );
   return 0;
 }
 
@@ -470,26 +563,57 @@ async function runTestCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo
   const archiveResolution = await resolveArchiveInput(ctx.cwd, parsed.args);
   const archive = archiveResolution.archive;
   const format = toOptionalArchiveFormat(parsed.options.format);
-  const result = await testArchive({ cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) }, ctx);
+  const result = await testArchive(
+    { cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) },
+    ctx,
+  );
   const normalizedFormat = normalizeArchiveFormat(format ?? detectArchiveFormat(archive));
 
   if (isJson(parsed)) {
-    printJson({ out: io.out } as never, { ok: true, command: "test", format: normalizedFormat, diagnostics: [], executed: [result.command, ...result.args], archiveResolution });
+    printJson({ out: io.out } as never, {
+      ok: true,
+      command: "test",
+      format: normalizedFormat,
+      diagnostics: [],
+      executed: [result.command, ...result.args],
+      archiveResolution,
+    });
     return 0;
   }
 
-  io.out(formatTestOutput({ archive, archiveResolution, format: normalizedFormat, backendCommand: toBackendCommand(result) }));
+  io.out(
+    formatTestOutput({
+      archive,
+      archiveResolution,
+      format: normalizedFormat,
+      backendCommand: toBackendCommand(result),
+    }),
+  );
   return 0;
 }
 
-async function runVerifyCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo): Promise<number> {
+async function runVerifyCommand(
+  ctx: CommandContext,
+  parsed: ParsedArgv,
+  io: CliIo,
+): Promise<number> {
   const archiveResolution = await resolveArchiveInput(ctx.cwd, parsed.args);
   const archive = archiveResolution.archive;
   const format = toOptionalArchiveFormat(parsed.options.format);
-  const result = await verifyArchive({ cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) }, ctx);
+  const result = await verifyArchive(
+    { cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) },
+    ctx,
+  );
 
   if (isJson(parsed)) {
-    printJson({ out: io.out } as never, { ok: result.ok, command: "verify", format: result.format, diagnostics: [], archiveResolution, result });
+    printJson({ out: io.out } as never, {
+      ok: result.ok,
+      command: "verify",
+      format: result.format,
+      diagnostics: [],
+      archiveResolution,
+      result,
+    });
   } else {
     io.out(formatVerifyOutput(result, archiveResolution));
   }
@@ -503,12 +627,25 @@ async function runDiffCommand(ctx: CommandContext, parsed: ParsedArgv, io: CliIo
   const outputDir = toOptionalString(parsed.options.output);
   const format = toOptionalArchiveFormat(parsed.options.format);
   const extraIgnoredNames = parseIgnoredNameInput(parsed.options.ignore);
-  const ignoredNames = buildIgnoredNames({ includeDefaultIgnores: parsed.options.includeIgnored !== true, extraIgnoredNames });
+  const ignoredNames = buildIgnoredNames({
+    includeDefaultIgnores: parsed.options.includeIgnored !== true,
+    extraIgnoredNames,
+  });
   if (outputDir === undefined) throw new Error("Diff command requires -o or --output.");
 
-  const result = await diffArchiveWithOutput({ cwd: ctx.cwd, archive, outputDir, ...(format === undefined ? {} : { format }), ignoredNames }, ctx);
+  const result = await diffArchiveWithOutput(
+    { cwd: ctx.cwd, archive, outputDir, ...(format === undefined ? {} : { format }), ignoredNames },
+    ctx,
+  );
   if (isJson(parsed)) {
-    printJson({ out: io.out } as never, { ok: true, command: "diff", format: result.format, diagnostics: [], archiveResolution, result });
+    printJson({ out: io.out } as never, {
+      ok: true,
+      command: "diff",
+      format: result.format,
+      diagnostics: [],
+      archiveResolution,
+      result,
+    });
     return 0;
   }
 
@@ -526,7 +663,11 @@ async function runExplainCommand(parsed: ParsedArgv, io: CliIo): Promise<number>
   return 0;
 }
 
-async function resolveUnpackTargets(parsed: ParsedArgv, cwd: string, format: ArchiveFormat | undefined): Promise<readonly UnpackTarget[]> {
+async function resolveUnpackTargets(
+  parsed: ParsedArgv,
+  cwd: string,
+  format: ArchiveFormat | undefined,
+): Promise<readonly UnpackTarget[]> {
   const rawArgs = parsed.args;
   const explicitOutputs = normalizeStringList(parsed.options.output);
 
@@ -534,7 +675,14 @@ async function resolveUnpackTargets(parsed: ParsedArgv, cwd: string, format: Arc
 
   if (explicitOutputs.length === 0) {
     const resolution = await resolveArchiveInput(cwd, rawArgs);
-    return [{ archive: resolution.archive, outputDir: ".", ...(format === undefined ? {} : { format }), archiveResolution: resolution }];
+    return [
+      {
+        archive: resolution.archive,
+        outputDir: ".",
+        ...(format === undefined ? {} : { format }),
+        archiveResolution: resolution,
+      },
+    ];
   }
 
   const archiveInputs: string[] = [];
@@ -548,13 +696,16 @@ async function resolveUnpackTargets(parsed: ParsedArgv, cwd: string, format: Arc
     }
   }
 
-  if (archiveInputs.length === 0) throw new Error("At least one archive path is required before output directories.");
+  if (archiveInputs.length === 0)
+    throw new Error("At least one archive path is required before output directories.");
 
   const outputs = [...explicitOutputs, ...positionalOutputs];
   const archiveList = await resolveArchiveInputs(cwd, archiveInputs);
 
   if (archiveList.archives.length !== outputs.length) {
-    throw new Error(`Batch unpack needs one output directory per resolved archive. Resolved ${archiveList.archives.length} archive(s) but received ${outputs.length} output director${outputs.length === 1 ? "y" : "ies"}.`);
+    throw new Error(
+      `Batch unpack needs one output directory per resolved archive. Resolved ${archiveList.archives.length} archive(s) but received ${outputs.length} output director${outputs.length === 1 ? "y" : "ies"}.`,
+    );
   }
 
   return archiveList.archives.map((resolution, index) => ({
@@ -571,18 +722,22 @@ function validateUnpackOptions(options: {
   readonly backup: boolean;
   readonly rollbackOnFail: boolean;
   readonly hasExplicitOutput: boolean;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
 }): void {
   if (options.format !== undefined && normalizeArchiveFormat(options.format) === "unknown") {
     throw new Error(`Unsupported --format value: ${options.format}`);
   }
 
   if (options.cleanOutput && !options.hasExplicitOutput) {
-    throw new Error("--clean-output / --overwrite-mode clean requires explicit -o/--output directories so relpack knows exactly what to delete.");
+    throw new Error(
+      "--clean-output / --overwrite-mode clean requires explicit -o/--output directories so relpack knows exactly what to delete.",
+    );
   }
 
   if (options.cleanOutput && options.overwriteMode === "never") {
-    throw new Error("--clean-output requires --overwrite or --overwrite-mode clean because it intentionally deletes output directories before extraction.");
+    throw new Error(
+      "--clean-output requires --overwrite or --overwrite-mode clean because it intentionally deletes output directories before extraction.",
+    );
   }
 
   if (options.backup && !options.hasExplicitOutput) {
@@ -605,7 +760,7 @@ function buildPackCommandParts(
   inputs: readonly string[],
   output: string,
   options: {
-    readonly format?: ArchiveFormat;
+    readonly format?: ArchiveFormat | undefined;
     readonly overwrite: boolean;
     readonly extraIgnoredNames: readonly string[];
     readonly includeIgnored: boolean;
@@ -620,7 +775,9 @@ function buildPackCommandParts(
     output,
     ...(options.format === undefined ? [] : ["--format", options.format]),
     ...(options.overwrite ? ["--overwrite"] : []),
-    ...(options.extraIgnoredNames.length === 0 ? [] : ["--ignore", options.extraIgnoredNames.join(",")]),
+    ...(options.extraIgnoredNames.length === 0
+      ? []
+      : ["--ignore", options.extraIgnoredNames.join(",")]),
     ...(options.includeIgnored ? ["--include-ignored"] : []),
     ...(options.showSkipped ? ["--show-skipped"] : []),
     ...(options.manifestEnabled ? [] : ["--no-manifest"]),
@@ -631,9 +788,19 @@ function buildSingleUnpackCommandParts(target: UnpackTarget, options: UnpackCliO
   return ["unpack", target.archive, "-o", target.outputDir, ...buildUnpackOptionParts(options)];
 }
 
-function buildBatchUnpackCommandParts(targets: readonly UnpackTarget[], options: UnpackCliOptions): string[] {
+function buildBatchUnpackCommandParts(
+  targets: readonly UnpackTarget[],
+  options: UnpackCliOptions,
+): string[] {
   const [firstOutput, ...remainingOutputs] = targets.map((target) => target.outputDir);
-  return ["unpack", ...targets.map((target) => target.archive), "-o", firstOutput ?? ".", ...remainingOutputs, ...buildUnpackOptionParts(options)];
+  return [
+    "unpack",
+    ...targets.map((target) => target.archive),
+    "-o",
+    firstOutput ?? ".",
+    ...remainingOutputs,
+    ...buildUnpackOptionParts(options),
+  ];
 }
 
 function buildUnpackOptionParts(options: UnpackCliOptions): string[] {
@@ -644,18 +811,19 @@ function buildUnpackOptionParts(options: UnpackCliOptions): string[] {
   if (options.cleanOutput) parts.push("--clean-output");
   if (options.backup) parts.push("--backup");
   if (options.rollbackOnFail) parts.push("--rollback-on-fail");
-  if (options.postCheckCommand !== undefined) parts.push("--post-check-command", options.postCheckCommand);
+  if (options.postCheckCommand !== undefined)
+    parts.push("--post-check-command", options.postCheckCommand);
   return parts;
 }
 
 interface UnpackCliOptions {
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
   readonly overwriteMode: UnpackOverwriteMode;
   readonly deleteArchive: boolean;
   readonly cleanOutput: boolean;
   readonly backup: boolean;
   readonly rollbackOnFail: boolean;
-  readonly postCheckCommand?: string;
+  readonly postCheckCommand?: string | undefined;
 }
 
 function toOptionalString(value: unknown): string | undefined {
@@ -675,7 +843,10 @@ function toOptionalArchiveFormat(value: unknown): ArchiveFormat | undefined {
 
 function normalizeStringList(value: unknown): string[] {
   if (Array.isArray(value)) {
-    return value.flatMap((item) => normalizeStringList(item)).map((item) => item.trim()).filter(Boolean);
+    return value
+      .flatMap((item) => normalizeStringList(item))
+      .map((item) => item.trim())
+      .filter(Boolean);
   }
 
   if (typeof value === "string" || typeof value === "number") {

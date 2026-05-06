@@ -1,6 +1,9 @@
 import { defineCommand } from "@reliverse/rempts";
 
-import { unpackArchiveBatch, deleteBatchSourceArchives } from "../../../impl/core/commands/unpack-batch";
+import {
+  unpackArchiveBatch,
+  deleteBatchSourceArchives,
+} from "../../../impl/core/commands/unpack-batch";
 import { normalizeArchiveFormat } from "../../../impl/core/format";
 import {
   looksLikeArchiveInput,
@@ -89,7 +92,8 @@ export default defineCommand({
     },
     overwriteMode: {
       type: "string",
-      description: "Collision mode: never, files, or clean. clean deletes explicit -o/--output before extraction.",
+      description:
+        "Collision mode: never, files, or clean. clean deletes explicit -o/--output before extraction.",
       inputSources: ["flag"],
     },
     dryRun: {
@@ -99,7 +103,8 @@ export default defineCommand({
     },
     deleteArchive: {
       type: "boolean",
-      description: "Delete source archive(s) after successful extraction and post-check. Only runs with --apply.",
+      description:
+        "Delete source archive(s) after successful extraction and post-check. Only runs with --apply.",
       inputSources: ["flag"],
     },
     cleanOutput: {
@@ -110,7 +115,8 @@ export default defineCommand({
     },
     backup: {
       type: "boolean",
-      description: "Create sibling .relpack-backup-* copies of output directories before extraction.",
+      description:
+        "Create sibling .relpack-backup-* copies of output directories before extraction.",
       inputSources: ["flag"],
     },
     rollbackOnFail: {
@@ -170,15 +176,21 @@ export default defineCommand({
         commandContext,
       );
 
-      const deletedArchivePaths = deleteArchive && !dryRun
-        ? await deleteBatchSourceArchives(result.items, commandContext.cwd)
-        : [];
+      const deletedArchivePaths =
+        deleteArchive && !dryRun
+          ? await deleteBatchSourceArchives(result.items, commandContext.cwd)
+          : [];
 
       if (targets.length === 1) {
         const [target] = targets;
         const [itemResult] = result.items;
         if (!target || !itemResult) {
-          emitUsageError(ctx, COMMAND_NAME, USAGE, "Unpack command could not resolve an archive target.");
+          emitUsageError(
+            ctx,
+            COMMAND_NAME,
+            USAGE,
+            "Unpack command could not resolve an archive target.",
+          );
         }
 
         if (isJsonOutput(ctx)) {
@@ -311,13 +323,13 @@ export default defineCommand({
 });
 
 interface UnpackCliOptions {
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
   readonly overwriteMode: "never" | "files" | "clean";
   readonly deleteArchive: boolean;
   readonly cleanOutput: boolean;
   readonly backup: boolean;
   readonly rollbackOnFail: boolean;
-  readonly postCheckCommand?: string;
+  readonly postCheckCommand?: string | undefined;
 }
 
 async function resolveUnpackTargets(
@@ -334,7 +346,14 @@ async function resolveUnpackTargets(
 
   if (explicitOutputs.length === 0) {
     const resolution = await resolveArchiveInputOrUsage(ctx, cwd, rawArgs);
-    return [{ archive: resolution.archive, outputDir: ".", ...(format === undefined ? {} : { format }), archiveResolution: resolution }];
+    return [
+      {
+        archive: resolution.archive,
+        outputDir: ".",
+        ...(format === undefined ? {} : { format }),
+        archiveResolution: resolution,
+      },
+    ];
   }
 
   const archiveInputs: string[] = [];
@@ -350,7 +369,12 @@ async function resolveUnpackTargets(
   }
 
   if (archiveInputs.length === 0) {
-    emitUsageError(ctx, COMMAND_NAME, USAGE, "At least one archive path is required before output directories.");
+    emitUsageError(
+      ctx,
+      COMMAND_NAME,
+      USAGE,
+      "At least one archive path is required before output directories.",
+    );
   }
 
   const outputs = [...explicitOutputs, ...positionalOutputs];
@@ -382,11 +406,19 @@ function validateUnpackOptions(
     readonly rollbackOnFail: boolean;
     readonly hasExplicitOutput: boolean;
     readonly batch: boolean;
-    readonly format?: ArchiveFormat;
+    readonly format?: ArchiveFormat | undefined;
   },
 ): void {
-  if (toOptionalString(ctx.options?.overwriteMode) !== undefined && !["never", "files", "clean"].includes(String(ctx.options?.overwriteMode))) {
-    emitUsageError(ctx, COMMAND_NAME, USAGE, "--overwrite-mode must be one of: never, files, clean.");
+  if (
+    toOptionalString(ctx.options?.overwriteMode) !== undefined &&
+    !["never", "files", "clean"].includes(String(ctx.options?.overwriteMode))
+  ) {
+    emitUsageError(
+      ctx,
+      COMMAND_NAME,
+      USAGE,
+      "--overwrite-mode must be one of: never, files, clean.",
+    );
   }
 
   if (options.format !== undefined && normalizeArchiveFormat(options.format) === "unknown") {
@@ -466,7 +498,10 @@ function buildSingleApplyCommand(target: UnpackTarget, options: UnpackCliOptions
   return buildRelpackCommand([...buildSingleCommandParts(target, options), "--apply"]);
 }
 
-function buildBatchApplyCommand(targets: readonly UnpackTarget[], options: UnpackCliOptions): string {
+function buildBatchApplyCommand(
+  targets: readonly UnpackTarget[],
+  options: UnpackCliOptions,
+): string {
   const [firstOutput, ...remainingOutputs] = targets.map((target) => target.outputDir);
   return buildRelpackCommand([
     "unpack",
@@ -491,6 +526,7 @@ function buildOptionParts(options: UnpackCliOptions): string[] {
   if (options.cleanOutput) parts.push("--clean-output");
   if (options.backup) parts.push("--backup");
   if (options.rollbackOnFail) parts.push("--rollback-on-fail");
-  if (options.postCheckCommand !== undefined) parts.push("--post-check-command", options.postCheckCommand);
+  if (options.postCheckCommand !== undefined)
+    parts.push("--post-check-command", options.postCheckCommand);
   return parts;
 }

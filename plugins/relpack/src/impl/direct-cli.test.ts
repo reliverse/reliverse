@@ -19,12 +19,13 @@ describe("standalone relpack CLI", () => {
     expect(lines.join("\n")).toContain("rse relpack <command>");
   });
 
-
   test("prints command-specific help", async () => {
     const { runRelpackCli } = await loadCli();
     const lines: string[] = [];
 
-    const code = await runRelpackCli(["pack", "--help"], { stdout: (message) => lines.push(message) });
+    const code = await runRelpackCli(["pack", "--help"], {
+      stdout: (message) => lines.push(message),
+    });
 
     expect(code).toBe(0);
     expect(lines.join("\n")).toContain("Usage:");
@@ -36,7 +37,10 @@ describe("standalone relpack CLI", () => {
     const { runRelpackCli } = await loadCli();
     const cwd = await mkdtemp(path.join(tmpdir(), "relpack-direct-cli-"));
     await mkdir(path.join(cwd, "src"), { recursive: true });
-    await writeFile(path.join(cwd, "package.json"), JSON.stringify({ name: "fixture", version: "1.2.3" }));
+    await writeFile(
+      path.join(cwd, "package.json"),
+      JSON.stringify({ name: "fixture", version: "1.2.3" }),
+    );
     await writeFile(path.join(cwd, "src", "index.ts"), "export const ok = true;\n");
 
     const output = path.join(cwd, "fixture.zip");
@@ -74,39 +78,47 @@ describe("standalone relpack CLI", () => {
       await mkdir(dir, { recursive: true });
       await writeFile(path.join(dir, "package.json"), JSON.stringify({ name, version: "0.1.2" }));
       await writeFile(path.join(dir, "README.md"), `${name}\n`);
-      const code = await runRelpackCli(["pack", "package.json", "README.md", "-o", path.join(cwd, `${name}-0.1.2.zip`), "--apply"], {
-        cwd: dir,
-        stdout: () => undefined,
-        stderr: () => undefined,
-      });
+      const code = await runRelpackCli(
+        ["pack", "package.json", "README.md", "-o", path.join(cwd, `${name}-0.1.2.zip`), "--apply"],
+        {
+          cwd: dir,
+          stdout: () => undefined,
+          stderr: () => undefined,
+        },
+      );
       expect(code).toBe(0);
     }
 
     const appOut = path.join(cwd, "apps", "rse");
     const pluginOut = path.join(cwd, "plugins", "relpack");
-    const code = await runRelpackCli([
-      "unpack",
-      "./rse-*.zip",
-      "./relpack-*.zip",
-      "-o",
-      appOut,
-      pluginOut,
-      "--overwrite-mode",
-      "clean",
-      "--backup",
-      "--rollback-on-fail",
-      "--post-check-command",
-      "test -f apps/rse/package.json && test -f plugins/relpack/package.json",
-      "--delete-archive",
-      "--apply",
-    ], {
-      cwd,
-      stdout: () => undefined,
-      stderr: () => undefined,
-    });
+    const code = await runRelpackCli(
+      [
+        "unpack",
+        "./rse-*.zip",
+        "./relpack-*.zip",
+        "-o",
+        appOut,
+        pluginOut,
+        "--overwrite-mode",
+        "clean",
+        "--backup",
+        "--rollback-on-fail",
+        "--post-check-command",
+        "test -f apps/rse/package.json && test -f plugins/relpack/package.json",
+        "--delete-archive",
+        "--apply",
+      ],
+      {
+        cwd,
+        stdout: () => undefined,
+        stderr: () => undefined,
+      },
+    );
 
     expect(code).toBe(0);
     expect(await readFile(path.join(appOut, "package.json"), "utf8")).toContain('"name":"rse"');
-    expect(await readFile(path.join(pluginOut, "package.json"), "utf8")).toContain('"name":"relpack"');
+    expect(await readFile(path.join(pluginOut, "package.json"), "utf8")).toContain(
+      '"name":"relpack"',
+    );
   });
 });

@@ -184,7 +184,6 @@
     "rse": "bun apps/rse/src/cli.ts",
     "build": "bun rse build --apply",
     "typecheck": "bun rse tsc --apply",
-    "check": "bun format && bun lint",
     "latest": "bun rse update --apply && bun i && bun typecheck && bun check",
     "upd:relpack": "bun rse relpack unpack './relpack-*.zip' -o ./plugins/relpack --overwrite-mode clean --backup --rollback-on-fail --post-check-command 'bun test plugins/relpack && bun plugins/relpack/src/cli.ts doctor' --delete-archive --apply",
     "upd:relpack:direct": "bun plugins/relpack/src/cli.ts unpack './relpack-*.zip' -o ./plugins/relpack --overwrite-mode clean --backup --rollback-on-fail --post-check-command 'bun test plugins/relpack && bun plugins/relpack/src/cli.ts doctor' --delete-archive --apply",

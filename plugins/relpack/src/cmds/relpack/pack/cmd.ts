@@ -85,7 +85,8 @@ export default defineCommand({
     },
     includeIgnored: {
       type: "boolean",
-      description: "Disable relpack's default junk/secret ignore list and include ignored names intentionally.",
+      description:
+        "Disable relpack's default junk/secret ignore list and include ignored names intentionally.",
       inputSources: ["flag"],
     },
     showSkipped: {
@@ -159,7 +160,8 @@ export default defineCommand({
 
       const formatFlag = format === undefined ? [] : ["--format", format];
       const overwriteFlag = overwrite ? ["--overwrite"] : [];
-      const ignoreFlag = extraIgnoredNames.length > 0 ? ["--ignore", extraIgnoredNames.join(",")] : [];
+      const ignoreFlag =
+        extraIgnoredNames.length > 0 ? ["--ignore", extraIgnoredNames.join(",")] : [];
       const includeIgnoredFlag = includeIgnored ? ["--include-ignored"] : [];
       const showSkippedFlag = showSkipped ? ["--show-skipped"] : [];
       const noManifestFlag = manifestEnabled ? [] : ["--no-manifest"];

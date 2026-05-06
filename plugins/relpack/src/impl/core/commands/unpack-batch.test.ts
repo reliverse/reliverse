@@ -3,9 +3,9 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
+import type { CommandContext } from "../types";
 import { packArchive } from "./pack";
 import { deleteBatchSourceArchives, unpackArchiveBatch } from "./unpack-batch";
-import type { CommandContext } from "../types";
 
 async function createBatchFixture(): Promise<{
   readonly root: string;
@@ -16,8 +16,14 @@ async function createBatchFixture(): Promise<{
 
   await mkdir(path.join(root, "sources/rse"), { recursive: true });
   await mkdir(path.join(root, "sources/relpack"), { recursive: true });
-  await writeFile(path.join(root, "sources/rse/package.json"), '{"name":"@reliverse/rse","version":"0.1.1"}\n');
-  await writeFile(path.join(root, "sources/relpack/package.json"), '{"name":"@reliverse/relpack-rse-plugin","version":"0.1.1"}\n');
+  await writeFile(
+    path.join(root, "sources/rse/package.json"),
+    '{"name":"@reliverse/rse","version":"0.1.1"}\n',
+  );
+  await writeFile(
+    path.join(root, "sources/relpack/package.json"),
+    '{"name":"@reliverse/relpack-rse-plugin","version":"0.1.1"}\n',
+  );
 
   await packArchive(
     {
@@ -76,8 +82,12 @@ describe("batch unpack", () => {
       expect(result.items).toHaveLength(2);
       expect(result.postCheck?.ok).toBe(true);
       expect(result.backupCreated).toBe(true);
-      expect(await readFile(path.join(root, "apps/rse/sources/rse/package.json"), "utf8")).toContain("@reliverse/rse");
-      expect(await readFile(path.join(root, "plugins/relpack/sources/relpack/package.json"), "utf8")).toContain("relpack");
+      expect(
+        await readFile(path.join(root, "apps/rse/sources/rse/package.json"), "utf8"),
+      ).toContain("@reliverse/rse");
+      expect(
+        await readFile(path.join(root, "plugins/relpack/sources/relpack/package.json"), "utf8"),
+      ).toContain("relpack");
 
       const deleted = await deleteBatchSourceArchives(result.items, root);
       expect(deleted).toHaveLength(2);
@@ -109,7 +119,9 @@ describe("batch unpack", () => {
       ).rejects.toThrow("Rollback: restored batch output directories");
 
       expect(await readFile(path.join(root, "apps/rse/old.txt"), "utf8")).toBe("old rse\n");
-      expect(await readFile(path.join(root, "plugins/relpack/old.txt"), "utf8")).toBe("old relpack\n");
+      expect(await readFile(path.join(root, "plugins/relpack/old.txt"), "utf8")).toBe(
+        "old relpack\n",
+      );
     } finally {
       await rm(root, { recursive: true, force: true });
     }

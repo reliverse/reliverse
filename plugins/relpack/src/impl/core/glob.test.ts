@@ -101,5 +101,4 @@ describe("archive glob resolution", () => {
       await rm(dir, { recursive: true, force: true });
     }
   });
-
 });

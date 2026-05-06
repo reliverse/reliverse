@@ -87,7 +87,10 @@ export async function cleanOutputDirectory(outputDir: string, cwd: string): Prom
   }
 }
 
-export async function createOutputBackup(outputDir: string, cwd: string): Promise<{
+export async function createOutputBackup(
+  outputDir: string,
+  cwd: string,
+): Promise<{
   readonly backupPath?: string;
   readonly skippedReason?: string;
 }> {
@@ -102,7 +105,11 @@ export async function createOutputBackup(outputDir: string, cwd: string): Promis
       return { skippedReason: "output directory does not exist yet" };
     }
     const message = error instanceof Error ? error.message : String(error);
-    throw relpackError("backup-output-failed", `Could not inspect output before backup: ${resolvedOutputDir}`, message);
+    throw relpackError(
+      "backup-output-failed",
+      `Could not inspect output before backup: ${resolvedOutputDir}`,
+      message,
+    );
   }
 
   if (info.isSymbolicLink() || !info.isDirectory()) {
@@ -136,7 +143,10 @@ function createBackupPath(resolvedOutputDir: string): string {
   return `${resolvedOutputDir}.relpack-backup-${timestamp}`;
 }
 
-function assertSafeOutputDirectoryForCleaning(resolvedOutputDir: string, resolvedCwd: string): void {
+function assertSafeOutputDirectoryForCleaning(
+  resolvedOutputDir: string,
+  resolvedCwd: string,
+): void {
   const root = path.parse(resolvedOutputDir).root;
   const home = process.env.HOME ? path.resolve(process.env.HOME) : undefined;
 
@@ -165,7 +175,12 @@ function assertSafeOutputDirectoryForCleaning(resolvedOutputDir: string, resolve
   }
 
   const relative = path.relative(resolvedCwd, resolvedOutputDir);
-  if (relative === "" || relative === "." || relative.startsWith("..") || path.isAbsolute(relative)) {
+  if (
+    relative === "" ||
+    relative === "." ||
+    relative.startsWith("..") ||
+    path.isAbsolute(relative)
+  ) {
     throw relpackError(
       "clean-output-outside-cwd",
       `Refusing to clean output directory outside the current workspace: ${resolvedOutputDir}`,

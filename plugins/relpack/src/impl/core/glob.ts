@@ -6,7 +6,12 @@ export interface ArchiveInputResolution {
   readonly archive: string;
   readonly matches: readonly string[];
   readonly usedGlob: boolean;
-  readonly selectedBy: "exact" | "single-match" | "highest-version" | "newest-mtime" | "lexicographic";
+  readonly selectedBy:
+    | "exact"
+    | "single-match"
+    | "highest-version"
+    | "newest-mtime"
+    | "lexicographic";
 }
 
 export interface ArchiveListResolution {
@@ -27,7 +32,6 @@ const VERSION_RE = /(\d+)\.(\d+)\.(\d+)(?:[-._+][0-9A-Za-z][0-9A-Za-z.-]*)?/g;
 export function hasGlobMagic(input: string): boolean {
   return GLOB_MAGIC_RE.test(input);
 }
-
 
 export async function resolveArchiveInputs(
   cwd: string,
@@ -102,7 +106,9 @@ export function looksLikeArchiveInput(input: string): boolean {
   );
 }
 
-function groupArchiveCandidates(candidates: readonly string[]): readonly { readonly key: string; readonly candidates: readonly string[] }[] {
+function groupArchiveCandidates(
+  candidates: readonly string[],
+): readonly { readonly key: string; readonly candidates: readonly string[] }[] {
   const groups = new Map<string, string[]>();
   const orderedKeys: string[] = [];
 
@@ -169,7 +175,7 @@ export async function resolveArchiveInput(
   }
 
   if (requested.length === 1) {
-    const [input] = requested;
+    const input = requested[0]!;
     if (!hasGlobMagic(input)) {
       return {
         requested,
@@ -239,7 +245,7 @@ async function walkGlob(baseDir: string, segments: readonly string[]): Promise<s
     }
   }
 
-  const [segment, ...rest] = segments;
+  const [segment = "", ...rest] = segments;
 
   if (segment === "**") {
     const directMatches = await walkGlob(baseDir, rest);
@@ -286,14 +292,16 @@ async function listDirectoryEntries(directory: string) {
 
 async function listChildDirectories(directory: string): Promise<string[]> {
   const entries = await listDirectoryEntries(directory);
-  return entries.filter((entry) => entry.isDirectory()).map((entry) => path.join(directory, entry.name));
+  return entries
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => path.join(directory, entry.name));
 }
 
 function segmentToRegExp(segment: string): RegExp {
   let source = "^";
 
   for (let index = 0; index < segment.length; index += 1) {
-    const char = segment[index];
+    const char = segment[index]!;
 
     if (char === "*") {
       source += "[^/]*";
@@ -325,15 +333,21 @@ function segmentToRegExp(segment: string): RegExp {
 async function selectBestArchiveCandidate(
   cwd: string,
   candidates: readonly string[],
-): Promise<{ readonly archive: string; readonly selectedBy: ArchiveInputResolution["selectedBy"] }> {
+): Promise<{
+  readonly archive: string;
+  readonly selectedBy: ArchiveInputResolution["selectedBy"];
+}> {
   const uniqueCandidates = unique(candidates).sort(comparePathNames);
   if (uniqueCandidates.length === 1) {
     return { archive: uniqueCandidates[0]!, selectedBy: "single-match" };
   }
 
-  const scores = await Promise.all(uniqueCandidates.map((candidate) => scoreCandidate(cwd, candidate)));
-  const withVersions = scores.filter((score): score is CandidateScore & { readonly version: readonly number[] } =>
-    score.version !== undefined,
+  const scores = await Promise.all(
+    uniqueCandidates.map((candidate) => scoreCandidate(cwd, candidate)),
+  );
+  const withVersions = scores.filter(
+    (score): score is CandidateScore & { readonly version: readonly number[] } =>
+      score.version !== undefined,
   );
 
   if (withVersions.length > 0) {
@@ -375,7 +389,7 @@ function extractVersion(candidate: string): readonly number[] | undefined {
     return undefined;
   }
 
-  return [Number(last[1]), Number(last[2]), Number(last[3])];
+  return [Number(last[1]!), Number(last[2]!), Number(last[3]!)];
 }
 
 function compareScoresByVersionThenName(a: CandidateScore, b: CandidateScore): number {

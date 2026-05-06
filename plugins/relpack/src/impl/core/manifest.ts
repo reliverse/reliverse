@@ -4,6 +4,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 
 import { getAdapterForFormat } from "./adapters/registry";
+import { listArchive } from "./commands/list";
 import { relpackError } from "./error";
 import { detectArchiveFormat, normalizeArchiveFormat } from "./format";
 import { assertSafeArchiveEntryPath } from "./path-safety";
@@ -15,7 +16,6 @@ import type {
   RelpackManifest,
   RelpackManifestEntry,
 } from "./types";
-import { listArchive } from "./commands/list";
 
 export const RELPACK_MANIFEST_PATH = ".relpack/manifest.json";
 export const RELPACK_METADATA_DIR = ".relpack";
@@ -160,7 +160,11 @@ export async function readArchiveFileBuffer(
       env: ctx.env,
     });
     if (result.exitCode !== 0) {
-      throw relpackError("archive-read-failed", `Could not read archive entry: ${safeEntry}`, result.stderr);
+      throw relpackError(
+        "archive-read-failed",
+        `Could not read archive entry: ${safeEntry}`,
+        result.stderr,
+      );
     }
     return result.stdout;
   }
@@ -171,7 +175,11 @@ export async function readArchiveFileBuffer(
       env: ctx.env,
     });
     if (result.exitCode !== 0) {
-      throw relpackError("archive-read-failed", `Could not read archive entry: ${safeEntry}`, result.stderr);
+      throw relpackError(
+        "archive-read-failed",
+        `Could not read archive entry: ${safeEntry}`,
+        result.stderr,
+      );
     }
     return result.stdout;
   }
@@ -181,7 +189,11 @@ export async function readArchiveFileBuffer(
     env: ctx.env,
   });
   if (result.exitCode !== 0) {
-    throw relpackError("archive-read-failed", `Could not read archive entry: ${safeEntry}`, result.stderr);
+    throw relpackError(
+      "archive-read-failed",
+      `Could not read archive entry: ${safeEntry}`,
+      result.stderr,
+    );
   }
   return result.stdout;
 }
@@ -204,7 +216,10 @@ export async function archiveHasManifest(
   format: ArchiveFormat | undefined,
   ctx: CommandContext,
 ): Promise<boolean> {
-  const entries = await listArchive({ cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) }, ctx);
+  const entries = await listArchive(
+    { cwd: ctx.cwd, archive, ...(format === undefined ? {} : { format }) },
+    ctx,
+  );
   return entries.some(isManifestEntryPath);
 }
 

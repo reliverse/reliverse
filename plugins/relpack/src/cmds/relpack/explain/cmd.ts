@@ -1,7 +1,13 @@
 import { defineCommand } from "@reliverse/rempts";
 
 import { explainCommand } from "../../../impl/core/explain";
-import { formatExplainOutput, handleRelpackError, isJsonOutput, normalizeArgs, printJson } from "../_shared";
+import {
+  formatExplainOutput,
+  handleRelpackError,
+  isJsonOutput,
+  normalizeArgs,
+  printJson,
+} from "../_shared";
 
 const COMMAND_NAME = "explain";
 

@@ -1,8 +1,7 @@
+import { describe, expect, test } from "bun:test";
 import { access, lstat, mkdtemp, mkdir, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
-
-import { describe, expect, test } from "bun:test";
 
 import { RelpackError } from "./error";
 import { cleanOutputDirectory, deleteExistingFile } from "./fs";

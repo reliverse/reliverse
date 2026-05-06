@@ -1,4 +1,14 @@
-import { copyFile, lstat, mkdir, mkdtemp, readdir, readlink, rm, symlink, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readdir,
+  readlink,
+  rm,
+  symlink,
+  writeFile,
+} from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
@@ -59,7 +69,11 @@ export async function packArchive(request: PackRequest, ctx: CommandContext): Pr
       },
       ctx,
     );
-    return { ...result, skipped: plan.skipped, ...(plan.manifest === undefined ? {} : { manifest: plan.manifest }) };
+    return {
+      ...result,
+      skipped: plan.skipped,
+      ...(plan.manifest === undefined ? {} : { manifest: plan.manifest }),
+    };
   }
 
   const stageDir = await mkdtemp(path.join(tmpdir(), "relpack-pack-"));
@@ -69,7 +83,10 @@ export async function packArchive(request: PackRequest, ctx: CommandContext): Pr
     const stageInputs = [...plan.inputEntries];
 
     if (request.manifest !== false) {
-      const manifest = await createManifestFromStagedEntries(stageDir, await collectStageEntries(stageDir));
+      const manifest = await createManifestFromStagedEntries(
+        stageDir,
+        await collectStageEntries(stageDir),
+      );
       await writeManifest(stageDir, manifest);
       stageInputs.push(RELPACK_MANIFEST_PATH);
       const result = await adapter.pack(
@@ -140,12 +157,16 @@ async function createDryRunPackPlan(request: PackRequest, output: string): Promi
       for (const child of children) {
         const childPath = path.join(fullInput, child);
         const childArchivePath = assertSafeArchiveEntryPath(child);
-        if (shouldSkipEntry(childArchivePath, childPath, output, request.ignoredNames ?? [], skipped)) {
+        if (
+          shouldSkipEntry(childArchivePath, childPath, output, request.ignoredNames ?? [], skipped)
+        ) {
           continue;
         }
         inputEntries.push(childArchivePath);
       }
-    } else if (!shouldSkipEntry(archiveInputPath, fullInput, output, request.ignoredNames ?? [], skipped)) {
+    } else if (
+      !shouldSkipEntry(archiveInputPath, fullInput, output, request.ignoredNames ?? [], skipped)
+    ) {
       inputEntries.push(archiveInputPath);
     }
   }
@@ -173,14 +194,32 @@ async function stagePackInputs(
       for (const child of children) {
         const childFullPath = path.join(fullInput, child);
         const childArchivePath = assertSafeArchiveEntryPath(child);
-        if (await copyEntryToStage(childFullPath, childArchivePath, stageDir, output, request.ignoredNames ?? [], skipped)) {
+        if (
+          await copyEntryToStage(
+            childFullPath,
+            childArchivePath,
+            stageDir,
+            output,
+            request.ignoredNames ?? [],
+            skipped,
+          )
+        ) {
           inputEntries.push(childArchivePath);
         }
       }
       continue;
     }
 
-    if (await copyEntryToStage(fullInput, archiveInputPath, stageDir, output, request.ignoredNames ?? [], skipped)) {
+    if (
+      await copyEntryToStage(
+        fullInput,
+        archiveInputPath,
+        stageDir,
+        output,
+        request.ignoredNames ?? [],
+        skipped,
+      )
+    ) {
       inputEntries.push(archiveInputPath);
     }
   }

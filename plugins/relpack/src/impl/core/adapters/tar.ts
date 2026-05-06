@@ -44,14 +44,22 @@ function parseTarList(stdout: string): readonly ArchiveEntry[] {
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
     .map((line): ArchiveEntry | undefined => {
-      const verboseMatch = /^([dlh-])\S*\s+\S+\s+(\d+)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/.exec(line);
+      const verboseMatch =
+        /^([dlh-])\S*\s+\S+\s+(\d+)\s+\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}\s+(.+)$/.exec(line);
       if (verboseMatch !== null) {
         const marker = verboseMatch[1];
         const entryPath = verboseMatch[3]?.replace(/\/$/, "") ?? "";
         if (entryPath.length === 0 || entryPath === "." || entryPath === "./") return undefined;
         return {
           path: entryPath,
-          kind: marker === "d" ? "directory" : marker === "l" ? "symlink" : marker === "h" ? "hardlink" : "file",
+          kind:
+            marker === "d"
+              ? "directory"
+              : marker === "l"
+                ? "symlink"
+                : marker === "h"
+                  ? "hardlink"
+                  : "file",
           size: Number(verboseMatch[2]),
         };
       }

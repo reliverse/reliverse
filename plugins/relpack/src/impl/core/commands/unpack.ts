@@ -15,7 +15,10 @@ import { runProcess } from "../spawn";
 import type { CommandContext, PostCheckResult, UnpackRequest, UnpackResult } from "../types";
 import { listArchive } from "./list";
 
-export async function unpackArchive(request: UnpackRequest, ctx: CommandContext): Promise<UnpackResult> {
+export async function unpackArchive(
+  request: UnpackRequest,
+  ctx: CommandContext,
+): Promise<UnpackResult> {
   const format = normalizeArchiveFormat(request.format ?? detectArchiveFormat(request.archive));
   const adapter = await getAdapterForFormat(format, ctx);
 
@@ -98,7 +101,9 @@ export async function unpackArchive(request: UnpackRequest, ctx: CommandContext)
       throw relpackError(
         "post-check-failed",
         `Post-check command failed with exit code ${postCheck.exitCode}: ${request.postCheckCommand}`,
-        postCheck.stderr || postCheck.stdout || "Fix the extracted files or rerun with --rollback-on-fail to restore the backup automatically.",
+        postCheck.stderr ||
+          postCheck.stdout ||
+          "Fix the extracted files or rerun with --rollback-on-fail to restore the backup automatically.",
       );
     }
 

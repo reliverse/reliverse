@@ -98,7 +98,9 @@ export function toOverwritePolicy(value: unknown): OverwritePolicy {
   return value === true ? "files" : "never";
 }
 
-export function toUnpackOverwriteMode(options: Record<string, unknown> | undefined): UnpackOverwriteMode {
+export function toUnpackOverwriteMode(
+  options: Record<string, unknown> | undefined,
+): UnpackOverwriteMode {
   const value = toOptionalString(options?.overwriteMode);
   if (value === undefined) {
     return options?.overwrite === true ? "files" : "never";
@@ -210,7 +212,9 @@ export function getRelpackCommandPrefix(): string {
 }
 
 export function buildRelpackCommand(parts: readonly string[]): string {
-  return [...getRelpackCommandPrefix().split(/\s+/).filter(Boolean), ...parts].map(shellQuote).join(" ");
+  return [...getRelpackCommandPrefix().split(/\s+/).filter(Boolean), ...parts]
+    .map(shellQuote)
+    .join(" ");
 }
 
 export function toBackendCommand(result: ProcessResult): string {
@@ -245,10 +249,7 @@ function compactBackendArgsForHumans(command: string, args: readonly string[]): 
     return args;
   }
 
-  return [
-    ...args.filter((arg) => !arg.startsWith("-xr!")),
-    `-xr!<${sevenZExcludeCount}-patterns>`,
-  ];
+  return [...args.filter((arg) => !arg.startsWith("-xr!")), `-xr!<${sevenZExcludeCount}-patterns>`];
 }
 
 interface PrettyReportSection {
@@ -279,7 +280,9 @@ export function formatPrettyReport(report: PrettyReport): string {
   return lines.join("\n");
 }
 
-export function formatKeyValues(values: readonly [string, string | number | undefined][]): string[] {
+export function formatKeyValues(
+  values: readonly [string, string | number | undefined][],
+): string[] {
   return values
     .filter(([, value]) => value !== undefined)
     .map(([key, value]) => `${key}: ${String(value)}`);
@@ -357,8 +360,8 @@ interface PackOutputOptions {
   readonly overwriteApplyCommand: string;
   readonly skipped?: readonly PackSkippedEntry[];
   readonly showSkipped?: boolean;
-  readonly manifest?: RelpackManifest;
-  readonly manifestEnabled?: boolean;
+  readonly manifest?: RelpackManifest | undefined;
+  readonly manifestEnabled?: boolean | undefined;
 }
 
 export function formatPackOutput(options: PackOutputOptions): string {
@@ -405,7 +408,10 @@ export function formatPackOutput(options: PackOutputOptions): string {
           extraIgnoredNames: options.extraIgnoredNames,
         }),
       },
-      { title: "Skipped while packing", lines: formatSkippedLines(options.skipped, options.showSkipped === true) },
+      {
+        title: "Skipped while packing",
+        lines: formatSkippedLines(options.skipped, options.showSkipped === true),
+      },
       { title: "Backend command", lines: [options.backendCommand] },
       {
         title: "Flags explained",
@@ -456,7 +462,9 @@ function formatIgnorePolicyLines(options: IgnorePolicyOutputOptions): string[] {
     lines.push(
       "default junk examples: .git, node_modules, dist, build, .next, .turbo, coverage, tmp, logs, .env",
     );
-    lines.push("pass --include-ignored only when you intentionally want those paths inside the archive.");
+    lines.push(
+      "pass --include-ignored only when you intentionally want those paths inside the archive.",
+    );
   } else {
     lines.push("default ignores are disabled because --include-ignored was passed.");
   }
@@ -464,7 +472,10 @@ function formatIgnorePolicyLines(options: IgnorePolicyOutputOptions): string[] {
   return lines;
 }
 
-function formatSkippedLines(skipped: readonly PackSkippedEntry[] | undefined, showSkipped: boolean): string[] {
+function formatSkippedLines(
+  skipped: readonly PackSkippedEntry[] | undefined,
+  showSkipped: boolean,
+): string[] {
   skipped = skipped ?? [];
   if (skipped.length === 0) return ["nothing skipped."];
 
@@ -493,7 +504,7 @@ function formatSkippedLines(skipped: readonly PackSkippedEntry[] | undefined, sh
 
 interface UnpackOutputOptions {
   readonly archive: string;
-  readonly archiveResolution?: ArchiveInputResolution;
+  readonly archiveResolution?: ArchiveInputResolution | undefined;
   readonly outputDir: string;
   readonly format: ArchiveFormat;
   readonly overwrite?: boolean;
@@ -502,7 +513,7 @@ interface UnpackOutputOptions {
   readonly cleanOutput: boolean;
   readonly backup?: boolean;
   readonly rollbackOnFail?: boolean;
-  readonly postCheckCommand?: string;
+  readonly postCheckCommand?: string | undefined;
   readonly deletedArchivePath?: string | undefined;
   readonly backupPath?: string | undefined;
   readonly backupCreated?: boolean;
@@ -516,7 +527,9 @@ interface UnpackOutputOptions {
 }
 
 export function formatUnpackOutput(options: UnpackOutputOptions): string {
-  const overwriteMode = options.overwriteMode ?? (options.cleanOutput ? "clean" : options.overwrite ? "files" : "never");
+  const overwriteMode =
+    options.overwriteMode ??
+    (options.cleanOutput ? "clean" : options.overwrite ? "files" : "never");
   const backup = options.backup === true;
   const rollbackOnFail = options.rollbackOnFail === true;
   const backupCreated = options.backupCreated === true;
@@ -568,14 +581,20 @@ export function formatUnpackOutput(options: UnpackOutputOptions): string {
           ["format", options.format],
           ["output directory", options.outputDir],
           ["overwrite mode", overwriteMode],
-          ["delete source archive", options.deleteArchive ? "after successful extraction" : "disabled"],
+          [
+            "delete source archive",
+            options.deleteArchive ? "after successful extraction" : "disabled",
+          ],
           ["clean output directory", options.cleanOutput ? "before extraction" : "disabled"],
           ["backup", backup ? "enabled" : "disabled"],
           ["rollback on fail", rollbackOnFail ? "enabled" : "disabled"],
           ["post-check", options.postCheckCommand],
         ]),
       },
-      { title: "Archive pattern resolution", lines: formatArchiveResolutionLines(options.archiveResolution) },
+      {
+        title: "Archive pattern resolution",
+        lines: formatArchiveResolutionLines(options.archiveResolution),
+      },
       {
         title: "Safety checks",
         lines: [
@@ -607,7 +626,7 @@ export function formatUnpackOutput(options: UnpackOutputOptions): string {
 
 interface BatchUnpackTargetOutput {
   readonly archive: string;
-  readonly archiveResolution?: ArchiveInputResolution;
+  readonly archiveResolution?: ArchiveInputResolution | undefined;
   readonly outputDir: string;
   readonly format: ArchiveFormat;
   readonly backendCommand: string;
@@ -620,7 +639,7 @@ interface BatchUnpackOutputOptions {
   readonly cleanOutput: boolean;
   readonly backup: boolean;
   readonly rollbackOnFail: boolean;
-  readonly postCheckCommand?: string;
+  readonly postCheckCommand?: string | undefined;
   readonly deletedArchivePaths?: readonly string[];
   readonly dryRun: boolean;
   readonly explicitDryRun: boolean;
@@ -645,14 +664,20 @@ export function formatBatchUnpackOutput(options: BatchUnpackOutputOptions): stri
     ...formatArchiveResolutionLines(target.archiveResolution).map((line) => `   ${line}`),
   ]);
 
-  const backendLines = options.targets.map((target, index) => `${index + 1}. ${target.backendCommand}`);
+  const backendLines = options.targets.map(
+    (target, index) => `${index + 1}. ${target.backendCommand}`,
+  );
   const backupLines = options.result?.backups.length
     ? options.result.backups.map((backup) =>
         backup.backupPath
           ? `${backup.outputDir} → ${backup.backupPath}`
           : `${backup.outputDir} skipped: ${backup.skippedReason ?? "no backup was needed"}`,
       )
-    : [options.backup ? "backup will be created for each existing output directory when --apply is passed." : "disabled"];
+    : [
+        options.backup
+          ? "backup will be created for each existing output directory when --apply is passed."
+          : "disabled",
+      ];
 
   const nextSteps = options.dryRun
     ? [
@@ -668,7 +693,9 @@ export function formatBatchUnpackOutput(options: BatchUnpackOutputOptions): stri
           : `Run one smoke check after the whole batch: ${options.applyCommand.replace(" --apply", " --post-check-command 'bun test apps/rse plugins/relpack' --apply")}`,
       ]
     : [
-        options.result?.rolledBack ? "Rollback was executed; inspect the failure above." : "Batch extraction completed successfully.",
+        options.result?.rolledBack
+          ? "Rollback was executed; inspect the failure above."
+          : "Batch extraction completed successfully.",
         options.deletedArchivePaths?.length
           ? `Deleted source archives: ${options.deletedArchivePaths.join(", ")}`
           : "Source archives were kept. Add --delete-archive to remove them after a successful batch.",
@@ -729,16 +756,18 @@ function formatUnpackSuccessStatus(options: UnpackOutputOptions): string {
 
 interface ListOutputOptions {
   readonly archive: string;
-  readonly archiveResolution?: ArchiveInputResolution;
+  readonly archiveResolution?: ArchiveInputResolution | undefined;
   readonly format: ArchiveFormat;
   readonly entries: readonly ArchiveEntry[];
-  readonly manifest?: RelpackManifest;
+  readonly manifest?: RelpackManifest | undefined;
   readonly tree?: boolean;
   readonly maxDepth?: number;
 }
 
 export function formatListOutput(options: ListOutputOptions): string {
-  const files = options.entries.filter((entry) => entry.kind === "file" || entry.kind === "unknown");
+  const files = options.entries.filter(
+    (entry) => entry.kind === "file" || entry.kind === "unknown",
+  );
   const dirs = options.entries.filter((entry) => entry.kind === "directory");
   const totalSize = files.reduce((sum, entry) => sum + (entry.size ?? 0), 0);
   const largest = [...files]
@@ -747,7 +776,9 @@ export function formatListOutput(options: ListOutputOptions): string {
     .slice(0, 8);
   const important = options.entries
     .map((entry) => entry.path)
-    .filter((entryPath) => ["package.json", "README.md", "tsconfig.json", RELPACK_MANIFEST_PATH].includes(entryPath));
+    .filter((entryPath) =>
+      ["package.json", "README.md", "tsconfig.json", RELPACK_MANIFEST_PATH].includes(entryPath),
+    );
 
   return formatPrettyReport({
     title: "Relpack list",
@@ -766,13 +797,25 @@ export function formatListOutput(options: ListOutputOptions): string {
           ["version", options.manifest?.version],
         ]),
       },
-      { title: "Archive pattern resolution", lines: formatArchiveResolutionLines(options.archiveResolution) },
+      {
+        title: "Archive pattern resolution",
+        lines: formatArchiveResolutionLines(options.archiveResolution),
+      },
       { title: "Important files", lines: formatBullets(important) },
       {
         title: "Largest files",
-        lines: largest.length === 0 ? ["size data unavailable for this backend."] : largest.map((entry) => `${formatByteSize(entry.size) ?? "?"}  ${entry.path}`),
+        lines:
+          largest.length === 0
+            ? ["size data unavailable for this backend."]
+            : largest.map((entry) => `${formatByteSize(entry.size) ?? "?"}  ${entry.path}`),
       },
-      { title: options.tree === true ? "Tree" : "Entries", lines: options.tree === true ? formatTree(options.entries, options.maxDepth) : formatEntriesForHumans(options.entries) },
+      {
+        title: options.tree === true ? "Tree" : "Entries",
+        lines:
+          options.tree === true
+            ? formatTree(options.entries, options.maxDepth)
+            : formatEntriesForHumans(options.entries),
+      },
       {
         title: "What to do next",
         lines: formatNumbered([
@@ -810,7 +853,7 @@ function formatTree(entries: readonly ArchiveEntry[], maxDepth: number | undefin
 
 interface TestOutputOptions {
   readonly archive: string;
-  readonly archiveResolution?: ArchiveInputResolution;
+  readonly archiveResolution?: ArchiveInputResolution | undefined;
   readonly format: ArchiveFormat;
   readonly backendCommand: string;
 }
@@ -827,7 +870,10 @@ export function formatTestOutput(options: TestOutputOptions): string {
           ["format", options.format],
         ]),
       },
-      { title: "Archive pattern resolution", lines: formatArchiveResolutionLines(options.archiveResolution) },
+      {
+        title: "Archive pattern resolution",
+        lines: formatArchiveResolutionLines(options.archiveResolution),
+      },
       { title: "Backend command", lines: [options.backendCommand] },
       {
         title: "What to do next",
@@ -841,7 +887,10 @@ export function formatTestOutput(options: TestOutputOptions): string {
   });
 }
 
-export function formatVerifyOutput(result: VerifyResult, archiveResolution?: ArchiveInputResolution): string {
+export function formatVerifyOutput(
+  result: VerifyResult,
+  archiveResolution?: ArchiveInputResolution,
+): string {
   return formatPrettyReport({
     title: "Relpack verify",
     status: result.ok
@@ -858,26 +907,44 @@ export function formatVerifyOutput(result: VerifyResult, archiveResolution?: Arc
           ["created at", result.manifest.createdAt],
         ]),
       },
-      { title: "Archive pattern resolution", lines: formatArchiveResolutionLines(archiveResolution) },
+      {
+        title: "Archive pattern resolution",
+        lines: formatArchiveResolutionLines(archiveResolution),
+      },
       {
         title: "Mismatches",
-        lines: result.mismatches.length === 0
-          ? ["none"]
-          : result.mismatches.slice(0, 30).map((mismatch) => `- ${mismatch.path} — ${mismatch.reason}${mismatch.expected !== undefined ? ` expected=${mismatch.expected}` : ""}${mismatch.actual !== undefined ? ` actual=${mismatch.actual}` : ""}`),
+        lines:
+          result.mismatches.length === 0
+            ? ["none"]
+            : result.mismatches
+                .slice(0, 30)
+                .map(
+                  (mismatch) =>
+                    `- ${mismatch.path} — ${mismatch.reason}${mismatch.expected !== undefined ? ` expected=${mismatch.expected}` : ""}${mismatch.actual !== undefined ? ` actual=${mismatch.actual}` : ""}`,
+                ),
       },
       {
         title: "What to do next",
         lines: formatNumbered(
           result.ok
-            ? [`List entries: ${buildRelpackCommand(["list", result.archive])}`, `Preview extraction: ${buildRelpackCommand(["unpack", result.archive, "-o", "./out"])}`]
-            : ["Recreate the archive from trusted source files.", `Inspect entries: ${buildRelpackCommand(["list", result.archive])}`],
+            ? [
+                `List entries: ${buildRelpackCommand(["list", result.archive])}`,
+                `Preview extraction: ${buildRelpackCommand(["unpack", result.archive, "-o", "./out"])}`,
+              ]
+            : [
+                "Recreate the archive from trusted source files.",
+                `Inspect entries: ${buildRelpackCommand(["list", result.archive])}`,
+              ],
         ),
       },
     ],
   });
 }
 
-export function formatDiffOutput(result: DiffResult, archiveResolution?: ArchiveInputResolution): string {
+export function formatDiffOutput(
+  result: DiffResult,
+  archiveResolution?: ArchiveInputResolution,
+): string {
   return formatPrettyReport({
     title: "Relpack diff",
     status: formatDiffStatus(result),
@@ -888,13 +955,22 @@ export function formatDiffOutput(result: DiffResult, archiveResolution?: Archive
           ["archive", result.archive],
           ["format", result.format],
           ["output directory", result.outputDir],
-          ["manifest", result.manifest ? "present" : "not found; falling back to path/size heuristics"],
+          [
+            "manifest",
+            result.manifest ? "present" : "not found; falling back to path/size heuristics",
+          ],
         ]),
       },
-      { title: "Archive pattern resolution", lines: formatArchiveResolutionLines(archiveResolution) },
+      {
+        title: "Archive pattern resolution",
+        lines: formatArchiveResolutionLines(archiveResolution),
+      },
       { title: "Added by archive", lines: formatLimitedBullets(result.added) },
       { title: "Changed", lines: formatLimitedBullets(result.changed) },
-      { title: "Removed from archive but still in output", lines: formatLimitedBullets(result.removed) },
+      {
+        title: "Removed from archive but still in output",
+        lines: formatLimitedBullets(result.removed),
+      },
       {
         title: "What to do next",
         lines: formatNumbered([
@@ -908,7 +984,8 @@ export function formatDiffOutput(result: DiffResult, archiveResolution?: Archive
 
 function formatDiffStatus(result: DiffResult): string {
   const changes = result.added.length + result.changed.length + result.removed.length;
-  if (changes === 0) return `no differences found — ${result.unchanged.length} archive path(s) already match output.`;
+  if (changes === 0)
+    return `no differences found — ${result.unchanged.length} archive path(s) already match output.`;
   return `${changes} difference(s): ${result.added.length} added, ${result.changed.length} changed, ${result.removed.length} removed.`;
 }
 
@@ -926,7 +1003,10 @@ export function formatExplainOutput(summary: string, notes: readonly string[]): 
     status: "explanation only — no backend command was executed.",
     sections: [
       { title: "Summary", lines: [summary] },
-      { title: "Details", lines: notes.length > 0 ? formatBullets([...notes]) : ["No extra notes."] },
+      {
+        title: "Details",
+        lines: notes.length > 0 ? formatBullets([...notes]) : ["No extra notes."],
+      },
       {
         title: "What to do next",
         lines: formatNumbered([
@@ -986,19 +1066,31 @@ export function formatDoctorSummary(
   lines.push("What to do next:");
   if (missing.length === 0) {
     lines.push("  1. You are good to go: all configured relpack backends are available.");
-    lines.push(`  2. Try a safe preview: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst"])}`);
-    lines.push(`  3. Actually write the archive: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst", "--apply"])}`);
+    lines.push(
+      `  2. Try a safe preview: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst"])}`,
+    );
+    lines.push(
+      `  3. Actually write the archive: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst", "--apply"])}`,
+    );
   } else if (hasCoreBackend) {
     lines.push("  1. You can continue now with the formats listed under Working now.");
     if (missingFormats.length > 0) {
-      lines.push(`  2. Install the missing backend only if you need: ${missingFormats.join(", ")}.`);
+      lines.push(
+        `  2. Install the missing backend only if you need: ${missingFormats.join(", ")}.`,
+      );
       lines.push(`  3. After installing, rerun: ${buildRelpackCommand(["doctor"])}`);
-      lines.push(`  4. Try a safe preview: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst"])}`);
-      lines.push(`  5. Actually write the archive: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst", "--apply"])}`);
+      lines.push(
+        `  4. Try a safe preview: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst"])}`,
+      );
+      lines.push(
+        `  5. Actually write the archive: ${buildRelpackCommand(["pack", "./dist", "-o", "dist.tar.zst", "--apply"])}`,
+      );
     }
   } else {
     lines.push("  1. Install at least one backend from Needs attention before using relpack.");
-    lines.push("  2. Recommended first install on Ubuntu/Debian: sudo apt update && sudo apt install tar zip unzip");
+    lines.push(
+      "  2. Recommended first install on Ubuntu/Debian: sudo apt update && sudo apt install tar zip unzip",
+    );
     lines.push(`  3. Rerun: ${buildRelpackCommand(["doctor"])}`);
   }
 
@@ -1015,14 +1107,18 @@ function formatDoctorStatus(
   hasCoreBackend: boolean,
 ): string {
   if (missingCount === 0) return "ready — all configured archive backends are available.";
-  if (hasCoreBackend) return `usable with warnings — ${availableCount} backend(s) available, ${missingCount} backend(s) missing.`;
+  if (hasCoreBackend)
+    return `usable with warnings — ${availableCount} backend(s) available, ${missingCount} backend(s) missing.`;
   return "blocked — no tar/zip backend is available yet.";
 }
 
 function getBackendImpact(backendId: string, formats: readonly string[]): string {
-  if (backendId === "system-7z") return "Only .7z support is unavailable. tar and zip workflows are unaffected.";
-  if (backendId === "system-zip") return ".zip pack/unpack/list/test support is unavailable until both zip and unzip are installed.";
-  if (backendId === "system-tar") return `tar-family formats are unavailable: ${formats.join(", ")}.`;
+  if (backendId === "system-7z")
+    return "Only .7z support is unavailable. tar and zip workflows are unaffected.";
+  if (backendId === "system-zip")
+    return ".zip pack/unpack/list/test support is unavailable until both zip and unzip are installed.";
+  if (backendId === "system-tar")
+    return `tar-family formats are unavailable: ${formats.join(", ")}.`;
   return `Formats unavailable through this backend: ${formats.join(", ")}.`;
 }
 

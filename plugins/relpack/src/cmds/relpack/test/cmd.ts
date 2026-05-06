@@ -51,7 +51,12 @@ export default defineCommand({
   async handler(ctx) {
     try {
       const commandContext = getCommandContext();
-      const archiveResolution = await resolveArchiveArgs(ctx, COMMAND_NAME, USAGE, commandContext.cwd);
+      const archiveResolution = await resolveArchiveArgs(
+        ctx,
+        COMMAND_NAME,
+        USAGE,
+        commandContext.cwd,
+      );
       const archive = archiveResolution.archive;
       const format = toOptionalArchiveFormat(ctx.options?.format);
 

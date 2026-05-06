@@ -65,11 +65,17 @@ export function explainCommand(argv: readonly string[]): ExplainReport {
   }
 
   if (parsed.command === "verify") {
-    return { summary: `Verify relpack manifest in ${parsed.archive ?? "<missing-archive>"}.`, notes: [] };
+    return {
+      summary: `Verify relpack manifest in ${parsed.archive ?? "<missing-archive>"}.`,
+      notes: [],
+    };
   }
 
   if (parsed.command === "diff") {
-    return { summary: `Compare ${parsed.archive ?? "<missing-archive>"} with ${parsed.outputDir ?? parsed.output ?? "<missing-output>"}.`, notes: [] };
+    return {
+      summary: `Compare ${parsed.archive ?? "<missing-archive>"} with ${parsed.outputDir ?? parsed.output ?? "<missing-output>"}.`,
+      notes: [],
+    };
   }
 
   if (parsed.command === "doctor") {

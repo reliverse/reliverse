@@ -3,6 +3,14 @@ import type { Diagnostic } from "./types";
 export class RelpackError extends Error {
   readonly diagnostic: Diagnostic;
 
+  get code(): string {
+    return this.diagnostic.code;
+  }
+
+  get hint(): string | undefined {
+    return this.diagnostic.hint;
+  }
+
   constructor(diagnostic: Diagnostic) {
     super(diagnostic.message);
     this.name = "RelpackError";

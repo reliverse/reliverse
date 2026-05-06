@@ -63,14 +63,19 @@ export default defineCommand({
   async handler(ctx) {
     try {
       const commandContext = getCommandContext();
-      const archiveResolution = await resolveArchiveArgs(ctx, COMMAND_NAME, USAGE, commandContext.cwd);
+      const archiveResolution = await resolveArchiveArgs(
+        ctx,
+        COMMAND_NAME,
+        USAGE,
+        commandContext.cwd,
+      );
       const archive = archiveResolution.archive;
       const format = toOptionalArchiveFormat(ctx.options?.format);
       const tree = ctx.options?.tree === true;
       const maxDepthValue = toOptionalString(ctx.options?.maxDepth);
       const maxDepth = maxDepthValue === undefined ? undefined : Number(maxDepthValue);
 
-      if (maxDepthValue !== undefined && (!Number.isInteger(maxDepth) || maxDepth < 1)) {
+      if (maxDepth !== undefined && (!Number.isInteger(maxDepth) || maxDepth < 1)) {
         throw new Error("--max-depth must be a positive integer.");
       }
 

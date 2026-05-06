@@ -146,7 +146,10 @@ function normalizeIgnoredName(value: unknown): string | undefined {
     return undefined;
   }
 
-  const normalized = value.trim().replace(/\\/g, "/").replace(/^\/+|\/+$/g, "");
+  const normalized = value
+    .trim()
+    .replace(/\\/g, "/")
+    .replace(/^\/+|\/+$/g, "");
   if (normalized.length === 0 || normalized === "." || normalized === "..") {
     return undefined;
   }

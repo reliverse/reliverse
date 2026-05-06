@@ -72,44 +72,44 @@ export interface PackRequest {
   readonly cwd: string;
   readonly inputs: readonly string[];
   readonly output: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
   readonly overwrite: OverwritePolicy;
   readonly dryRun: boolean;
-  readonly ignoredNames?: readonly string[];
+  readonly ignoredNames?: readonly string[] | undefined;
   readonly manifest?: boolean;
 }
 
 export interface PackResult extends ProcessResult {
   readonly skipped: readonly PackSkippedEntry[];
-  readonly manifest?: RelpackManifest;
-  readonly manifestPath?: string;
+  readonly manifest?: RelpackManifest | undefined;
+  readonly manifestPath?: string | undefined;
 }
 
 export interface UnpackRequest {
   readonly cwd: string;
   readonly archive: string;
   readonly outputDir: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
   readonly overwrite: OverwritePolicy;
   readonly dryRun: boolean;
-  readonly cleanOutput?: boolean;
-  readonly backup?: boolean;
-  readonly rollbackOnFail?: boolean;
-  readonly postCheckCommand?: string;
+  readonly cleanOutput?: boolean | undefined;
+  readonly backup?: boolean | undefined;
+  readonly rollbackOnFail?: boolean | undefined;
+  readonly postCheckCommand?: string | undefined;
 }
 
 export interface UnpackResult extends ProcessResult {
-  readonly backupPath?: string;
+  readonly backupPath?: string | undefined;
   readonly backupCreated: boolean;
-  readonly backupSkippedReason?: string;
+  readonly backupSkippedReason?: string | undefined;
   readonly rolledBack: boolean;
-  readonly postCheck?: PostCheckResult;
+  readonly postCheck?: PostCheckResult | undefined;
 }
 
 export interface BatchUnpackItem {
   readonly archive: string;
   readonly outputDir: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
 }
 
 export interface BatchUnpackRequest {
@@ -117,10 +117,10 @@ export interface BatchUnpackRequest {
   readonly items: readonly BatchUnpackItem[];
   readonly overwrite: OverwritePolicy;
   readonly dryRun: boolean;
-  readonly cleanOutput?: boolean;
-  readonly backup?: boolean;
-  readonly rollbackOnFail?: boolean;
-  readonly postCheckCommand?: string;
+  readonly cleanOutput?: boolean | undefined;
+  readonly backup?: boolean | undefined;
+  readonly rollbackOnFail?: boolean | undefined;
+  readonly postCheckCommand?: string | undefined;
 }
 
 export interface BatchUnpackItemResult {
@@ -132,8 +132,8 @@ export interface BatchUnpackItemResult {
 
 export interface BatchOutputBackup {
   readonly outputDir: string;
-  readonly backupPath?: string;
-  readonly skippedReason?: string;
+  readonly backupPath?: string | undefined;
+  readonly skippedReason?: string | undefined;
 }
 
 export interface BatchUnpackResult {
@@ -141,7 +141,7 @@ export interface BatchUnpackResult {
   readonly backups: readonly BatchOutputBackup[];
   readonly backupCreated: boolean;
   readonly rolledBack: boolean;
-  readonly postCheck?: PostCheckResult;
+  readonly postCheck?: PostCheckResult | undefined;
 }
 
 export interface PostCheckResult extends ProcessResult {
@@ -151,19 +151,19 @@ export interface PostCheckResult extends ProcessResult {
 export interface ListRequest {
   readonly cwd: string;
   readonly archive: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
 }
 
 export interface TestRequest {
   readonly cwd: string;
   readonly archive: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
 }
 
 export interface VerifyRequest {
   readonly cwd: string;
   readonly archive: string;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
 }
 
 export interface VerifyResult {
@@ -186,8 +186,8 @@ export interface DiffRequest {
   readonly cwd: string;
   readonly archive: string;
   readonly outputDir: string;
-  readonly format?: ArchiveFormat;
-  readonly ignoredNames?: readonly string[];
+  readonly format?: ArchiveFormat | undefined;
+  readonly ignoredNames?: readonly string[] | undefined;
 }
 
 export interface DiffResult {
@@ -198,13 +198,13 @@ export interface DiffResult {
   readonly changed: readonly string[];
   readonly unchanged: readonly string[];
   readonly removed: readonly string[];
-  readonly manifest?: RelpackManifest;
+  readonly manifest?: RelpackManifest | undefined;
 }
 
 export interface RelpackJsonReport {
   readonly ok: boolean;
   readonly command: RelpackCommandName;
-  readonly format?: ArchiveFormat;
+  readonly format?: ArchiveFormat | undefined;
   readonly diagnostics: readonly Diagnostic[];
   readonly entries?: readonly ArchiveEntry[];
   readonly executed?: readonly string[];

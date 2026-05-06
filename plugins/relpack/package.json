@@ -23,9 +23,7 @@
     }
   },
   "scripts": {
-    "relpack": "bun src/cli.ts",
-    "test": "bun test",
-    "check": "bun test && bun build src/cli.ts src/cmds/relpack/**/cmd.ts --external @reliverse/rempts --outdir /tmp/relpack-build"
+    "relpack": "bun src/cli.ts"
   },
   "dependencies": {
     "@reliverse/rempts": "workspace:*"

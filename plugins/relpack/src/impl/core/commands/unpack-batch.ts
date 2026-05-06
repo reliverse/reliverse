@@ -1,13 +1,13 @@
 import path from "node:path";
 
 import { relpackError, RelpackError } from "../error";
+import { detectArchiveFormat, normalizeArchiveFormat } from "../format";
 import {
   cleanOutputDirectory,
   createOutputBackup,
   deleteExistingFile,
   rollbackOutputFromBackup,
 } from "../fs";
-import { detectArchiveFormat, normalizeArchiveFormat } from "../format";
 import type {
   BatchOutputBackup,
   BatchUnpackItem,
@@ -48,7 +48,9 @@ export async function unpackArchiveBatch(
       throw relpackError(
         "post-check-failed",
         `Post-check command failed with exit code ${postCheck.exitCode}: ${request.postCheckCommand}`,
-        postCheck.stderr || postCheck.stdout || "Fix the extracted files or rerun with --rollback-on-fail to restore the backup automatically.",
+        postCheck.stderr ||
+          postCheck.stdout ||
+          "Fix the extracted files or rerun with --rollback-on-fail to restore the backup automatically.",
       );
     }
 
@@ -94,7 +96,10 @@ export async function deleteBatchSourceArchives(
 
 function validateBatchRequest(request: BatchUnpackRequest): void {
   if (request.items.length === 0) {
-    throw relpackError("missing-unpack-inputs", "Unpack command requires at least one archive path.");
+    throw relpackError(
+      "missing-unpack-inputs",
+      "Unpack command requires at least one archive path.",
+    );
   }
 
   if (request.rollbackOnFail === true && request.backup !== true) {
@@ -166,7 +171,9 @@ async function previewBatchUnpack(
   return items;
 }
 
-async function createBatchBackups(request: BatchUnpackRequest): Promise<readonly BatchOutputBackup[]> {
+async function createBatchBackups(
+  request: BatchUnpackRequest,
+): Promise<readonly BatchOutputBackup[]> {
   const outputs = uniqueOutputDirectories(request.cwd, request.items);
   const backups: BatchOutputBackup[] = [];
 
@@ -219,7 +226,9 @@ async function rollbackBatchOutputs(
   request: BatchUnpackRequest,
   backups: readonly BatchOutputBackup[],
 ): Promise<void> {
-  const backupsByOutput = new Map(backups.map((backup) => [path.resolve(request.cwd, backup.outputDir), backup]));
+  const backupsByOutput = new Map(
+    backups.map((backup) => [path.resolve(request.cwd, backup.outputDir), backup]),
+  );
 
   for (const outputDir of uniqueOutputDirectories(request.cwd, request.items).reverse()) {
     const resolvedOutput = path.resolve(request.cwd, outputDir);

@@ -75,7 +75,9 @@ async function compareDestination(
     if (!info.isFile()) return "changed";
     if (expected.size !== undefined && info.size !== expected.size) return "changed";
     if (expected.sha256 !== undefined) {
-      const digest = createHash("sha256").update(await readFile(destination)).digest("hex");
+      const digest = createHash("sha256")
+        .update(await readFile(destination))
+        .digest("hex");
       return digest === expected.sha256 ? "unchanged" : "changed";
     }
     return "unchanged";
@@ -84,7 +86,10 @@ async function compareDestination(
   return "changed";
 }
 
-async function collectOutputPaths(outputDir: string, ignoredNames: readonly string[]): Promise<string[]> {
+async function collectOutputPaths(
+  outputDir: string,
+  ignoredNames: readonly string[],
+): Promise<string[]> {
   const paths: string[] = [];
 
   async function walk(currentDir: string, prefix: string): Promise<void> {
@@ -94,7 +99,9 @@ async function collectOutputPaths(outputDir: string, ignoredNames: readonly stri
         continue;
       }
 
-      const entryPath = assertSafeArchiveEntryPath(prefix.length > 0 ? `${prefix}/${child.name}` : child.name);
+      const entryPath = assertSafeArchiveEntryPath(
+        prefix.length > 0 ? `${prefix}/${child.name}` : child.name,
+      );
       paths.push(entryPath);
       if (child.isDirectory()) {
         await walk(path.join(currentDir, child.name), entryPath);

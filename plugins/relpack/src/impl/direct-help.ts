@@ -68,8 +68,15 @@ const DIRECT_COMMAND_HELP: Record<RelpackCommandName, DirectCommandHelp> = {
   list: {
     usage: "relpack list <archive> [--tree] [--max-depth <n>] [--json]",
     summary: "Show archive contents, summary stats, manifest info, and next actions.",
-    flags: ["--tree                   Show a compact tree view.", "--max-depth <n>          Limit tree depth.", ...COMMON_FLAGS],
-    examples: ["relpack list relpack-0.1.3.zip", "relpack list './relpack-*.zip' --tree --max-depth 3"],
+    flags: [
+      "--tree                   Show a compact tree view.",
+      "--max-depth <n>          Limit tree depth.",
+      ...COMMON_FLAGS,
+    ],
+    examples: [
+      "relpack list relpack-0.1.3.zip",
+      "relpack list './relpack-*.zip' --tree --max-depth 3",
+    ],
   },
   test: {
     usage: "relpack test <archive> [--json]",
@@ -92,12 +99,18 @@ const DIRECT_COMMAND_HELP: Record<RelpackCommandName, DirectCommandHelp> = {
       "--include-ignored        Disable default ignored names while finding removed files.",
       ...COMMON_FLAGS,
     ],
-    examples: ["relpack diff relpack-0.1.3.zip -o ./plugins/relpack", "relpack diff './relpack-*.zip' -o ./plugins/relpack"],
+    examples: [
+      "relpack diff relpack-0.1.3.zip -o ./plugins/relpack",
+      "relpack diff './relpack-*.zip' -o ./plugins/relpack",
+    ],
   },
   explain: {
     usage: "relpack explain <command...>",
     summary: "Explain what a relpack command would do without executing it.",
-    examples: ["relpack explain pack ./dist -o dist.tar.zst", "relpack explain unpack dist.zip -o ./out --overwrite"],
+    examples: [
+      "relpack explain pack ./dist -o dist.tar.zst",
+      "relpack explain unpack dist.zip -o ./out --overwrite",
+    ],
   },
 };
 

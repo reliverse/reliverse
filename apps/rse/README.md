@@ -159,7 +159,6 @@ The current CLI metadata is:
 - Root repo docs: [`../../README.md`](../../README.md)
 - Rempts docs: [`../../packages/rempts/README.md`](../../packages/rempts/README.md)
 
-
 ## Relpack batch update example
 
 When both `rse` and `relpack` are shipped as local zip updates, `rse` can run the relpack plugin update as one safe batch:

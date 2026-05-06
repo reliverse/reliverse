@@ -2,7 +2,6 @@
 
 `relpack` is a modern archive helper for Rse/dev workflows: safe previews, archive manifests, verification, diffs, backups, rollback, and human-readable output.
 
-
 ## Direct CLI usage
 
 `relpack` can run directly without the `rse` wrapper:
@@ -165,7 +164,6 @@ Actual support depends on installed system backends. Run:
 ```bash
 rse relpack doctor
 ```
-
 
 ## Batch plugin updates
 

@@ -52,7 +52,9 @@ describe("relpack human output", () => {
     expect(output).toContain("Relpack unpack preview");
     expect(output).toContain("Archive entry paths are validated before extraction");
     expect(output).toContain("Extract files: rse relpack unpack dist.zip -o ./out --apply");
-    expect(output).toContain("--delete-archive deletes the source archive only after extraction succeeds");
+    expect(output).toContain(
+      "--delete-archive deletes the source archive only after extraction succeeds",
+    );
   });
 
   test("unpack preview explains delete archive", () => {
@@ -121,7 +123,9 @@ describe("relpack human output", () => {
     expect(output).toContain(
       "When you add --apply, the output directory will be deleted first, then recreated for extraction.",
     );
-    expect(output).toContain("--clean-output deletes the explicit -o/--output directory before extraction");
+    expect(output).toContain(
+      "--clean-output deletes the explicit -o/--output directory before extraction",
+    );
   });
 
   test("list output has next steps", () => {
