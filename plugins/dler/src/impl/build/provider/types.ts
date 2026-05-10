@@ -1,8 +1,10 @@
 export interface BuildTarget {
   readonly command: readonly string[];
   readonly cwd: string;
+  readonly declarationStrategy?: "emit" | "fast" | "off" | "rollup" | undefined;
   readonly displayCommand?: string | undefined;
   readonly label?: string | undefined;
+  readonly runDeclarations?: boolean | undefined;
 }
 
 export interface BuildTargetResult {

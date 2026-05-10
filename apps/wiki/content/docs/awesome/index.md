@@ -5,15 +5,18 @@ description: Builders. Ideas. Architecture. The ecosystem growing around Reliver
 
 Welcome to **Awesome Reliverse**.
 
-This is not just a list of repositories. It is a record of people who build with intention. Because Reliverse is more than a monorepo. It is an evolving ecosystem of developer tools, modular architecture, and clarity-first philosophy. And every project listed here expands that philosophy in its own way.
+This is not just a list of repositories. It is a record of people who build with intention.
 
-Every listed project carries a piece of its [creator's soul](/blog/soul). If some project resonates with you, please support it: star the repository, contribute, or sponsor the maintainers.
+Because Reliverse is more than a monorepo. It is an evolving ecosystem of developer tools, modular architecture, and clarity-first philosophy. And every project listed here expands that philosophy in its own way.
+
+Every listed project carries a piece of its [creator's soul](/blog/soul). If some project resonates with you, please support it: star the repository, contribute, or sponsor its maintainers.
 
 ## The Builders
 
 These projects use Reliverse directly: in production, in experiments, in real systems touched by real users.
 
 - [Reliverse](https://github.com/reliverse/reliverse): The official monorepo and a living example of the developer tools ecosystem in action.
+- [Bleverse](https://github.com/reliverse/bleverse): [bleverse.com](https://bleverse.com) is an open-source social platform built around clarity, consent, and modular architecture.
 
 > Want your project featured here? Open a PR and tell us what you're building.
 
@@ -23,7 +26,7 @@ No meaningful system is built in isolation.
 
 Reliverse learns from the open-source world. From projects that value clarity over chaos, architecture over hacks, and thoughtfulness over noise.
 
-We study them. We borrow patterns. We adapt ideas. We say huge thank you to them. With respect.
+We study them. We do not steal files, we borrow patterns. We adapt ideas. We say huge thank you to them. With respect.
 
 These projects shaped parts of Reliverse's thinking.
 
@@ -41,6 +44,6 @@ Tools, templates, communities. They are all pushing toward better developer expe
 
 ## Thank You
 
-Reliverse grows because [builders](/blog/architects) care.
+Reliverse grows [because builders care](/blog/architects).
 
 And if you are here, reading this, you are already part of that story.

@@ -109,4 +109,61 @@ describe("dler Declar declaration layer", () => {
       await rm(packageDir, { force: true, recursive: true });
     }
   });
+
+  test("can skip declarations through declaration strategy off", async () => {
+    const packageDir = await createPackageFixture();
+
+    try {
+      await writeFile(
+        join(packageDir, "package.json"),
+        JSON.stringify({
+          name: "demo",
+          type: "module",
+          exports: { ".": "./src/index.ts" },
+        }),
+      );
+      await writeFile(join(packageDir, "src", "index.ts"), "export const demo: number = 1;\n");
+
+      const result = await runDeclarDeclarationLayer(
+        { cwd: packageDir, label: "packages/demo" },
+        { declarationStrategy: "off" },
+      );
+
+      expect(result).toEqual({
+        diagnostics: [],
+        emittedFiles: [],
+        ok: true,
+        skippedReason: "declaration strategy off",
+      });
+      await expect(readFile(join(packageDir, "dist", "index.d.ts"), "utf8")).rejects.toThrow();
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
+
+  test("supports fast declaration strategy with TypeScript fallback", async () => {
+    const packageDir = await createPackageFixture();
+
+    try {
+      await writeFile(
+        join(packageDir, "package.json"),
+        JSON.stringify({
+          name: "demo",
+          type: "module",
+          exports: { ".": "./src/index.ts" },
+        }),
+      );
+      await writeFile(join(packageDir, "src", "index.ts"), "export const demo: number = 1;\n");
+
+      const result = await runDeclarDeclarationLayer(
+        { cwd: packageDir, label: "packages/demo" },
+        { declarationStrategy: "fast" },
+      );
+
+      expect(result.ok).toBe(true);
+      expect(result.emittedFiles).toContain(join(packageDir, "dist", "index.d.ts"));
+    } finally {
+      await rm(packageDir, { force: true, recursive: true });
+    }
+  });
 });

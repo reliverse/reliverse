@@ -1,4 +1,4 @@
-import { isCI as detectCI, isTTY as detectTTY } from "@reliverse/myenv";
+import { isCI as detectCI, isTTY as detectTTY } from "@reliverse/reenv";
 
 import type {
   ConfirmationMode,

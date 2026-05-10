@@ -142,7 +142,7 @@ describe("dler build command", () => {
       ],
       steps: [
         {
-          command: expect.stringContaining("internal-runner.ts"),
+          command: expect.stringContaining("bun build"),
           label: "plugins/dler",
           packageCommand: expect.any(String),
         },
@@ -264,8 +264,7 @@ describe("dler build command", () => {
     const text = textLines.join("\n");
     expect(text).toContain("Generated commands");
     expect(text).toContain("1. plugins/ok");
-    expect(text).toContain("internal-runner.ts");
-    expect(text).toContain("--cwd ./plugins/ok");
+    expect(text).toContain("bun build");
     expect(text).toContain("Use --json for the full machine-readable plan.");
   });
 
@@ -358,7 +357,9 @@ describe("dler build command", () => {
 
     expect(resultCalls[0]?.value).toEqual({
       apply: false,
+      bundleStrategy: "auto",
       concurrency: 4,
+      declarationStrategy: "emit",
       preview: true,
       executedTargets: [],
       ok: true,
@@ -368,10 +369,12 @@ describe("dler build command", () => {
       skippedTargets: [],
       steps: [
         {
-          command: expect.stringContaining("internal-runner.ts"),
+          command: expect.stringContaining("bun build"),
           cwd: pkgDir,
+          declarationStrategy: "emit",
           label: "plugins/stable",
-          packageCommand: "bun build ./src/index.ts --outdir ./dist --target bun",
+          packageCommand: "bun build ./src/index.ts --outfile ./dist/index.js --target bun",
+          resolvedBundleStrategy: "single",
         },
       ],
       summary: { failed: 0, planned: 1, skipped: 0, succeeded: 0 },

@@ -5,6 +5,8 @@ import { emitTypeScriptDeclarations, type DeclarDiagnostic } from "@reliverse/de
 
 import { fileExists, type RequestedTarget } from "../shared-targets";
 
+export type DlerDeclarationStrategy = "emit" | "fast" | "off" | "rollup";
+
 interface DlerDeclarationPackageJson {
   readonly exports?: unknown;
   readonly main?: string | undefined;
@@ -195,7 +197,14 @@ export function formatDeclarDiagnostics(diagnostics: readonly DeclarDiagnostic[]
 
 export async function runDeclarDeclarationLayer(
   target: RequestedTarget,
+  options: { readonly declarationStrategy?: DlerDeclarationStrategy | undefined } = {},
 ): Promise<DlerDeclarationLayerResult> {
+  const declarationStrategy = options.declarationStrategy ?? "emit";
+
+  if (declarationStrategy === "off") {
+    return { diagnostics: [], emittedFiles: [], ok: true, skippedReason: "declaration strategy off" };
+  }
+
   if (!(await fileExists(join(target.cwd, "tsconfig.json")))) {
     return { diagnostics: [], emittedFiles: [], ok: true, skippedReason: "missing tsconfig.json" };
   }
@@ -220,12 +229,12 @@ export async function runDeclarDeclarationLayer(
 
   const result = await emitTypeScriptDeclarations({
     fastDeclarationFallback: "typescript",
-    fastDeclarations: false,
+    fastDeclarations: declarationStrategy === "fast" ? "auto" : false,
     files: toSourceFiles(target.cwd, declarPlan.sourceEntrypoints),
     outDir: "dist",
     packageDir: target.cwd,
     packageJson: declarPlan.packageJson,
-    rollup: false,
+    rollup: declarationStrategy === "rollup",
     rootDir: await resolveDefaultRootDir(target.cwd),
     updatePackageJson: false,
   });

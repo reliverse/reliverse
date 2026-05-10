@@ -1,4 +1,4 @@
-# `@reliverse/myenv`
+# `@reliverse/reenv`
 
 Compact, conservative runtime and terminal capability detection for Bun, Node, Deno, browsers, and worker-like environments.
 
@@ -25,7 +25,7 @@ import {
   getMyEnv,
   isCI,
   isTTY,
-} from "@reliverse/myenv";
+} from "@reliverse/reenv";
 ```
 
 ## Example

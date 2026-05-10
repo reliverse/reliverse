@@ -1,6 +1,5 @@
 export { createBunBuildProvider } from "./provider/bun";
 export { createBuildProviderRegistry, type BuildProviderRegistry } from "./provider-registry";
-export { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
 export { createBuildPlan, type DlerBuildPlan, type PlannedBuildTarget } from "./plan";
 export {
   resolvePackageBuildCommand,

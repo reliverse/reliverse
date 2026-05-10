@@ -2,14 +2,11 @@
 
 Thanks for contributing.
 
-Reliverse is now a focused monorepo for:
+Reliverse is a monorepo for:
 
-- developer tooling
-- the `rse` CLI and its plugins
-- reusable UI packages
-- the web presence and docs for those tools
-
-User-facing product flows, auth, API, billing, and social features were intentionally moved out of this repo.
+- developer packages and reliverse tooling
+- the Rse core/CLI/UI and its implementation
+- the web presence and docs for reliverse tools
 
 ## Tooling
 
@@ -30,7 +27,7 @@ If your change affects behavior, configuration, UX, or public APIs, update the r
 ```bash
 apps/       → deployable surfaces (web, wiki, cli)
 packages/   → reusable packages (UI, blocks, rempts, reliverse libs)
-plugins/    → RSE plugins such as build/publish and package-management helpers
+plugins/    → Rse plugins such as build/publish and package-management helpers
 scripts/    → automation helpers
 ```
 
@@ -73,7 +70,7 @@ Before opening a PR:
 
 - `packages/rempts` - Bun-first file-based CLI foundation
 - `packages/relico` - terminal color helpers
-- `packages/myenv` - env helpers
+- `packages/reenv` - env helpers
 - `packages/tailwind` - shared design preset
 - `packages/tsconfig` - shared TS config
 - `packages/ui` - UI primitives
@@ -84,9 +81,8 @@ Before opening a PR:
 
 - `plugins/dler` - build and publish flows
 - `plugins/pm` - package-management helpers
-- `plugins/tools` - file conversion helpers such as `escape`
+- `plugins/tools` - file-related helpers
 - `plugins/os` - OS automation commands
-- `plugins/agent` - agent-related CLI extensions
 
 ## Reporting Issues
 
@@ -99,4 +95,4 @@ Helpful issue reports include:
 
 ## Security
 
-If you discover a vulnerability, follow the responsible disclosure guidance in `SECURITY.md`.
+If you discover a vulnerability, follow the corresponding guidance in `SECURITY.md`.

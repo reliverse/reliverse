@@ -35,12 +35,14 @@ Thumbs.db
 .turbo/
 
 # Temporary
+meta.json
 .relpack/
 *-context.**
 *.tar.zst
 *.tar.bz2
 *.tar.gz
 *.tar.xz
+*.tgz
 *.zip
 *.tar
 *.rar

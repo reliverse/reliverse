@@ -108,6 +108,7 @@ describe("publish validation", () => {
       "utf8",
     );
     await writeFile(join(okDir, "dist", "index.d.ts"), "export declare const ok = 1;\n", "utf8");
+    await writeFile(join(okDir, "dist", "index.js"), "export const ok = 1;\n", "utf8");
 
     await writeFile(join(missingTypesDir, "tsconfig.json"), "{}\n", "utf8");
     await writeFile(
@@ -138,6 +139,7 @@ describe("publish validation", () => {
       "export declare const sourceTyped = 1;\n",
       "utf8",
     );
+    await writeFile(join(sourceTypesDir, "dist", "index.js"), "export const sourceTyped = 1;\n", "utf8");
     await writeFile(
       join(sourceTypesDir, "package.json"),
       JSON.stringify({
@@ -183,6 +185,134 @@ describe("publish validation", () => {
       {
         label: "packages/typed-no-types",
         reason: "missing declaration targets in package.json for TypeScript package",
+      },
+    ]);
+  });
+
+  test("requires publish package file references to exist", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-validation-"));
+    const okDir = join(root, "packages", "files-ok");
+    const brokenDir = join(root, "packages", "files-broken");
+    await mkdir(join(okDir, "dist"), { recursive: true });
+    await mkdir(join(brokenDir, "dist"), { recursive: true });
+
+    const basePackageJson = { type: "module", publishConfig: { access: "public" } };
+    await writeFile(
+      join(okDir, "package.json"),
+      JSON.stringify({
+        ...basePackageJson,
+        name: "files-ok",
+        bin: { ok: "dist/cli.js" },
+        exports: {
+          ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+          "./cli": "./dist/cli.js",
+        },
+        main: "./dist/index.js",
+      }),
+      "utf8",
+    );
+    await writeFile(join(okDir, "dist", "index.js"), "export const ok = 1;\n", "utf8");
+    await writeFile(join(okDir, "dist", "index.d.ts"), "export declare const ok = 1;\n", "utf8");
+    await writeFile(join(okDir, "dist", "cli.js"), "#!/usr/bin/env bun\n", "utf8");
+
+    await writeFile(
+      join(brokenDir, "package.json"),
+      JSON.stringify({
+        ...basePackageJson,
+        name: "files-broken",
+        exports: {
+          ".": { types: "./dist/index.d.ts", import: "./dist/index.js" },
+          "./missing": "./dist/missing.js",
+        },
+      }),
+      "utf8",
+    );
+    await writeFile(join(brokenDir, "dist", "index.d.ts"), "export declare const broken = 1;\n", "utf8");
+
+    const result = await resolvePublishableTargets({
+      publishFrom: "dist",
+      targets: [
+        { cwd: okDir, label: "packages/files-ok" },
+        { cwd: brokenDir, label: "packages/files-broken" },
+      ],
+    });
+
+    expect(result.publishable).toMatchObject([{ label: "packages/files-ok" }]);
+    expect(result.skipped).toEqual([
+      {
+        label: "packages/files-broken",
+        reason: expect.stringContaining("missing publish file references"),
+      },
+    ]);
+    expect(result.skipped[0]?.reason).toContain("exports[.].import:./dist/index.js");
+    expect(result.skipped[0]?.reason).toContain("exports[./missing]:./dist/missing.js");
+  });
+
+  test("single bundle publish metadata rewrites root runtime entries to dist/index.js", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-validation-"));
+    const pkgDir = join(root, "plugins", "single-root");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(join(pkgDir, "tsconfig.json"), "{}\n", "utf8");
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const single = 1;\n", "utf8");
+    await writeFile(join(pkgDir, "dist", "index.js"), "export const single = 1;\n", "utf8");
+    await writeFile(join(pkgDir, "dist", "index.d.ts"), "export declare const single = 1;\n", "utf8");
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "single-root",
+        type: "module",
+        publishConfig: { access: "public" },
+        exports: { ".": { types: "./src/index.ts", import: "./src/index.ts" } },
+        main: "./src/index.ts",
+      }),
+      "utf8",
+    );
+
+    const result = await resolvePublishableTargets({
+      bundleStrategy: "single",
+      publishFrom: "dist",
+      targets: [{ cwd: pkgDir, label: "plugins/single-root" }],
+    });
+
+    expect(result.skipped).toEqual([]);
+    expect(result.publishable[0]?.packageRecord).toMatchObject({
+      exports: { ".": { types: "./dist/index.d.ts", import: "./dist/index.js" } },
+      main: "./dist/index.js",
+      types: "./dist/index.d.ts",
+    });
+  });
+
+  test("single bundle publish policy rejects subpath exports", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-validation-"));
+    const pkgDir = join(root, "packages", "single-subpaths");
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(join(pkgDir, "dist", "index.js"), "export const root = 1;\n", "utf8");
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "single-subpaths",
+        type: "module",
+        publishConfig: { access: "public" },
+        exports: {
+          ".": "./dist/index.js",
+          "./extra": "./dist/index.js",
+        },
+      }),
+      "utf8",
+    );
+
+    const result = await resolvePublishableTargets({
+      bundleStrategy: "single",
+      publishFrom: "dist",
+      targets: [{ cwd: pkgDir, label: "packages/single-subpaths" }],
+    });
+
+    expect(result.publishable).toEqual([]);
+    expect(result.skipped).toEqual([
+      {
+        label: "packages/single-subpaths",
+        reason: expect.stringContaining("bundle strategy single requires package exports"),
       },
     ]);
   });

@@ -3,19 +3,20 @@ import { resolve } from "node:path";
 
 import { fileExists, type RequestedTarget, type SkippedTarget } from "../shared-targets";
 import { getWorkspacePackageIgnoreReason } from "../workspace-package-policy";
-import { createGeneratedBuildCommand, type BuildCommandInvocation } from "./generated-command";
+import type { BuildCommandInvocation } from "./generated-command";
 import {
   explainMissingPackageBuildCommand,
   resolvePackageBuildCommand,
+  type BunBundleStrategy,
 } from "./package-build-command";
 
 export interface BuildableTarget extends RequestedTarget {
-  readonly orchestratorCommand: BuildCommandInvocation;
   readonly packageCommand: BuildCommandInvocation;
   readonly manifestPath: string;
 }
 
 export async function resolveBuildableTargets(options: {
+  readonly bundleStrategy?: BunBundleStrategy | undefined;
   readonly targets: readonly RequestedTarget[];
 }): Promise<{
   readonly buildable: readonly BuildableTarget[];
@@ -45,7 +46,9 @@ export async function resolveBuildableTargets(options: {
       continue;
     }
 
-    const packageCommand = await resolvePackageBuildCommand(target);
+    const packageCommand = await resolvePackageBuildCommand(target, {
+      bundleStrategy: options.bundleStrategy,
+    });
     if (!packageCommand) {
       skipped.push({
         label: target.label,
@@ -55,7 +58,6 @@ export async function resolveBuildableTargets(options: {
     }
 
     buildable.push({
-      orchestratorCommand: createGeneratedBuildCommand(target),
       cwd: target.cwd,
       packageCommand,
       label: target.label,

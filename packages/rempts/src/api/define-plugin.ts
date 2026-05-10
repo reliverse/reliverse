@@ -1,5 +1,6 @@
 import type { CommandOptionsRecord } from "@reliverse/parser";
 
+import type { CommandDefinition } from "./define-command";
 import { RemptsUsageError } from "../runtime/errors";
 import { resolveEntry } from "../runtime/resolve-entry";
 
@@ -8,11 +9,17 @@ export const REMPTS_PLUGIN_API_VERSION = 1;
 export interface RemptsPlugin {
   readonly apiVersion: typeof REMPTS_PLUGIN_API_VERSION;
   readonly capabilities?: readonly string[] | undefined;
+  readonly commands?: readonly RemptsPluginCommand[] | undefined;
   readonly description?: string | undefined;
   readonly entry: string;
   readonly name: string;
   readonly options?: CommandOptionsRecord | undefined;
   readonly provides?: readonly string[] | undefined;
+}
+
+export interface RemptsPluginCommand {
+  readonly command: CommandDefinition<any>;
+  readonly path: readonly string[];
 }
 
 function assertValidSegment(segment: string, path: readonly string[]): void {
@@ -31,6 +38,16 @@ function assertValidSegment(segment: string, path: readonly string[]): void {
 
 export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
   assertValidSegment(plugin.name, [plugin.name]);
+  for (const command of plugin.commands ?? []) {
+    if (command.path.length === 0) {
+      throw new RemptsUsageError(`Plugin command path for "${plugin.name}" cannot be empty.`);
+    }
+
+    for (const segment of command.path) {
+      assertValidSegment(segment, command.path);
+    }
+  }
+
   if (plugin.apiVersion !== REMPTS_PLUGIN_API_VERSION) {
     throw new RemptsUsageError(
       `Unsupported Rempts plugin apiVersion "${String(plugin.apiVersion)}" for plugin "${plugin.name}". Expected ${REMPTS_PLUGIN_API_VERSION}.`,
@@ -41,6 +58,9 @@ export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
   return {
     apiVersion: plugin.apiVersion,
     capabilities: plugin.capabilities ? [...plugin.capabilities] : undefined,
+    commands: plugin.commands
+      ? plugin.commands.map((command) => ({ command: command.command, path: [...command.path] }))
+      : undefined,
     description: plugin.description,
     entry: plugin.entry,
     name: plugin.name,

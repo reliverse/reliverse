@@ -1,11 +1,15 @@
 import { describe, expect, test } from "bun:test";
-import { mkdtemp, mkdir, writeFile } from "node:fs/promises";
+import { chmod, mkdtemp, mkdir, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import command from "./cmd";
 
-function createJsonCtx(cwd: string, options: Record<string, unknown>) {
+function createJsonCtx(
+  cwd: string,
+  options: Record<string, unknown>,
+  env: NodeJS.ProcessEnv = process.env,
+) {
   const resultCalls: Array<{ value: unknown; command?: string | undefined }> = [];
   const textLines: string[] = [];
   const errorLines: string[] = [];
@@ -26,7 +30,7 @@ function createJsonCtx(cwd: string, options: Record<string, unknown>) {
         },
       },
       cwd,
-      env: process.env,
+      env,
       err: (...values: unknown[]) => errorLines.push(values.join(" ")),
       exit(code: number, message: string): never {
         throw new Error(`EXIT ${code}: ${message}`);
@@ -252,8 +256,106 @@ describe("dler pub command", () => {
     expect(text).toContain("Command\n  npm publish --access public --dry-run");
     expect(text).toContain("Details");
     expect(text).toContain("Total duration:");
+    expect(text).toContain("tarball:");
+    expect(text).toContain("dist/index.js");
     expect(text).toContain("npm");
     expect(text).toContain("Use --json for the full machine-readable result.");
+  });
+
+  test("json preview includes npm pack dry-run tarball metadata", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const pkgDir = join(root, "packages", "ok");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "ok-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"ok-pkg-1.0.0.tgz","name":"ok-pkg","version":"1.0.0","size":222,"unpackedSize":111,"files":[{"path":"package.json","size":80},{"path":"dist/index.js","size":10}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  printf 'publish dry-run ok\\n'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        publishFrom: "dist",
+        targets: "packages/ok",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: true,
+      published: [
+        {
+          label: "packages/ok",
+          pack: {
+            filename: "ok-pkg-1.0.0.tgz",
+            packageSize: 222,
+            unpackedSize: 111,
+            files: [
+              { path: "package.json", size: 80 },
+              { path: "dist/index.js", size: 10 },
+            ],
+          },
+          stdout: "publish dry-run ok\n",
+        },
+      ],
+    });
+  });
+
+  test("pack policy skips tarballs that include source or fixture files", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const pkgDir = join(root, "packages", "dirty");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "dirty-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"dirty-pkg-1.0.0.tgz","name":"dirty-pkg","version":"1.0.0","size":333,"files":[{"path":"package.json","size":80},{"path":"dist/index.js","size":10},{"path":"src/index.ts","size":12},{"path":"dist/index.js.map","size":20},{"path":"tests/index.test.js","size":30}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  echo "publish should not run" >&2\n  exit 1\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        publishFrom: "dist",
+        targets: "packages/dirty",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: false,
+      published: [],
+      skippedTargets: [
+        {
+          label: "packages/dirty",
+          reason: expect.stringContaining("pack policy violations"),
+        },
+      ],
+    });
+    const reason = (resultCalls[0]?.value as { skipped?: Array<{ reason: string }> }).skipped?.[0]?.reason;
+    expect(reason).toContain("source files included: src/index.ts");
+    expect(reason).toContain("source maps included: dist/index.js.map");
+    expect(reason).toContain("test/fixture files included: tests/index.test.js");
   });
 
   test("when --targets is omitted at package cwd, pub auto-targets only that package", async () => {
@@ -315,6 +417,68 @@ describe("dler pub command", () => {
     });
   });
 
+  test("apply syncs the source package version before real publish", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const pkgDir = join(root, "packages", "ok");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "ok-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "view" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"ok-pkg-1.0.1.tgz","name":"ok-pkg","version":"1.0.1","size":123,"unpackedSize":45,"files":[{"path":"package.json","size":2},{"path":"dist/index.js","size":10}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); console.log(pkg.name + "@" + pkg.version);'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        apply: true,
+        publishFrom: "dist",
+        tag: "latest",
+        targets: "packages/ok",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    await expect(readFile(join(pkgDir, "package.json"), "utf8")).resolves.toBe(
+      `${JSON.stringify({ name: "ok-pkg", version: "1.0.1", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+    );
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: true,
+      published: [
+        {
+          label: "packages/ok",
+          packageName: "ok-pkg",
+          publishVersion: "1.0.1",
+          sourceVersion: "1.0.0",
+          pack: {
+            filename: "ok-pkg-1.0.1.tgz",
+            files: [
+              { path: "package.json", size: 2 },
+              { path: "dist/index.js", size: 10 },
+            ],
+          },
+          stdout: expect.stringContaining("ok-pkg@1.0.1"),
+          versionUpdated: true,
+        },
+      ],
+    });
+  });
+
   test("json preview keeps a stable machine-readable shape when nothing is publishable", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "private-pkg");
@@ -334,6 +498,7 @@ describe("dler pub command", () => {
 
     expect(resultCalls[0]?.value).toStrictEqual({
       apply: false,
+      bundleStrategy: "auto",
       concurrency: 1,
       preview: true,
       executedTargets: [],

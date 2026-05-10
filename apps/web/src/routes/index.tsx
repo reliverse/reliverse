@@ -25,7 +25,7 @@ function HomePage() {
       <div className="flex flex-col items-center gap-3 text-center">
         <p className="max-w-2xl text-sm text-foreground/80 sm:text-base">
           Reliverse is now focused on developer tools, reusable UI building blocks, and landing
-          pages for each tool and RSE plugin.
+          pages for each tool and Rse plugin.
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
           <a

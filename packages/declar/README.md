@@ -179,6 +179,22 @@ Fast-path diagnostics are structured and user-facing:
 
 Fast mode is **opt-in experimental complete** for M3. It is suitable for simple isolated packages, but TypeScript remains the correctness baseline.
 
+
+## dler integration strategy contract
+
+`dler build` exposes Declar through a small declaration strategy contract:
+
+```bash
+rse build --declaration-strategy emit|fast|rollup|off
+```
+
+- `emit` keeps the stable TypeScript-backed unbundled declaration path.
+- `fast` tries the opt-in isolated declaration path and falls back to TypeScript.
+- `rollup` enables Declar's conservative declaration rollup path.
+- `off` disables the dler declaration layer for that build.
+
+This CLI layer deliberately mirrors Declar's own posture: TypeScript-backed emit is the correctness baseline, fast mode is opt-in, and rollup is explicit.
+
 ## Quick start: inspect package exports
 
 Use this when a build tool only needs to understand the public type surface:

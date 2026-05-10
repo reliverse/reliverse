@@ -4,14 +4,20 @@ import { dirname, resolve } from "node:path";
 
 import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
 import {
+  DLER_BUILD_BUNDLE_STRATEGIES,
+  DLER_BUILD_DEFAULTS,
   DLER_COMMAND_NAMES,
   DLER_CONCURRENCY_DEFAULTS,
   DLER_PUBLISH_DEFAULTS,
 } from "../../impl/constants";
+import { runNpmPackDryRun } from "../../impl/pub/npm-pack";
+import type { NpmPackPreview } from "../../impl/pub/npm-pack";
 import { runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
 import { createPublishStaging } from "../../impl/pub/staging";
+import { syncPackageJsonVersion } from "../../impl/pub/source-version";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
+import type { PublishBundleStrategy } from "../../impl/pub/validation";
 import {
   findUnsafeDependencySpecifiers,
   normalizePublishDependencySpecifiers,
@@ -36,7 +42,79 @@ interface PublishTextResult {
   readonly durationMs: number;
   readonly label: string;
   readonly npm: { readonly stderr: string; readonly stdout: string };
+  readonly pack: NpmPackPreview;
   readonly packageName: string;
+}
+
+const packedSourceFileExtensions = [".cts", ".mts", ".ts", ".tsx"] as const;
+const packedSourceMapExtensions = [".cjs.map", ".js.map", ".mjs.map"] as const;
+const packedTestSegments = [
+  ".bench.",
+  ".fixture.",
+  ".spec.",
+  ".test.",
+  "__fixtures__/",
+  "__tests__/",
+  "fixtures/",
+  "test/",
+  "tests/",
+] as const;
+
+function formatBytes(value: number | undefined): string {
+  if (typeof value !== "number" || !Number.isFinite(value)) return "unknown size";
+  if (value < 1024) return `${value} B`;
+  if (value < 1024 * 1024) return `${(value / 1024).toFixed(1)} KB`;
+
+  return `${(value / 1024 / 1024).toFixed(1)} MB`;
+}
+
+function isPackedTypeDeclaration(path: string): boolean {
+  return path.endsWith(".d.ts") || path.endsWith(".d.mts") || path.endsWith(".d.cts");
+}
+
+function isPackedSourceFile(path: string): boolean {
+  return packedSourceFileExtensions.some((extension) => path.endsWith(extension)) && !isPackedTypeDeclaration(path);
+}
+
+function validatePackPolicy(options: {
+  readonly bundleStrategy: Exclude<PublishBundleStrategy, "auto">;
+  readonly pack: NpmPackPreview;
+  readonly publishFrom: string;
+}): string | undefined {
+  const normalizedPublishFrom = options.publishFrom.replace(/^\.\//, "").replace(/\/$/, "");
+  const files = options.pack.files.map((file) => file.path);
+  const violations: string[] = [];
+
+  if (!files.includes("package.json")) {
+    violations.push("missing package.json");
+  }
+
+  if (!files.some((path) => path === normalizedPublishFrom || path.startsWith(`${normalizedPublishFrom}/`))) {
+    violations.push(`missing ${normalizedPublishFrom}/ artifacts`);
+  }
+
+  const sourceFiles = files.filter((path) => isPackedSourceFile(path));
+  if (sourceFiles.length > 0) {
+    violations.push(`source files included: ${sourceFiles.slice(0, 5).join(", ")}`);
+  }
+
+  const sourceMaps = files.filter((path) => packedSourceMapExtensions.some((extension) => path.endsWith(extension)));
+  if (sourceMaps.length > 0) {
+    violations.push(`source maps included: ${sourceMaps.slice(0, 5).join(", ")}`);
+  }
+
+  const testFiles = files.filter((path) => packedTestSegments.some((segment) => path.includes(segment)));
+  if (testFiles.length > 0) {
+    violations.push(`test/fixture files included: ${testFiles.slice(0, 5).join(", ")}`);
+  }
+
+  if (options.bundleStrategy === "single" && !files.includes(`${normalizedPublishFrom}/index.js`)) {
+    violations.push(`missing ${normalizedPublishFrom}/index.js for single-bundle publish`);
+  }
+
+  return violations.length > 0
+    ? `pack policy violations: ${violations.join("; ")}`
+    : undefined;
 }
 
 function formatCount(
@@ -84,6 +162,27 @@ function formatNpmCommand(options: {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function resolveBundleStrategy(value: string | undefined): PublishBundleStrategy {
+  const strategy = value?.trim() || DLER_BUILD_DEFAULTS.bundleStrategy;
+
+  if (DLER_BUILD_BUNDLE_STRATEGIES.includes(strategy as PublishBundleStrategy)) {
+    return strategy as PublishBundleStrategy;
+  }
+
+  throw new Error(
+    `Invalid --bundle-strategy "${strategy}". Expected one of: ${DLER_BUILD_BUNDLE_STRATEGIES.join(", ")}.`,
+  );
+}
+
+function resolveEffectiveBundleStrategy(
+  strategy: PublishBundleStrategy,
+  label: string,
+): Exclude<PublishBundleStrategy, "auto"> {
+  if (strategy === "single" || strategy === "split") return strategy;
+
+  return label.startsWith("plugins/") ? "single" : "split";
 }
 
 async function findWorkspaceRoot(start: string): Promise<string> {
@@ -270,8 +369,25 @@ function pushNpmOutput(
   );
 }
 
+function pushPackOutput(lines: string[], colors: PreviewColors, result: PublishTextResult): void {
+  const filename = result.pack.filename ?? `${result.packageName}.tgz`;
+  const fileCount = result.pack.files.length;
+  lines.push(
+    `  ${colors.bold(result.label)} ${colors.gray("tarball:")} ${filename} (${fileCount} files, ${formatBytes(result.pack.packageSize)})`,
+  );
+
+  for (const file of result.pack.files.slice(0, 20)) {
+    lines.push(`     ${colors.gray(file.path)}${typeof file.size === "number" ? colors.gray(` ${formatBytes(file.size)}`) : ""}`);
+  }
+
+  if (result.pack.files.length > 20) {
+    lines.push(`     ${colors.gray(`… ${result.pack.files.length - 20} more files`)}`);
+  }
+}
+
 function formatPublishText(options: {
   readonly apply: boolean;
+  readonly bundleStrategy: PublishBundleStrategy;
   readonly colors: PreviewColors;
   readonly concurrency: number;
   readonly publishFrom: string;
@@ -287,6 +403,7 @@ function formatPublishText(options: {
     options.colors.bold(options.colors.cyan(title)),
     "",
     `${options.colors.bold("Publish from:")} ${options.colors.magenta(options.publishFrom)}`,
+    `${options.colors.bold("Bundle strategy:")} ${options.colors.magenta(options.bundleStrategy)}`,
     `${options.colors.bold("Concurrency:")} ${options.colors.magenta(options.concurrency)}`,
   ];
 
@@ -344,6 +461,7 @@ function formatPublishText(options: {
     );
 
     for (const result of options.results) {
+      pushPackOutput(lines, options.colors, result);
       pushNpmOutput(lines, options.colors, result.label, "stdout", result.npm.stdout);
       pushNpmOutput(lines, options.colors, result.label, "stderr", result.npm.stderr);
     }
@@ -422,12 +540,28 @@ export default defineCommand({
       description: "Show verbose text output, including npm output and durations",
       inputSources: ["flag"],
     },
+    bundleStrategy: {
+      type: "string",
+      defaultValue: DLER_BUILD_DEFAULTS.bundleStrategy,
+      description:
+        "Expected Bun runtime output strategy for publish validation: auto, single, or split",
+      hint: "auto | single | split",
+      inputSources: ["flag", "default"],
+    },
   },
   async handler(ctx) {
     const concurrency = resolveConcurrency(ctx.options.concurrency, {
       defaultValue: DLER_CONCURRENCY_DEFAULTS.pub,
       label: "--concurrency",
     });
+    const bundleStrategy = (() => {
+      try {
+        return resolveBundleStrategy(ctx.options.bundleStrategy);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.exit(1, message);
+      }
+    })();
     const requestedTargets = await resolveRequestedTargets({
       cwd: ctx.cwd,
       rawTargets: ctx.options.targets,
@@ -454,6 +588,7 @@ export default defineCommand({
     const preview = !apply;
     const startedAt = performance.now();
     const validation = await resolvePublishableTargets({
+      bundleStrategy,
       requireArtifactDir: true,
       publishFrom,
       targets: requestedTargets.resolution.resolved,
@@ -481,7 +616,11 @@ export default defineCommand({
       durationMs: number;
       label: string;
       npm: { exitCode: number; stderr: string; stdout: string };
+      pack: NpmPackPreview;
       packageName: string;
+      publishVersion?: string | undefined;
+      sourceVersion?: string | undefined;
+      versionUpdated: boolean;
     };
 
     const outcomes = await mapWithConcurrency(
@@ -490,10 +629,14 @@ export default defineCommand({
       async (target) => {
         const label = target.label;
         const packageRoot = target.cwd;
+        const sourceVersion = typeof target.packageRecord.version === "string"
+          ? target.packageRecord.version
+          : undefined;
+        const publishVersion = publishVersions.get(target.packageName) ?? sourceVersion;
         const pkgRecord = normalizePublishDependencySpecifiers(
           {
             ...target.packageRecord,
-            version: publishVersions.get(target.packageName) ?? target.packageRecord.version,
+            version: publishVersion ?? target.packageRecord.version,
           },
           { ...dependencyResolutionContext, workspaceVersions },
         );
@@ -517,12 +660,51 @@ export default defineCommand({
           };
         }
 
+        let versionUpdated = false;
         if (apply) {
           ctx.safety.assertApplied("fs.write");
+          if (publishVersion) {
+            versionUpdated = (await syncPackageJsonVersion(packageRoot, publishVersion)).updated;
+          }
         }
         const staging = await createPublishStaging(packageRoot, publishFrom, pkgRecord);
         try {
           const publishStartedAt = performance.now();
+          const packResult = await runNpmPackDryRun({
+            cwd: staging.stagingDir,
+            env: ctx.env,
+          });
+          const packPreview = packResult.preview;
+
+          if (packResult.exitCode !== 0 || !packPreview || packPreview.files.length === 0) {
+            if (ctx.output.mode !== "json") {
+              if (packResult.stdout.trim()) ctx.out(packResult.stdout.trim());
+              if (packResult.stderr.trim()) ctx.err(packResult.stderr.trim());
+            }
+
+            ctx.exit(
+              1,
+              `npm pack dry-run failed for ${label} during staging validation (exit ${packResult.exitCode}).`,
+            );
+          }
+          if (!packPreview) {
+            throw new Error(`npm pack dry-run did not return parseable tarball metadata for ${label}.`);
+          }
+
+          const packPolicyReason = validatePackPolicy({
+            bundleStrategy: resolveEffectiveBundleStrategy(bundleStrategy, label),
+            pack: packPreview,
+            publishFrom,
+          });
+          if (packPolicyReason) {
+            return {
+              skipped: {
+                label,
+                reason: packPolicyReason,
+              },
+            };
+          }
+
           if (apply) {
             ctx.safety.assertApplied("network.publish");
           }
@@ -537,7 +719,11 @@ export default defineCommand({
             durationMs: Math.round(performance.now() - publishStartedAt),
             label,
             npm: npmResult,
+            pack: packPreview,
             packageName: target.packageName,
+            publishVersion,
+            sourceVersion,
+            versionUpdated,
           } satisfies PublishResult;
 
           if (npmResult.exitCode !== 0) {
@@ -577,6 +763,7 @@ export default defineCommand({
         ctx.output.result(
           {
             apply,
+            bundleStrategy,
             concurrency,
             preview,
             executedTargets: targetSets.executedTargets,
@@ -596,6 +783,7 @@ export default defineCommand({
       const totalDurationMs = Math.round(performance.now() - startedAt);
       for (const line of formatPublishText({
         apply,
+        bundleStrategy,
         colors: ctx.colors.stdout,
         concurrency,
         publishFrom,
@@ -626,6 +814,7 @@ export default defineCommand({
       ctx.output.result(
         {
           apply,
+          bundleStrategy,
           concurrency,
           preview,
           executedTargets: targetSets.executedTargets,
@@ -636,7 +825,11 @@ export default defineCommand({
             exitCode: r.npm.exitCode,
             label: r.label,
             packageName: r.packageName,
+            publishVersion: r.publishVersion,
+            sourceVersion: r.sourceVersion,
+            versionUpdated: r.versionUpdated,
             durationMs: r.durationMs,
+            pack: r.pack,
             stderr: r.npm.stderr,
             stdout: r.npm.stdout,
           })),
@@ -653,6 +846,7 @@ export default defineCommand({
     const totalDurationMs = Math.round(performance.now() - startedAt);
     for (const line of formatPublishText({
       apply,
+      bundleStrategy,
       colors: ctx.colors.stdout,
       concurrency,
       publishFrom,

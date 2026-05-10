@@ -306,3 +306,49 @@ Possible post-M5 work:
 - API Extractor-style trimming and release-tag analysis
 - broader package metadata rewriting for unusual export shapes
 - stable default fast mode for packages that fully satisfy isolated declaration requirements
+
+## Milestone 11: `dler` build/pub contract hardening
+
+Status: **closed as build/pub contract complete**.
+
+Implemented M11 behavior:
+
+- `dler build --bundle-strategy auto|single|split` is now the explicit runtime output contract.
+- `auto` resolves plugins/CLI targets to `single` and package libraries to `split`.
+- plugin commands can be registered inline through Rempts so plugin packages can bundle into one `dist/index.js`.
+- the old `internal-runner.ts` build path was removed; Declar runs in-process after a successful runtime build.
+- `dler pub --bundle-strategy auto|single|split` validates publish metadata against the expected build output shape.
+- `single` publish metadata rewrites source runtime entrypoints to `dist/index.js`; subpath exports require `split`.
+- publish metadata/file validation checks `exports`, `main`, `module`, `types`, and `bin` against real staged artifacts.
+- publish staging runs `npm pack --dry-run --json` before publish preview/apply and records tarball metadata.
+- pack policy blocks suspicious tarballs containing source files, source maps, tests/fixtures, missing `dist/` artifacts, or missing `dist/index.js` for single-bundle packages.
+
+M11 exit criteria:
+
+- [x] make runtime bundle strategy explicit in build previews and execution
+- [x] align publish validation with runtime bundle strategy
+- [x] validate package metadata against real artifact files
+- [x] validate the actual npm tarball through pack dry-run
+- [x] prevent obvious tarball pollution before publish
+- [x] preserve preview-first publish behavior and staging isolation
+
+## Milestone 12: `dler` declaration strategy CLI contract
+
+Status: **closed as declaration strategy complete**.
+
+Implemented M12 behavior:
+
+- `dler build --declaration-strategy emit|fast|rollup|off` is now the explicit declaration output contract.
+- `emit` is the default and keeps Declar's TypeScript-backed unbundled declaration emit.
+- `fast` enables Declar's fast isolated declaration path with TypeScript fallback.
+- `rollup` enables Declar declaration rollup for targets that opt into it.
+- `off` disables the in-process Declar layer for the build target.
+- build JSON/text previews report the requested declaration strategy and per-target strategy.
+
+M12 exit criteria:
+
+- [x] expose declaration strategy as a build CLI option
+- [x] wire strategy through build plan, provider target, and Declar layer
+- [x] preserve old default behavior under `emit`
+- [x] add tests for `off`, `fast`, and plan/preview propagation
+- [x] document the strategy contract and smoke matrix

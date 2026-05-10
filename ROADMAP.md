@@ -59,7 +59,7 @@ Reliverse is a calm, tool-first monorepo for:
 - [ ] align blocks with the new site/docs direction
 - [ ] remove old app/backend assumptions
 
-#### packages/relico / myenv / ui-utils
+#### packages/relico / reenv / ui-utils
 
 - [ ] keep helpers small and boring in the best way
 

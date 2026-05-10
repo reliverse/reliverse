@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
+import { defineCommand } from "../api/define-command";
 import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "../api/define-plugin";
 import { discoverCommandPath } from "./discover-command";
 import { RemptsUsageError } from "./errors";
@@ -101,11 +102,48 @@ async function createPluginSource(
   );
 }
 
+async function createInlinePluginSource(root: string, pluginName: string) {
+  const entryPath = join(root, "dist", "index.js");
+  await mkdir(dirname(entryPath), { recursive: true });
+  await writeFile(entryPath, "export {};\n");
+
+  return createPluginCommandSource(
+    definePlugin({
+      apiVersion: REMPTS_PLUGIN_API_VERSION,
+      commands: [
+        {
+          path: ["dler", "build"],
+          command: defineCommand({
+            meta: { name: "build", description: "inline build", aliases: ["b"] },
+            async handler() {
+              return undefined;
+            },
+          }),
+        },
+      ],
+      entry: entryPath,
+      name: pluginName,
+    }),
+  );
+}
+
 afterEach(async () => {
   await Promise.all(tempRoots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
 });
 
 describe("discoverCommandPath precedence", () => {
+  test("discovers inline plugin commands without a cmds directory", async () => {
+    const root = await createTempRoot();
+    const plugin = await createInlinePluginSource(join(root, "plugin-inline"), "plugin-inline");
+
+    const topLevel = await discoverCommandPath([plugin], ["dler"]);
+    expect(topLevel.availableSubcommands.map((item) => item.name)).toEqual(["build"]);
+
+    const discovered = await discoverCommandPath([plugin], ["dler", "b"]);
+    expect(discovered.commandNode?.description).toBe("inline build");
+    expect(discovered.matchedPath).toEqual(["dler", "build"]);
+  });
+
   test("local commands win over plugins on the same exact node", async () => {
     const root = await createTempRoot();
     const local = await createLocalSource(join(root, "local"), [

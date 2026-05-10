@@ -10,10 +10,14 @@ import {
 } from "../../impl/build";
 import { resolveConcurrency } from "../../impl/concurrency";
 import {
+  DLER_BUILD_BUNDLE_STRATEGIES,
+  DLER_BUILD_DECLARATION_STRATEGIES,
   DLER_BUILD_DEFAULTS,
   DLER_COMMAND_NAMES,
   DLER_CONCURRENCY_DEFAULTS,
 } from "../../impl/constants";
+import type { BunBundleStrategy } from "../../impl/build/package-build-command";
+import type { DlerDeclarationStrategy } from "../../impl/build/declaration-layer";
 import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
 import { createBuildSummary, formatBuildSummary } from "../../impl/result-contract";
 import { resolveRequestedTargets } from "../../impl/shared-targets";
@@ -36,6 +40,30 @@ function normalizeSkippedReason(reason: string): string {
   }
 
   return reason;
+}
+
+function resolveBundleStrategy(value: string | undefined): BunBundleStrategy {
+  const strategy = value?.trim() || DLER_BUILD_DEFAULTS.bundleStrategy;
+
+  if (DLER_BUILD_BUNDLE_STRATEGIES.includes(strategy as BunBundleStrategy)) {
+    return strategy as BunBundleStrategy;
+  }
+
+  throw new Error(
+    `Invalid --bundle-strategy "${strategy}". Expected one of: ${DLER_BUILD_BUNDLE_STRATEGIES.join(", ")}.`,
+  );
+}
+
+function resolveDeclarationStrategy(value: string | undefined): DlerDeclarationStrategy {
+  const strategy = value?.trim() || DLER_BUILD_DEFAULTS.declarationStrategy;
+
+  if (DLER_BUILD_DECLARATION_STRATEGIES.includes(strategy as DlerDeclarationStrategy)) {
+    return strategy as DlerDeclarationStrategy;
+  }
+
+  throw new Error(
+    `Invalid --declaration-strategy "${strategy}". Expected one of: ${DLER_BUILD_DECLARATION_STRATEGIES.join(", ")}.`,
+  );
 }
 
 type PreviewStyle = (value: unknown) => string;
@@ -87,6 +115,8 @@ function formatBuildPreviewText(options: {
     readonly label: string;
   }[];
   readonly provider: string;
+  readonly bundleStrategy: BunBundleStrategy;
+  readonly declarationStrategy: DlerDeclarationStrategy;
   readonly root: string;
   readonly skippedTargets: readonly { readonly label: string; readonly reason: string }[];
   readonly verbose: boolean;
@@ -96,6 +126,8 @@ function formatBuildPreviewText(options: {
     options.colors.bold(options.colors.cyan(`${DLER_COMMAND_NAMES.build} preview`)),
     "",
     `${options.colors.bold("Provider:")} ${options.colors.magenta(options.provider)}`,
+    `${options.colors.bold("Bundle strategy:")} ${options.colors.magenta(options.bundleStrategy)}`,
+    `${options.colors.bold("Declaration strategy:")} ${options.colors.magenta(options.declarationStrategy)}`,
     `${options.colors.bold("Concurrency:")} ${options.colors.magenta(options.concurrency)}`,
     `${options.colors.bold("Targets:")} ${formatCount(options.colors, options.targets.length, "planned", "green")}, ${formatCount(options.colors, options.skippedTargets.length, "skipped", "yellow")}`,
     "",
@@ -204,12 +236,43 @@ export default defineCommand({
       description: "Show verbose text preview details, including generated build commands",
       inputSources: ["flag"],
     },
+    bundleStrategy: {
+      type: "string",
+      defaultValue: DLER_BUILD_DEFAULTS.bundleStrategy,
+      description:
+        "Bun runtime output strategy: auto, single (one dist/index.js), or split (one output per entrypoint)",
+      hint: "auto | single | split",
+      inputSources: ["flag", "default"],
+    },
+    declarationStrategy: {
+      type: "string",
+      defaultValue: DLER_BUILD_DEFAULTS.declarationStrategy,
+      description: "Declar declaration strategy: emit, fast, rollup, or off",
+      hint: "emit | fast | rollup | off",
+      inputSources: ["flag", "default"],
+    },
   },
   async handler(ctx) {
     const concurrency = resolveConcurrency(ctx.options.concurrency, {
       defaultValue: DLER_CONCURRENCY_DEFAULTS.build,
       label: "--concurrency",
     });
+    const bundleStrategy = (() => {
+      try {
+        return resolveBundleStrategy(ctx.options.bundleStrategy);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.exit(1, message);
+      }
+    })();
+    const declarationStrategy = (() => {
+      try {
+        return resolveDeclarationStrategy(ctx.options.declarationStrategy);
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.exit(1, message);
+      }
+    })();
     const providerRegistry = createBuildProviderRegistry({
       providers: [createBunBuildProvider()],
     });
@@ -239,6 +302,8 @@ export default defineCommand({
     }
 
     const plan = await createBuildPlan({
+      bundleStrategy,
+      declarationStrategy,
       provider,
       targets: requestedTargets.resolution.resolved,
     });
@@ -260,6 +325,8 @@ export default defineCommand({
         ctx.output.result(
           {
             apply: ctx.safety.apply,
+            bundleStrategy,
+            declarationStrategy,
             preview: !ctx.safety.apply,
             executedTargets: targetSets.executedTargets,
             ok: false,
@@ -290,7 +357,9 @@ export default defineCommand({
       });
       const preview = {
         apply: false,
+        bundleStrategy,
         concurrency,
+        declarationStrategy,
         preview: true,
         executedTargets: targetSets.executedTargets,
         ok: true,
@@ -305,6 +374,10 @@ export default defineCommand({
           packageCommand: plan.plannedTargets.find(
             (plannedTarget) => plannedTarget.label === target.label,
           )?.packageCommand.display,
+          resolvedBundleStrategy: plan.plannedTargets.find(
+            (plannedTarget) => plannedTarget.label === target.label,
+          )?.packageCommand.bundleStrategy,
+          declarationStrategy: target.declarationStrategy,
         })),
         summary,
         targets: targetLabels,
@@ -319,6 +392,8 @@ export default defineCommand({
         colors: ctx.colors.stdout,
         concurrency,
         commandDetails: preview.steps,
+        bundleStrategy,
+        declarationStrategy,
         provider,
         root: ctx.cwd,
         skippedTargets,
@@ -364,7 +439,9 @@ export default defineCommand({
           {
             ...report,
             apply: true,
+            bundleStrategy,
             concurrency,
+            declarationStrategy,
             preview: false,
             executedTargets: executedTargetSets.executedTargets,
             skipped: skippedTargets,
@@ -380,7 +457,9 @@ export default defineCommand({
       ctx.output.data({
         ...report,
         apply: true,
+        bundleStrategy,
         concurrency,
+        declarationStrategy,
         preview: false,
         executedTargets: executedTargetSets.executedTargets,
         ok: false,
@@ -392,6 +471,8 @@ export default defineCommand({
       });
     } else {
       ctx.out(`Provider: ${report.provider}`);
+      ctx.out(`Bundle strategy: ${bundleStrategy}`);
+      ctx.out(`Declaration strategy: ${declarationStrategy}`);
 
       for (const message of formatSkippedMessages(skippedTargets)) {
         ctx.err(message);

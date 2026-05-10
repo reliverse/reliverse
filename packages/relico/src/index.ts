@@ -1,4 +1,4 @@
-import { detectColorSupport, type ColorSupportLevel, type StreamName } from "@reliverse/myenv";
+import { detectColorSupport, type ColorSupportLevel, type StreamName } from "@reliverse/reenv";
 
 export interface RelicoOptions {
   readonly color?: boolean | ColorSupportLevel | undefined;

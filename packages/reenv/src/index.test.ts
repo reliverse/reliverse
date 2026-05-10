@@ -14,7 +14,7 @@ import {
   isTTY,
 } from "./index";
 
-describe("@reliverse/myenv", () => {
+describe("@reliverse/reenv", () => {
   test("detects bun via process.versions.bun", () => {
     expect(detectRuntime({ process: { versions: { bun: "1.3.0" } } })).toBe("bun");
   });

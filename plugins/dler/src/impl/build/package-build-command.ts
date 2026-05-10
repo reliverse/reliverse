@@ -3,11 +3,21 @@ import { readFile } from "node:fs/promises";
 import { fileExists, type RequestedTarget } from "../shared-targets";
 import type { BuildCommandInvocation } from "./generated-command";
 
+export type BunBundleStrategy = "auto" | "single" | "split";
+
+export interface ResolvePackageBuildCommandOptions {
+  readonly bundleStrategy?: BunBundleStrategy | undefined;
+}
+
 interface MinimalPackageJson {
+  readonly bin?: Record<string, string> | string;
+  readonly dependencies?: Record<string, string>;
   readonly exports?: Record<string, unknown>;
   readonly main?: string;
   readonly module?: string;
   readonly name?: string;
+  readonly optionalDependencies?: Record<string, string>;
+  readonly peerDependencies?: Record<string, string>;
   readonly private?: boolean;
   readonly scripts?: Record<string, string>;
   readonly types?: string;
@@ -30,6 +40,20 @@ const VITE_CONFIG_CANDIDATES = [
 const ELECTROBUN_CONFIG_CANDIDATES = ["electrobun.config.ts", "electrobun.config.js"] as const;
 
 const PACKAGE_ROOT_INDEX_CANDIDATES = ["index.ts", "index.tsx", "index.js"] as const;
+
+const PLUGIN_OR_CLI_RUNTIME_EXTERNALS = new Set([
+  "@reliverse/rempts",
+  "@typescript/native-preview",
+  "esbuild",
+  "eslint",
+  "prettier",
+  "rollup",
+  "tsdown",
+  "typescript",
+  "unbuild",
+  "vite",
+  "webpack",
+]);
 
 interface BuildShapeContext {
   readonly cwd: string;
@@ -144,6 +168,20 @@ function inferManifestEntrypoints(pkg: MinimalPackageJson | null): string[] {
     }
   }
 
+  if (typeof pkg?.bin === "string") {
+    const entrypoint = normalizeEntrypoint(pkg.bin);
+    if (entrypoint) {
+      entrypoints.add(entrypoint);
+    }
+  } else if (pkg?.bin) {
+    for (const value of Object.values(pkg.bin)) {
+      const entrypoint = normalizeEntrypoint(value);
+      if (entrypoint) {
+        entrypoints.add(entrypoint);
+      }
+    }
+  }
+
   if (pkg?.exports) {
     collectExportEntrypoints(pkg.exports, entrypoints);
   }
@@ -151,17 +189,97 @@ function inferManifestEntrypoints(pkg: MinimalPackageJson | null): string[] {
   return [...entrypoints].sort();
 }
 
+function collectDependencyNames(dependencies: Record<string, string> | undefined): string[] {
+  return dependencies ? Object.keys(dependencies) : [];
+}
+
+function uniqueSorted(values: readonly string[]): string[] {
+  return [...new Set(values)].sort();
+}
+
+function resolveExternalPackages(facts: BuildShapeFacts, targetRuntime: "bun" | "node"): string[] {
+  const packageJson = facts.packageJson;
+
+  if (!packageJson) {
+    return [];
+  }
+
+  const peerAndOptionalDependencies = [
+    ...collectDependencyNames(packageJson.peerDependencies),
+    ...collectDependencyNames(packageJson.optionalDependencies),
+  ];
+
+  if (targetRuntime === "node" && isPackageTarget(facts.label)) {
+    return uniqueSorted([
+      ...collectDependencyNames(packageJson.dependencies),
+      ...peerAndOptionalDependencies,
+    ]);
+  }
+
+  const selectedRuntimeDependencies = collectDependencyNames(packageJson.dependencies).filter(
+    (name) => PLUGIN_OR_CLI_RUNTIME_EXTERNALS.has(name),
+  );
+
+  return uniqueSorted([...peerAndOptionalDependencies, ...selectedRuntimeDependencies]);
+}
+
+function createExternalArgs(externalPackages: readonly string[]): string[] {
+  return externalPackages.flatMap((name) => ["--external", name]);
+}
+
 function createBunBuildInvocation(
   entrypoints: readonly string[],
   targetRuntime: "bun" | "node",
+  bundleStrategy: BunBundleStrategy,
+  externalPackages: readonly string[] = [],
 ): BuildCommandInvocation {
-  const rootArgs = entrypoints.length > 1 && entrypoints.every((entrypoint) => entrypoint.startsWith("./src/"))
-    ? ["--root", "./src"]
-    : [];
+  const externalArgs = createExternalArgs(externalPackages);
+  const externalDisplay =
+    externalPackages.length > 0
+      ? ` ${externalPackages.map((name) => `--external ${name}`).join(" ")}`
+      : "";
+
+  if (bundleStrategy === "single") {
+    const [entrypoint] = entrypoints;
+    if (!entrypoint) {
+      throw new Error("Cannot create a single-file Bun build without an entrypoint.");
+    }
+
+    return {
+      argv: [
+        "bun",
+        "build",
+        entrypoint,
+        "--outfile",
+        "./dist/index.js",
+        "--target",
+        targetRuntime,
+        ...externalArgs,
+      ],
+      bundleStrategy: "single",
+      display: `bun build ${entrypoint} --outfile ./dist/index.js --target ${targetRuntime}${externalDisplay}`,
+    };
+  }
+
+  const rootArgs =
+    entrypoints.length > 1 && entrypoints.every((entrypoint) => entrypoint.startsWith("./src/"))
+      ? ["--root", "./src"]
+      : [];
 
   return {
-    argv: ["bun", "build", ...entrypoints, "--outdir", "./dist", "--target", targetRuntime, ...rootArgs],
-    display: `bun build ${entrypoints.join(" ")} --outdir ./dist --target ${targetRuntime}${rootArgs.length > 0 ? " --root ./src" : ""}`,
+    argv: [
+      "bun",
+      "build",
+      ...entrypoints,
+      "--outdir",
+      "./dist",
+      "--target",
+      targetRuntime,
+      ...externalArgs,
+      ...rootArgs,
+    ],
+    bundleStrategy: "split",
+    display: `bun build ${entrypoints.join(" ")} --outdir ./dist --target ${targetRuntime}${externalDisplay}${rootArgs.length > 0 ? " --root ./src" : ""}`,
   };
 }
 
@@ -171,6 +289,14 @@ function isPluginTarget(label: string): boolean {
 
 function isPackageTarget(label: string): boolean {
   return label.startsWith("packages/");
+}
+
+function hasSubpathExports(pkg: MinimalPackageJson | null): boolean {
+  return Boolean(
+    pkg?.exports &&
+    typeof pkg.exports === "object" &&
+    Object.keys(pkg.exports).some((key) => key.startsWith("./")),
+  );
 }
 
 async function collectBuildShapeFacts(target: RequestedTarget): Promise<BuildShapeFacts> {
@@ -235,52 +361,115 @@ async function resolveConfigDrivenBuild(
 
 async function resolvePluginOrCliBuild(
   facts: BuildShapeFacts,
+  bundleStrategy: BunBundleStrategy,
 ): Promise<BuildCommandInvocation | null> {
   if (facts.srcCliExists) {
-    return createBunBuildInvocation(["./src/cli.ts"], "bun");
+    const entrypoints =
+      bundleStrategy === "split" && facts.manifestEntrypoints.length > 0
+        ? facts.manifestEntrypoints
+        : ["./src/cli.ts"];
+
+    return createBunBuildInvocation(
+      entrypoints,
+      "bun",
+      bundleStrategy,
+      resolveExternalPackages(facts, "bun"),
+    );
   }
 
   if (facts.srcIndexExists && isPluginTarget(facts.label)) {
-    return createBunBuildInvocation(await listCommandEntrypoints(facts.cwd), "bun");
+    const entrypoints =
+      bundleStrategy === "split" ? await listCommandEntrypoints(facts.cwd) : ["./src/index.ts"];
+
+    return createBunBuildInvocation(
+      entrypoints,
+      "bun",
+      bundleStrategy,
+      resolveExternalPackages(facts, "bun"),
+    );
   }
 
   return null;
 }
 
-function resolvePackageLibraryBuild(facts: BuildShapeFacts): BuildCommandInvocation | null {
+function resolvePackageLibraryBuild(
+  facts: BuildShapeFacts,
+  bundleStrategy: BunBundleStrategy,
+): BuildCommandInvocation | null {
   if (!isPackageTarget(facts.label)) {
     return null;
   }
 
   if (facts.srcIndexExists) {
+    const entrypoints =
+      bundleStrategy === "single"
+        ? ["./src/index.ts"]
+        : facts.manifestEntrypoints.length > 0
+          ? facts.manifestEntrypoints
+          : ["./src/index.ts"];
+
     return createBunBuildInvocation(
-      facts.manifestEntrypoints.length > 0 ? facts.manifestEntrypoints : ["./src/index.ts"],
+      entrypoints,
       "node",
+      bundleStrategy,
+      resolveExternalPackages(facts, "node"),
     );
   }
 
   if (facts.packageRootIndexPath) {
+    const entrypoints =
+      bundleStrategy === "single"
+        ? [facts.packageRootIndexPath]
+        : facts.manifestEntrypoints.length > 0
+          ? facts.manifestEntrypoints
+          : [facts.packageRootIndexPath];
+
     return createBunBuildInvocation(
-      facts.manifestEntrypoints.length > 0
-        ? facts.manifestEntrypoints
-        : [facts.packageRootIndexPath],
+      entrypoints,
       "node",
+      bundleStrategy,
+      resolveExternalPackages(facts, "node"),
     );
   }
 
   if (facts.manifestEntrypoints.length > 0) {
-    return createBunBuildInvocation(facts.manifestEntrypoints, "node");
+    return createBunBuildInvocation(
+      bundleStrategy === "single" ? [facts.manifestEntrypoints[0]!] : facts.manifestEntrypoints,
+      "node",
+      bundleStrategy,
+      resolveExternalPackages(facts, "node"),
+    );
   }
 
   return null;
 }
 
-function resolveGenericSourceBuild(facts: BuildShapeFacts): BuildCommandInvocation | null {
+function resolveGenericSourceBuild(
+  facts: BuildShapeFacts,
+  bundleStrategy: BunBundleStrategy,
+): BuildCommandInvocation | null {
   if (facts.srcIndexExists) {
-    return createBunBuildInvocation(["./src/index.ts"], "bun");
+    return createBunBuildInvocation(
+      ["./src/index.ts"],
+      "bun",
+      bundleStrategy,
+      resolveExternalPackages(facts, "bun"),
+    );
   }
 
   return null;
+}
+
+function resolveAutoBundleStrategy(facts: BuildShapeFacts): Exclude<BunBundleStrategy, "auto"> {
+  if (isPluginTarget(facts.label) && hasSubpathExports(facts.packageJson)) {
+    return "split";
+  }
+
+  if (isPluginTarget(facts.label) || facts.srcCliExists) {
+    return "single";
+  }
+
+  return "split";
 }
 
 export async function explainMissingPackageBuildCommand(target: RequestedTarget): Promise<string> {
@@ -307,13 +496,18 @@ export async function explainMissingPackageBuildCommand(target: RequestedTarget)
 
 export async function resolvePackageBuildCommand(
   target: RequestedTarget,
+  options: ResolvePackageBuildCommandOptions = {},
 ): Promise<BuildCommandInvocation | null> {
   const facts = await collectBuildShapeFacts(target);
+  const bundleStrategy =
+    options.bundleStrategy === "single" || options.bundleStrategy === "split"
+      ? options.bundleStrategy
+      : resolveAutoBundleStrategy(facts);
 
   return (
     (await resolveConfigDrivenBuild(facts)) ??
-    (await resolvePluginOrCliBuild(facts)) ??
-    resolvePackageLibraryBuild(facts) ??
-    resolveGenericSourceBuild(facts)
+    (await resolvePluginOrCliBuild(facts, bundleStrategy)) ??
+    resolvePackageLibraryBuild(facts, bundleStrategy) ??
+    resolveGenericSourceBuild(facts, bundleStrategy)
   );
 }

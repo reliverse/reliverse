@@ -1,6 +1,5 @@
 import { basename, extname } from "node:path";
 
-import { detectTerminalSupport } from "@reliverse/myenv";
 import {
   ParserUsageError,
   ParserValidationError,
@@ -9,6 +8,7 @@ import {
   type CommandOptionsRecord,
   type ParseArgvResult,
 } from "@reliverse/parser";
+import { detectTerminalSupport } from "@reliverse/reenv";
 import { createRelico } from "@reliverse/relico";
 
 import { createPromptRuntime } from "../prompts/adapter";

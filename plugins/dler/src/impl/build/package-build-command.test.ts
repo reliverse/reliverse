@@ -25,11 +25,54 @@ describe("package build command", () => {
       resolvePackageBuildCommand({ cwd: pkgDir, label: "packages/demo" }),
     ).resolves.toEqual({
       argv: ["bun", "build", "./src/index.ts", "--outdir", "./dist", "--target", "node"],
+      bundleStrategy: "split",
       display: "bun build ./src/index.ts --outdir ./dist --target node",
     });
   });
 
-  test("includes plugin command entrypoints in generated bun builds", async () => {
+  test("externalizes runtime dependencies for package libraries", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const pkgDir = join(root, "packages", "declar-like");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "declar-like",
+        dependencies: { "jsonc-parser": "catalog:" },
+        peerDependencies: { typescript: ">=5.6" },
+      }),
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const demo = 1;\n", "utf8");
+
+    await expect(
+      resolvePackageBuildCommand({ cwd: pkgDir, label: "packages/declar-like" }),
+    ).resolves.toEqual({
+      argv: [
+        "bun",
+        "build",
+        "./src/index.ts",
+        "--outdir",
+        "./dist",
+        "--target",
+        "node",
+        "--external",
+        "jsonc-parser",
+        "--external",
+        "typescript",
+      ],
+      bundleStrategy: "split",
+      display:
+        "bun build ./src/index.ts --outdir ./dist --target node --external jsonc-parser --external typescript",
+    });
+  });
+
+  test("includes plugin command entrypoints in split generated bun builds", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
     const pkgDir = join(root, "plugins", "demo");
     await mkdir(join(pkgDir, "src", "cmds", "demo", "sub"), { recursive: true });
@@ -47,7 +90,10 @@ describe("package build command", () => {
     );
 
     await expect(
-      resolvePackageBuildCommand({ cwd: pkgDir, label: "plugins/demo" }),
+      resolvePackageBuildCommand(
+        { cwd: pkgDir, label: "plugins/demo" },
+        { bundleStrategy: "split" },
+      ),
     ).resolves.toEqual({
       argv: [
         "bun",
@@ -61,7 +107,77 @@ describe("package build command", () => {
         "--root",
         "./src",
       ],
-      display: "bun build ./src/index.ts ./src/cmds/demo/sub/cmd.ts --outdir ./dist --target bun --root ./src",
+      bundleStrategy: "split",
+      display:
+        "bun build ./src/index.ts ./src/cmds/demo/sub/cmd.ts --outdir ./dist --target bun --root ./src",
+    });
+  });
+
+  test("uses single-file bun build for plugin targets in auto mode", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const pkgDir = join(root, "plugins", "single");
+    await mkdir(join(pkgDir, "src", "cmds", "single"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "package.json"), '{"name":"single-plugin"}\n', "utf8");
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const single = 1;\n", "utf8");
+    await writeFile(join(pkgDir, "src", "cmds", "single", "cmd.ts"), "export default 1;\n", "utf8");
+
+    await expect(
+      resolvePackageBuildCommand({ cwd: pkgDir, label: "plugins/single" }),
+    ).resolves.toEqual({
+      argv: ["bun", "build", "./src/index.ts", "--outfile", "./dist/index.js", "--target", "bun"],
+      bundleStrategy: "single",
+      display: "bun build ./src/index.ts --outfile ./dist/index.js --target bun",
+    });
+  });
+
+  test("externalizes host and TypeScript toolchain dependencies for plugins", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const pkgDir = join(root, "plugins", "dler-like");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["plugins/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({
+        name: "dler-like",
+        dependencies: {
+          "@reliverse/declar": "workspace:*",
+          "@reliverse/rempts": "workspace:*",
+          "jsonc-parser": "catalog:",
+          typescript: "catalog:",
+        },
+      }),
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const single = 1;\n", "utf8");
+
+    await expect(
+      resolvePackageBuildCommand({ cwd: pkgDir, label: "plugins/dler-like" }),
+    ).resolves.toEqual({
+      argv: [
+        "bun",
+        "build",
+        "./src/index.ts",
+        "--outfile",
+        "./dist/index.js",
+        "--target",
+        "bun",
+        "--external",
+        "@reliverse/rempts",
+        "--external",
+        "typescript",
+      ],
+      bundleStrategy: "single",
+      display:
+        "bun build ./src/index.ts --outfile ./dist/index.js --target bun --external @reliverse/rempts --external typescript",
     });
   });
 
@@ -118,7 +234,37 @@ describe("package build command", () => {
         "--root",
         "./src",
       ],
+      bundleStrategy: "split",
       display: "bun build ./src/api.ts ./src/vite.ts --outdir ./dist --target node --root ./src",
+    });
+  });
+
+  test("can force single-file bun build for package libraries", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-command-"));
+    const pkgDir = join(root, "packages", "singlelib");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(pkgDir, "package.json"),
+      JSON.stringify({ exports: { ".": "./src/index.ts", "./extra": "./src/extra.ts" } }),
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const index = 1;\n", "utf8");
+    await writeFile(join(pkgDir, "src", "extra.ts"), "export const extra = 1;\n", "utf8");
+
+    await expect(
+      resolvePackageBuildCommand(
+        { cwd: pkgDir, label: "packages/singlelib" },
+        { bundleStrategy: "single" },
+      ),
+    ).resolves.toEqual({
+      argv: ["bun", "build", "./src/index.ts", "--outfile", "./dist/index.js", "--target", "node"],
+      bundleStrategy: "single",
+      display: "bun build ./src/index.ts --outfile ./dist/index.js --target node",
     });
   });
 
@@ -142,6 +288,7 @@ describe("package build command", () => {
       resolvePackageBuildCommand({ cwd: pkgDir, label: "packages/patterned" }),
     ).resolves.toEqual({
       argv: ["bun", "build", "./src/index.ts", "--outdir", "./dist", "--target", "node"],
+      bundleStrategy: "split",
       display: "bun build ./src/index.ts --outdir ./dist --target node",
     });
   });
@@ -166,6 +313,7 @@ describe("package build command", () => {
       resolvePackageBuildCommand({ cwd: pkgDir, label: "packages/billinglike" }),
     ).resolves.toEqual({
       argv: ["bun", "build", "./index.ts", "--outdir", "./dist", "--target", "node"],
+      bundleStrategy: "split",
       display: "bun build ./index.ts --outdir ./dist --target node",
     });
   });

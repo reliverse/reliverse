@@ -1,6 +1,6 @@
 {
   "name": "@reliverse/relpack-rse-plugin",
-  "version": "0.1.3",
+  "version": "0.1.0",
   "description": "Modern archive CLI for safe pack/unpack workflows with manifests, diff, verify, backup, and rollback.",
   "license": "MIT",
   "bin": {

@@ -1,6 +1,6 @@
 {
   "name": "@reliverse/rempts",
-  "version": "0.1.0",
+  "version": "2.3.5",
   "private": false,
   "files": [
     "dist",
@@ -19,7 +19,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@reliverse/myenv": "workspace:*",
+    "@reliverse/reenv": "workspace:*",
     "@reliverse/parser": "workspace:*",
     "@reliverse/relico": "workspace:*",
     "p-map": "catalog:",

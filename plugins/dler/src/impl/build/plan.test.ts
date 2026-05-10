@@ -7,7 +7,7 @@ import { resolveRequestedTargets } from "../shared-targets";
 import { createBuildPlan } from "./plan";
 
 describe("build plan", () => {
-  test("creates a plan with orchestrator and package commands", async () => {
+  test("creates a plan with package commands and in-process declarations", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-build-plan-"));
     const pkgDir = join(root, "plugins", "demo");
     await mkdir(join(pkgDir, "src"), { recursive: true });
@@ -30,9 +30,6 @@ describe("build plan", () => {
       expect.objectContaining({
         cwd: pkgDir,
         label: "plugins/demo",
-        orchestratorCommand: expect.objectContaining({
-          display: expect.stringContaining("internal-runner.ts"),
-        }),
         packageCommand: expect.objectContaining({ display: expect.stringContaining("bun build") }),
       }),
     ]);
@@ -40,7 +37,29 @@ describe("build plan", () => {
       expect.objectContaining({
         cwd: pkgDir,
         label: "plugins/demo",
-        displayCommand: expect.stringContaining("internal-runner.ts"),
+        displayCommand: expect.stringContaining("bun build"),
+        runDeclarations: true,
+      }),
+    ]);
+  });
+
+  test("can disable declaration execution in the build plan", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-build-plan-"));
+    const pkgDir = join(root, "plugins", "demo");
+    await mkdir(join(pkgDir, "src"), { recursive: true });
+    await writeFile(join(pkgDir, "package.json"), '{"name":"demo"}\n', "utf8");
+    await writeFile(join(pkgDir, "src", "index.ts"), "export const demo = 1;\n", "utf8");
+
+    const plan = await createBuildPlan({
+      declarationStrategy: "off",
+      provider: "bun",
+      targets: [{ cwd: pkgDir, label: "plugins/demo" }],
+    });
+
+    expect(plan.executionTargets).toEqual([
+      expect.objectContaining({
+        declarationStrategy: "off",
+        runDeclarations: false,
       }),
     ]);
   });
