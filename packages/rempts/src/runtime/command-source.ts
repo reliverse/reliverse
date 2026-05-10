@@ -7,6 +7,7 @@ import type {
 } from "../api/define-command";
 
 export interface DiscoveredSubcommand {
+  readonly aliases: readonly string[];
   readonly description?: string | undefined;
   readonly name: string;
 }

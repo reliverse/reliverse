@@ -228,6 +228,8 @@ export function renderHelpDocument(document: HelpDocument, colors?: HelpRenderCo
         document.subcommands.map((subcommand) => ({
           description: subcommand.description ?? "",
           name: subcommand.name,
+          note:
+            subcommand.aliases.length > 0 ? `aliases: ${subcommand.aliases.join(", ")}` : undefined,
         })),
         colors,
       ),

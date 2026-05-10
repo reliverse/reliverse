@@ -141,7 +141,10 @@ function formatCount(
 }
 
 function formatLabelRows(
-  rows: ReadonlyArray<{ readonly label: string; readonly detail?: string | undefined }>,
+  rows: ReadonlyArray<{
+    readonly label: string;
+    readonly detail?: string | undefined;
+  }>,
   colors: PreviewColors,
 ): string[] {
   if (rows.length === 0) {
@@ -250,7 +253,9 @@ async function readPublishDependencyResolutionContext(options: {
 
       const parentDir = resolve(workspaceRoot, pattern.slice(0, -2));
       try {
-        const entries = await readdir(parentDir, { withFileTypes: true });
+        const entries = await readdir(parentDir, {
+          withFileTypes: true,
+        });
         for (const entry of entries) {
           if (entry.isDirectory()) workspacePackageDirs.add(resolve(parentDir, entry.name));
         }
@@ -412,7 +417,10 @@ function formatPublishText(options: {
   readonly concurrency: number;
   readonly publishFrom: string;
   readonly results: readonly PublishTextResult[];
-  readonly skipped: readonly { readonly label: string; readonly reason: string }[];
+  readonly skipped: readonly {
+    readonly label: string;
+    readonly reason: string;
+  }[];
   readonly tag?: string | undefined;
   readonly totalDurationMs: number;
   readonly verbose: boolean;
@@ -503,6 +511,7 @@ function formatPublishText(options: {
 export default defineCommand({
   meta: {
     name: "pub",
+    aliases: ["publish"],
     description:
       "Publish selected workspace packages to npm using a staging directory that merges package metadata with prepared artifacts.",
   },
@@ -599,15 +608,19 @@ export default defineCommand({
     })();
 
     if (apply) {
-      const whoami = await runNpmWhoami({ env: ctx.env, registry: "https://registry.npmjs.org/" });
+      const whoami = await runNpmWhoami({
+        env: ctx.env,
+        registry: "https://registry.npmjs.org/",
+      });
       if (whoami.exitCode !== 0) {
         await invokeCommand(pubOnboardCommand, ctx, {
           name: "onboard",
+          options: { writeNpmrc: false },
           path: ["pub", "onboard"],
         });
         ctx.exit(
           1,
-          "npm whoami failed for https://registry.npmjs.org/. Complete dler pub onboard, then retry pub --apply.",
+          "npm whoami failed for https://registry.npmjs.org/. Complete rse pub onboard, then retry pub --apply.",
         );
       }
     }

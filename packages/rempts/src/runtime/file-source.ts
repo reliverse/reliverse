@@ -139,6 +139,7 @@ export function createFileCommandSource(resolvedEntry: ResolvedEntry): CommandSo
         : null;
 
       const subcommands: DiscoveredSubcommand[] = childMetadata.map((child) => ({
+        aliases: child.aliases,
         description: child.description,
         name: child.name,
       }));

@@ -9,7 +9,7 @@ describe("help JSON contract", () => {
   test("launcher help JSON includes explicit non-interactive default", () => {
     const globalFlags = getGlobalFlagDefinitions();
     const document = buildLauncherHelpDocument({
-      availableSubcommands: [{ description: "Example command", name: "example" }],
+      availableSubcommands: [{ aliases: [], description: "Example command", name: "example" }],
       commandPath: [],
       description: "Example automation-first CLI",
       examples: ["example-cli example --help"],
@@ -83,7 +83,9 @@ describe("help JSON contract", () => {
   test("launcher help JSON for nested scope carries explicit interaction policy", () => {
     const globalFlags = getGlobalFlagDefinitions();
     const document = buildLauncherHelpDocument({
-      availableSubcommands: [{ description: "Publish artifacts", name: "publish" }],
+      availableSubcommands: [
+        { aliases: ["pub"], description: "Publish artifacts", name: "publish" },
+      ],
       commandPath: ["dler"],
       description: "Builder scope",
       globalFlagDefinitions: globalFlags,
@@ -99,6 +101,7 @@ describe("help JSON contract", () => {
     ]);
     expect(serialized.interactive).toBe("tty");
     expect(serialized.subcommands[0]).toEqual({
+      aliases: ["pub"],
       description: "Publish artifacts",
       name: "publish",
     });

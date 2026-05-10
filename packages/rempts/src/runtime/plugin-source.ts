@@ -73,6 +73,7 @@ function toInlineCommandNode(
 function toInlineSubcommands(inlineNode: InlineCommandNode): DiscoveredSubcommand[] {
   return [...inlineNode.children.entries()]
     .map(([name, child]) => ({
+      aliases: child.command?.meta?.aliases ?? [],
       description: child.command?.meta?.description,
       name,
     }))

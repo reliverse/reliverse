@@ -187,10 +187,39 @@ type RejectReservedOptionKeys<TOptions extends CommandOptionsRecord> =
         readonly __remptsReservedOptionNames__: Extract<keyof TOptions, RemptsReservedOptionName>;
       };
 
+function normalizeCommandAliases(meta: CommandConfig["meta"]): string[] {
+  const seen = new Set<string>();
+  const aliases: string[] = [];
+  const commandName = meta?.name;
+
+  for (const rawAlias of meta?.aliases ?? []) {
+    const alias = rawAlias.trim();
+
+    if (alias.length === 0) {
+      throw new TypeError("Command aliases must not be empty.");
+    }
+
+    if (alias.startsWith("-") || /\s/.test(alias)) {
+      throw new TypeError(`Command alias "${alias}" must be a single command segment.`);
+    }
+
+    if (commandName && alias === commandName) {
+      throw new TypeError(`Command alias "${alias}" must not duplicate the command name.`);
+    }
+
+    if (!seen.has(alias)) {
+      seen.add(alias);
+      aliases.push(alias);
+    }
+  }
+
+  return aliases;
+}
+
 export function defineCommand<TOptions extends CommandOptionsRecord = EmptyCommandOptions>(
   config: CommandConfig<TOptions> & RejectReservedOptionKeys<TOptions>,
 ): CommandDefinition<TOptions> {
-  const aliases = config.meta?.aliases ? [...config.meta.aliases] : [];
+  const aliases = normalizeCommandAliases(config.meta);
   const examples = config.help?.examples ? [...config.help.examples] : [];
 
   return {

@@ -16,6 +16,7 @@ export interface HelpFlagItem {
 }
 
 export interface HelpSubcommandItem {
+  readonly aliases: readonly string[];
   readonly description?: string | undefined;
   readonly name: string;
 }
@@ -88,6 +89,7 @@ function toSubcommandItems(
   subcommands: readonly DiscoveredSubcommand[],
 ): readonly HelpSubcommandItem[] {
   return subcommands.map((subcommand) => ({
+    aliases: subcommand.aliases,
     description: subcommand.description,
     name: subcommand.name,
   }));

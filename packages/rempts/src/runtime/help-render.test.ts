@@ -37,7 +37,7 @@ describe("renderHelpDocument colors", () => {
         programName: "demo",
         scope: "launcher",
         scopeLabel: "Commands",
-        subcommands: [{ name: "ship" }],
+        subcommands: [{ aliases: [], name: "ship" }],
         usage: ["demo --help"],
       },
       {
@@ -64,13 +64,13 @@ describe("renderHelpDocument colors", () => {
       scope: "launcher",
       scopeLabel: "Commands",
       subcommands: [
-        { description: "Run the deploy flow", name: "deploy" },
-        { description: "Print diagnostics", name: "doctor" },
+        { aliases: ["ship"], description: "Run the deploy flow", name: "deploy" },
+        { aliases: [], description: "Print diagnostics", name: "doctor" },
       ],
       usage: ["demo <command>"],
     });
 
-    expect(text).toContain("deploy  Run the deploy flow");
+    expect(text).toContain("deploy  Run the deploy flow (aliases: ship)");
     expect(text).toContain("doctor  Print diagnostics");
     expect(text).toContain("-h, --help  Second flag");
   });
