@@ -17,6 +17,11 @@ export interface ReadNpmPublishedVersionOptions {
   readonly version: string;
 }
 
+export interface RunNpmWhoamiOptions {
+  readonly env: NodeJS.ProcessEnv;
+  readonly registry?: string | undefined;
+}
+
 async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Promise<string> {
   if (!stream) {
     return "";
@@ -50,6 +55,26 @@ export async function readNpmPublishedVersion(
   } catch {
     return stdout.trim().replace(/^"|"$/g, "") || undefined;
   }
+}
+
+export async function runNpmWhoami(options: RunNpmWhoamiOptions): Promise<RunNpmPublishResult> {
+  const args = ["whoami"];
+  if (options.registry) {
+    args.push(`--registry=${options.registry}`);
+  }
+
+  const child = Bun.spawn(["npm", ...args], {
+    env: options.env,
+    stderr: "pipe",
+    stdout: "pipe",
+  });
+  const [stdout, stderr, exitCode] = await Promise.all([
+    readProcessStream(child.stdout),
+    readProcessStream(child.stderr),
+    child.exited,
+  ]);
+
+  return { exitCode, stderr, stdout };
 }
 
 export async function runNpmPublish(options: RunNpmPublishOptions): Promise<RunNpmPublishResult> {

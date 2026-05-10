@@ -1,4 +1,5 @@
 export { createCLI, type CLIExecutionResult, type CreateCLIOptions } from "./api/create-cli";
+export { invokeCommand, type InvokeCommandOptions } from "./api/invoke-command";
 export {
   findHostPluginPackageRoot,
   inspectPluginsFromHostManifest,

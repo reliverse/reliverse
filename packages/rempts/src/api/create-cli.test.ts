@@ -115,6 +115,87 @@ describe("createCLI", () => {
     );
   });
 
+  test("unknown top-level plugin-name command suggests plugin-provided commands", async () => {
+    const root = await mkdtemp(join(tmpdir(), "rempts-plugin-name-hint-"));
+    const entryPath = join(root, "cli.ts");
+    const pluginRoot = join(root, "node_modules", "@example", "dler-rse-plugin");
+    await mkdir(join(pluginRoot, "cmds", "build"), { recursive: true });
+    await mkdir(join(pluginRoot, "cmds", "pub"), { recursive: true });
+    await writeFile(entryPath, "#!/usr/bin/env bun\n", "utf8");
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ devDependencies: { "@example/dler-rse-plugin": "1.0.0" } }),
+      "utf8",
+    );
+    await writeFile(
+      join(pluginRoot, "package.json"),
+      JSON.stringify({
+        name: "@example/dler-rse-plugin",
+        type: "module",
+        exports: "./index.ts",
+        dependencies: { "@reliverse/rempts": "1.0.0" },
+      }),
+      "utf8",
+    );
+    await writeFile(
+      join(pluginRoot, "index.ts"),
+      [
+        'import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+        "export default definePlugin({",
+        "  apiVersion: REMPTS_PLUGIN_API_VERSION,",
+        "  entry: import.meta.url,",
+        "  name: 'dler-rse-plugin',",
+        "});",
+      ].join("\n"),
+      "utf8",
+    );
+    const commandFile = [
+      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      "export default defineCommand({ async handler(ctx) { ctx.out('ok'); } });",
+    ].join("\n");
+    await writeFile(join(pluginRoot, "cmds", "build", "cmd.ts"), commandFile, "utf8");
+    await writeFile(join(pluginRoot, "cmds", "pub", "cmd.ts"), commandFile, "utf8");
+
+    const jsonStderr = createBufferStream();
+    const jsonResult = await createCLI({
+      argv: ["dler", "pub"],
+      cwd: root,
+      entry: entryPath,
+      meta: { name: "rse" },
+      outputMode: "json",
+      plugins: { allowedPatterns: ["@example/*-rse-plugin"] },
+      stdin: { isTTY: false } as never,
+      stdout: createBufferStream().stream as never,
+      stderr: jsonStderr.stream as never,
+    });
+
+    expect(jsonResult.ok).toBe(false);
+    expect(jsonResult.exitCode).toBe(1);
+    const error = JSON.parse(jsonStderr.text()) as { hint?: string; message?: string };
+    expect(error.message).toBe('Unknown command "dler".');
+    expect(error.hint).toBe(
+      'Plugin "dler-rse-plugin" is loaded, but "dler" is not a command namespace. Maybe you meant: rse pub?',
+    );
+
+    const textStderr = createBufferStream();
+    const textResult = await createCLI({
+      argv: ["dler", "pub"],
+      cwd: root,
+      entry: entryPath,
+      meta: { name: "rse" },
+      plugins: { allowedPatterns: ["@example/*-rse-plugin"] },
+      stdin: { isTTY: false } as never,
+      stdout: createBufferStream().stream as never,
+      stderr: textStderr.stream as never,
+    });
+
+    expect(textResult.ok).toBe(false);
+    expect(textResult.exitCode).toBe(1);
+    expect(textStderr.text()).toContain('Hint: Plugin "dler-rse-plugin" is loaded');
+    expect(textStderr.text()).not.toContain("Usage");
+    expect(textStderr.text()).not.toContain("Commands");
+  });
+
   test("rejects plugin discovery config when allowedPatterns is empty", async () => {
     const root = await mkdtemp(join(tmpdir(), "rempts-empty-cli-"));
     const entryPath = join(root, "cli.ts");

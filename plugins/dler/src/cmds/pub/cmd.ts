@@ -1,7 +1,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 
-import { defineCommand } from "@reliverse/rempts";
+import { defineCommand, invokeCommand } from "@reliverse/rempts";
 
 import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
 import {
@@ -13,7 +13,7 @@ import {
 } from "../../impl/constants";
 import { runNpmPackDryRun } from "../../impl/pub/npm-pack";
 import type { NpmPackPreview } from "../../impl/pub/npm-pack";
-import { readNpmPublishedVersion, runNpmPublish } from "../../impl/pub/npm-publish";
+import { readNpmPublishedVersion, runNpmPublish, runNpmWhoami } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
 import { syncPackageJsonVersion } from "../../impl/pub/source-version";
 import { createPublishStaging } from "../../impl/pub/staging";
@@ -27,6 +27,7 @@ import { createPublishExecutedTargets, createTargetSets } from "../../impl/repor
 import { createPublishSummary, createPublishSummaryFromResults } from "../../impl/result-contract";
 import { readOptionalRseConfig } from "../../impl/rse-config";
 import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
+import pubOnboardCommand from "./onboard/cmd";
 
 type PreviewStyle = (value: unknown) => string;
 
@@ -581,6 +582,8 @@ export default defineCommand({
         return ctx.exit(1, message);
       }
     })();
+    const apply = ctx.safety.apply;
+    const preview = !apply;
     const rawTargets = await (async () => {
       const cliTargets = ctx.options.targets?.trim();
       if (cliTargets) return cliTargets;
@@ -594,6 +597,20 @@ export default defineCommand({
         return ctx.exit(1, `Failed to read optional rse.config.json: ${message}`);
       }
     })();
+
+    if (apply) {
+      const whoami = await runNpmWhoami({ env: ctx.env, registry: "https://registry.npmjs.org/" });
+      if (whoami.exitCode !== 0) {
+        await invokeCommand(pubOnboardCommand, ctx, {
+          name: "onboard",
+          path: ["pub", "onboard"],
+        });
+        ctx.exit(
+          1,
+          "npm whoami failed for https://registry.npmjs.org/. Complete dler pub onboard, then retry pub --apply.",
+        );
+      }
+    }
 
     const requestedTargets = await resolveRequestedTargets({
       cwd: ctx.cwd,
@@ -617,8 +634,6 @@ export default defineCommand({
       ctx.exit(1, "Invalid --publish-from: use a relative path without .. segments.");
     }
 
-    const apply = ctx.safety.apply;
-    const preview = !apply;
     const startedAt = performance.now();
     const validation = await resolvePublishableTargets({
       bundleStrategy,

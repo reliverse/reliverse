@@ -2,6 +2,7 @@ import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "@reliverse/rempts";
 
 import buildCommand from "./cmds/build/cmd";
 import pubCommand from "./cmds/pub/cmd";
+import pubOnboardCommand from "./cmds/pub/onboard/cmd";
 
 export default definePlugin({
   apiVersion: REMPTS_PLUGIN_API_VERSION,
@@ -9,6 +10,7 @@ export default definePlugin({
   commands: [
     { path: ["build"], command: buildCommand },
     { path: ["pub"], command: pubCommand },
+    { path: ["pub", "onboard"], command: pubOnboardCommand },
   ],
   config: {
     defaults: {
