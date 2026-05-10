@@ -1,6 +1,7 @@
-import { defineCommand } from "@reliverse/rempts";
 import { readdir, readFile } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
+
+import { defineCommand } from "@reliverse/rempts";
 
 import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
 import {
@@ -14,8 +15,8 @@ import { runNpmPackDryRun } from "../../impl/pub/npm-pack";
 import type { NpmPackPreview } from "../../impl/pub/npm-pack";
 import { runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
-import { createPublishStaging } from "../../impl/pub/staging";
 import { syncPackageJsonVersion } from "../../impl/pub/source-version";
+import { createPublishStaging } from "../../impl/pub/staging";
 import { resolvePublishableTargets } from "../../impl/pub/validation";
 import type { PublishBundleStrategy } from "../../impl/pub/validation";
 import {
@@ -73,7 +74,10 @@ function isPackedTypeDeclaration(path: string): boolean {
 }
 
 function isPackedSourceFile(path: string): boolean {
-  return packedSourceFileExtensions.some((extension) => path.endsWith(extension)) && !isPackedTypeDeclaration(path);
+  return (
+    packedSourceFileExtensions.some((extension) => path.endsWith(extension)) &&
+    !isPackedTypeDeclaration(path)
+  );
 }
 
 function validatePackPolicy(options: {
@@ -89,7 +93,11 @@ function validatePackPolicy(options: {
     violations.push("missing package.json");
   }
 
-  if (!files.some((path) => path === normalizedPublishFrom || path.startsWith(`${normalizedPublishFrom}/`))) {
+  if (
+    !files.some(
+      (path) => path === normalizedPublishFrom || path.startsWith(`${normalizedPublishFrom}/`),
+    )
+  ) {
     violations.push(`missing ${normalizedPublishFrom}/ artifacts`);
   }
 
@@ -98,12 +106,16 @@ function validatePackPolicy(options: {
     violations.push(`source files included: ${sourceFiles.slice(0, 5).join(", ")}`);
   }
 
-  const sourceMaps = files.filter((path) => packedSourceMapExtensions.some((extension) => path.endsWith(extension)));
+  const sourceMaps = files.filter((path) =>
+    packedSourceMapExtensions.some((extension) => path.endsWith(extension)),
+  );
   if (sourceMaps.length > 0) {
     violations.push(`source maps included: ${sourceMaps.slice(0, 5).join(", ")}`);
   }
 
-  const testFiles = files.filter((path) => packedTestSegments.some((segment) => path.includes(segment)));
+  const testFiles = files.filter((path) =>
+    packedTestSegments.some((segment) => path.includes(segment)),
+  );
   if (testFiles.length > 0) {
     violations.push(`test/fixture files included: ${testFiles.slice(0, 5).join(", ")}`);
   }
@@ -112,9 +124,7 @@ function validatePackPolicy(options: {
     violations.push(`missing ${normalizedPublishFrom}/index.js for single-bundle publish`);
   }
 
-  return violations.length > 0
-    ? `pack policy violations: ${violations.join("; ")}`
-    : undefined;
+  return violations.length > 0 ? `pack policy violations: ${violations.join("; ")}` : undefined;
 }
 
 function formatCount(
@@ -222,9 +232,8 @@ async function readPublishDependencyResolutionContext(options: {
       await readFile(resolve(workspaceRoot, "package.json"), "utf8"),
     ) as Record<string, unknown>;
     const workspaces = rootPackageJson.workspaces;
-    const catalogRecord = isRecord(workspaces) && isRecord(workspaces.catalog)
-      ? workspaces.catalog
-      : undefined;
+    const catalogRecord =
+      isRecord(workspaces) && isRecord(workspaces.catalog) ? workspaces.catalog : undefined;
 
     if (catalogRecord) {
       for (const [name, version] of Object.entries(catalogRecord)) {
@@ -232,9 +241,8 @@ async function readPublishDependencyResolutionContext(options: {
       }
     }
 
-    const packagePatterns = isRecord(workspaces) && Array.isArray(workspaces.packages)
-      ? workspaces.packages
-      : [];
+    const packagePatterns =
+      isRecord(workspaces) && Array.isArray(workspaces.packages) ? workspaces.packages : [];
     for (const pattern of packagePatterns) {
       if (typeof pattern !== "string" || !pattern.endsWith("/*")) continue;
 
@@ -255,10 +263,9 @@ async function readPublishDependencyResolutionContext(options: {
   await Promise.all(
     [...workspacePackageDirs].map(async (packageDir) => {
       try {
-        const pkg = JSON.parse(await readFile(resolve(packageDir, "package.json"), "utf8")) as Record<
-          string,
-          unknown
-        >;
+        const pkg = JSON.parse(
+          await readFile(resolve(packageDir, "package.json"), "utf8"),
+        ) as Record<string, unknown>;
         if (typeof pkg.name === "string" && typeof pkg.version === "string") {
           workspaceVersions.set(pkg.name, pkg.version);
         }
@@ -298,7 +305,10 @@ function nextPatchVersion(version: string): string | undefined {
   return `${parsed[0]}.${parsed[1]}.${parsed[2] + 1}`;
 }
 
-async function readNpmLatestVersion(packageName: string, env: NodeJS.ProcessEnv): Promise<string | undefined> {
+async function readNpmLatestVersion(
+  packageName: string,
+  env: NodeJS.ProcessEnv,
+): Promise<string | undefined> {
   const processHandle = Bun.spawn(["npm", "view", packageName, "version", "--json"], {
     env,
     stderr: "pipe",
@@ -322,15 +332,17 @@ async function readNpmLatestVersion(packageName: string, env: NodeJS.ProcessEnv)
 async function resolvePublishVersions(options: {
   readonly env: NodeJS.ProcessEnv;
   readonly latestTag: boolean;
-  readonly targets: readonly { readonly packageName: string; readonly packageRecord: Record<string, unknown> }[];
+  readonly targets: readonly {
+    readonly packageName: string;
+    readonly packageRecord: Record<string, unknown>;
+  }[];
 }): Promise<ReadonlyMap<string, string>> {
   const versions = new Map<string, string>();
 
   await Promise.all(
     options.targets.map(async (target) => {
-      const sourceVersion = typeof target.packageRecord.version === "string"
-        ? target.packageRecord.version
-        : undefined;
+      const sourceVersion =
+        typeof target.packageRecord.version === "string" ? target.packageRecord.version : undefined;
       if (!sourceVersion) return;
 
       if (!options.latestTag) {
@@ -377,7 +389,9 @@ function pushPackOutput(lines: string[], colors: PreviewColors, result: PublishT
   );
 
   for (const file of result.pack.files.slice(0, 20)) {
-    lines.push(`     ${colors.gray(file.path)}${typeof file.size === "number" ? colors.gray(` ${formatBytes(file.size)}`) : ""}`);
+    lines.push(
+      `     ${colors.gray(file.path)}${typeof file.size === "number" ? colors.gray(` ${formatBytes(file.size)}`) : ""}`,
+    );
   }
 
   if (result.pack.files.length > 20) {
@@ -629,9 +643,10 @@ export default defineCommand({
       async (target) => {
         const label = target.label;
         const packageRoot = target.cwd;
-        const sourceVersion = typeof target.packageRecord.version === "string"
-          ? target.packageRecord.version
-          : undefined;
+        const sourceVersion =
+          typeof target.packageRecord.version === "string"
+            ? target.packageRecord.version
+            : undefined;
         const publishVersion = publishVersions.get(target.packageName) ?? sourceVersion;
         const pkgRecord = normalizePublishDependencySpecifiers(
           {
@@ -688,7 +703,9 @@ export default defineCommand({
             );
           }
           if (!packPreview) {
-            throw new Error(`npm pack dry-run did not return parseable tarball metadata for ${label}.`);
+            throw new Error(
+              `npm pack dry-run did not return parseable tarball metadata for ${label}.`,
+            );
           }
 
           const packPolicyReason = validatePackPolicy({

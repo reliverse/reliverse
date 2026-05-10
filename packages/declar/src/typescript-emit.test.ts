@@ -390,10 +390,7 @@ describe("emitTypeScriptDeclarations", () => {
     const packageDir = await createFixturePackage();
 
     try {
-      await writeFile(
-        join(packageDir, "src", "index.ts"),
-        "export const value: number = 1;\n",
-      );
+      await writeFile(join(packageDir, "src", "index.ts"), "export const value: number = 1;\n");
 
       const result = await emitTypeScriptDeclarations({
         compiler: ts,
@@ -448,8 +445,9 @@ describe("emitTypeScriptDeclarations", () => {
       });
 
       expect(result.emitSkipped).toBe(false);
-      expect(result.diagnostics.every((diagnostic) => diagnostic.code === "DECLAR_FAST_PATH_USED"))
-        .toBe(true);
+      expect(
+        result.diagnostics.every((diagnostic) => diagnostic.code === "DECLAR_FAST_PATH_USED"),
+      ).toBe(true);
       expect(result.emittedFiles).toEqual([
         join(packageDir, "dist", "index.d.mts"),
         join(packageDir, "dist", "index.d.cts"),

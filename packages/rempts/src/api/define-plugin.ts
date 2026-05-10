@@ -1,8 +1,8 @@
 import type { CommandOptionsRecord } from "@reliverse/parser";
 
-import type { CommandDefinition } from "./define-command";
 import { RemptsUsageError } from "../runtime/errors";
 import { resolveEntry } from "../runtime/resolve-entry";
+import type { CommandDefinition } from "./define-command";
 
 export const REMPTS_PLUGIN_API_VERSION = 1;
 

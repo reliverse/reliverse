@@ -1,6 +1,11 @@
-import type { RemptsPlugin } from "../api/define-plugin";
 import type { CommandDefinition } from "../api/define-command";
-import type { CommandNode, CommandSource, CommandSourceScope, DiscoveredSubcommand } from "./command-source";
+import type { RemptsPlugin } from "../api/define-plugin";
+import type {
+  CommandNode,
+  CommandSource,
+  CommandSourceScope,
+  DiscoveredSubcommand,
+} from "./command-source";
 import { createFileCommandSource } from "./file-source";
 import { resolveEntry } from "./resolve-entry";
 
@@ -81,9 +86,10 @@ function createInlinePluginCommandSource(plugin: RemptsPlugin): CommandSource {
     id: plugin.name,
     async getScope(path): Promise<CommandSourceScope | null> {
       const inlineNode = getInlineNode(root, path);
-      if (!inlineNode) return path.length === 0
-        ? { node: null, resolveSegment: async () => null, subcommands: [] }
-        : null;
+      if (!inlineNode)
+        return path.length === 0
+          ? { node: null, resolveSegment: async () => null, subcommands: [] }
+          : null;
 
       const childNames = new Set(inlineNode.children.keys());
       const aliasesBySegment = new Map<string, string>();
@@ -95,7 +101,8 @@ function createInlinePluginCommandSource(plugin: RemptsPlugin): CommandSource {
       }
 
       return {
-        node: toInlineCommandNode(plugin, path, inlineNode) ?? getSyntheticTopLevelNode(plugin, path),
+        node:
+          toInlineCommandNode(plugin, path, inlineNode) ?? getSyntheticTopLevelNode(plugin, path),
         async resolveSegment(segment) {
           if (childNames.has(segment)) return segment;
           return aliasesBySegment.get(segment) ?? null;

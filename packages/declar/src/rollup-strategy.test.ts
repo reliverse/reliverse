@@ -14,9 +14,7 @@ const rootEntrypoint: DeclarEntrypoint = {
 
 describe("assessDeclarDeclarationRollupStrategy", () => {
   test("keeps declarations unbundled by default", () => {
-    expect(
-      assessDeclarDeclarationRollupStrategy({ entrypoints: [rootEntrypoint] }),
-    ).toEqual({
+    expect(assessDeclarDeclarationRollupStrategy({ entrypoints: [rootEntrypoint] })).toEqual({
       recommendation: "keep-unbundled-declarations",
       risks: [],
       summary:

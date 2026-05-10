@@ -22,6 +22,9 @@
       "import": "./src/cli.ts"
     }
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "scripts": {
     "relpack": "bun src/cli.ts"
   },
@@ -32,8 +35,5 @@
     "@repo/tsconfig": "workspace:*",
     "@types/bun": "catalog:",
     "@typescript/native-preview": "catalog:"
-  },
-  "publishConfig": {
-    "access": "public"
   }
 }

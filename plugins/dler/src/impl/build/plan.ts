@@ -51,7 +51,9 @@ export async function createBuildPlan(options: {
   }));
 
   return {
-    executionTargets: plannedTargets.map((target) => toExecutionTarget(target, declarationStrategy)),
+    executionTargets: plannedTargets.map((target) =>
+      toExecutionTarget(target, declarationStrategy),
+    ),
     plannedTargets,
     provider: options.provider,
     skippedTargets: validation.skipped,

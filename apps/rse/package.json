@@ -7,6 +7,9 @@
     "rse": "./src/cli.ts"
   },
   "type": "module",
+  "sideEffects": [
+    "./src/cli.ts"
+  ],
   "types": "./src/cli.ts",
   "exports": {
     ".": {
@@ -14,9 +17,6 @@
       "import": "./src/cli.ts"
     }
   },
-  "sideEffects": [
-    "./src/cli.ts"
-  ],
   "publishConfig": {
     "access": "public"
   },

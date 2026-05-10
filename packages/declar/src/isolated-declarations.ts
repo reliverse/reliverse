@@ -301,7 +301,11 @@ export async function emitIsolatedTypeScriptDeclarations(
   const diagnostics: DeclarDiagnostic[] = [];
   const emittedFiles: string[] = [];
   const skippedFiles: string[] = [];
-  const pendingOutputs: { readonly path: string; readonly sourceMapText?: string; readonly text: string }[] = [];
+  const pendingOutputs: {
+    readonly path: string;
+    readonly sourceMapText?: string;
+    readonly text: string;
+  }[] = [];
   const transpileDeclaration = options.compiler.transpileDeclaration;
 
   if (!transpileDeclaration) {

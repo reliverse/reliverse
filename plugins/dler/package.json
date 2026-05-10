@@ -18,14 +18,14 @@
   "publishConfig": {
     "access": "public"
   },
+  "scripts": {
+    "typecheck": "tsgo --noEmit"
+  },
   "dependencies": {
     "@reliverse/declar": "workspace:*",
     "@reliverse/rempts": "workspace:*",
     "jsonc-parser": "catalog:",
     "typescript": "catalog:"
-  },
-  "scripts": {
-    "typecheck": "tsgo --noEmit"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

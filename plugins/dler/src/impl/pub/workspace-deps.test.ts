@@ -1,6 +1,9 @@
 import { describe, expect, test } from "bun:test";
 
-import { findUnsafeDependencySpecifiers, normalizePublishDependencySpecifiers } from "./workspace-deps";
+import {
+  findUnsafeDependencySpecifiers,
+  normalizePublishDependencySpecifiers,
+} from "./workspace-deps";
 
 describe("publish workspace dependency detection", () => {
   test("finds unsafe runtime publish specifiers and ignores devDependencies", () => {

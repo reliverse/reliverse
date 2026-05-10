@@ -28,7 +28,8 @@ function hasPatternEntrypoints(entrypoints: readonly DeclarEntrypoint[]): boolea
 
 function hasSplitImportRequireTypes(entrypoints: readonly DeclarEntrypoint[]): boolean {
   return entrypoints.some(
-    (entrypoint) => entrypoint.importTypesPath !== undefined || entrypoint.requireTypesPath !== undefined,
+    (entrypoint) =>
+      entrypoint.importTypesPath !== undefined || entrypoint.requireTypesPath !== undefined,
   );
 }
 

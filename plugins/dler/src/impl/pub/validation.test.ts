@@ -133,13 +133,21 @@ describe("publish validation", () => {
     );
 
     await writeFile(join(sourceTypesDir, "tsconfig.json"), "{}\n", "utf8");
-    await writeFile(join(sourceTypesDir, "src", "index.ts"), "export const sourceTyped = 1;\n", "utf8");
+    await writeFile(
+      join(sourceTypesDir, "src", "index.ts"),
+      "export const sourceTyped = 1;\n",
+      "utf8",
+    );
     await writeFile(
       join(sourceTypesDir, "dist", "index.d.ts"),
       "export declare const sourceTyped = 1;\n",
       "utf8",
     );
-    await writeFile(join(sourceTypesDir, "dist", "index.js"), "export const sourceTyped = 1;\n", "utf8");
+    await writeFile(
+      join(sourceTypesDir, "dist", "index.js"),
+      "export const sourceTyped = 1;\n",
+      "utf8",
+    );
     await writeFile(
       join(sourceTypesDir, "package.json"),
       JSON.stringify({
@@ -227,7 +235,11 @@ describe("publish validation", () => {
       }),
       "utf8",
     );
-    await writeFile(join(brokenDir, "dist", "index.d.ts"), "export declare const broken = 1;\n", "utf8");
+    await writeFile(
+      join(brokenDir, "dist", "index.d.ts"),
+      "export declare const broken = 1;\n",
+      "utf8",
+    );
 
     const result = await resolvePublishableTargets({
       publishFrom: "dist",
@@ -256,7 +268,11 @@ describe("publish validation", () => {
     await writeFile(join(pkgDir, "tsconfig.json"), "{}\n", "utf8");
     await writeFile(join(pkgDir, "src", "index.ts"), "export const single = 1;\n", "utf8");
     await writeFile(join(pkgDir, "dist", "index.js"), "export const single = 1;\n", "utf8");
-    await writeFile(join(pkgDir, "dist", "index.d.ts"), "export declare const single = 1;\n", "utf8");
+    await writeFile(
+      join(pkgDir, "dist", "index.d.ts"),
+      "export declare const single = 1;\n",
+      "utf8",
+    );
     await writeFile(
       join(pkgDir, "package.json"),
       JSON.stringify({

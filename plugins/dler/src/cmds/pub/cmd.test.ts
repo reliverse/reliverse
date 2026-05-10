@@ -352,7 +352,8 @@ describe("dler pub command", () => {
         },
       ],
     });
-    const reason = (resultCalls[0]?.value as { skipped?: Array<{ reason: string }> }).skipped?.[0]?.reason;
+    const reason = (resultCalls[0]?.value as { skipped?: Array<{ reason: string }> }).skipped?.[0]
+      ?.reason;
     expect(reason).toContain("source files included: src/index.ts");
     expect(reason).toContain("source maps included: dist/index.js.map");
     expect(reason).toContain("test/fixture files included: tests/index.test.js");

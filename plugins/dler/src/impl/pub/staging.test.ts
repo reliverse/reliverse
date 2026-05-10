@@ -64,10 +64,12 @@ describe("publish staging", () => {
       await expect(readFile(join(staging.stagingDir, "dist", "index.d.ts"), "utf8")).resolves.toBe(
         "export {};\n",
       );
-      await expect(readFile(join(staging.stagingDir, "dist", "index.test.js"), "utf8")).resolves.toBe(
-        "export {};\n",
-      );
-      await expect(readFile(join(staging.stagingDir, "dist", "index.test.d.ts"), "utf8")).rejects.toThrow();
+      await expect(
+        readFile(join(staging.stagingDir, "dist", "index.test.js"), "utf8"),
+      ).resolves.toBe("export {};\n");
+      await expect(
+        readFile(join(staging.stagingDir, "dist", "index.test.d.ts"), "utf8"),
+      ).rejects.toThrow();
       await expect(
         readFile(join(staging.stagingDir, "dist", "nested", "cli.spec.d.mts"), "utf8"),
       ).rejects.toThrow();

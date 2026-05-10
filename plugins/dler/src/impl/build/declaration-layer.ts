@@ -35,18 +35,25 @@ const ignoredDeclarationSourceSegments = [".test.", ".spec.", ".bench.", ".fixtu
 
 async function readPackageJson(cwd: string): Promise<DlerDeclarationPackageJson | undefined> {
   try {
-    return JSON.parse(await readFile(join(cwd, "package.json"), "utf8")) as DlerDeclarationPackageJson;
+    return JSON.parse(
+      await readFile(join(cwd, "package.json"), "utf8"),
+    ) as DlerDeclarationPackageJson;
   } catch {
     return undefined;
   }
 }
 
 function isSourceEntrypoint(value: string): boolean {
-  return sourceExtensions.some((extension) => value.endsWith(extension)) && !value.endsWith(".d.ts");
+  return (
+    sourceExtensions.some((extension) => value.endsWith(extension)) && !value.endsWith(".d.ts")
+  );
 }
 
 function isDeclarationSourceFile(value: string): boolean {
-  return isSourceEntrypoint(value) && !ignoredDeclarationSourceSegments.some((segment) => value.includes(segment));
+  return (
+    isSourceEntrypoint(value) &&
+    !ignoredDeclarationSourceSegments.some((segment) => value.includes(segment))
+  );
 }
 
 function normalizePackagePath(value: string): string {
@@ -119,7 +126,9 @@ function createDeclarExportValue(value: unknown): unknown {
   };
 }
 
-function createDeclarPackagePlan(pkg: DlerDeclarationPackageJson): DlerDeclarPackagePlan | undefined {
+function createDeclarPackagePlan(
+  pkg: DlerDeclarationPackageJson,
+): DlerDeclarPackagePlan | undefined {
   if (!pkg.exports || typeof pkg.exports !== "object") {
     return undefined;
   }
@@ -146,7 +155,10 @@ function createDeclarPackagePlan(pkg: DlerDeclarationPackageJson): DlerDeclarPac
     packageJson: {
       name: pkg.name,
       type: "module",
-      types: pkg.types && isDeclarationSourceFile(pkg.types) ? toDeclarationOutputPath(pkg.types) : pkg.types,
+      types:
+        pkg.types && isDeclarationSourceFile(pkg.types)
+          ? toDeclarationOutputPath(pkg.types)
+          : pkg.types,
       exports: exportsValue,
     },
     sourceEntrypoints: [...sourceEntrypoints],
@@ -187,7 +199,10 @@ function formatDiagnostic(diagnostic: DeclarDiagnostic): string {
   return `${diagnostic.severity} ${diagnostic.code}: ${diagnostic.message}`;
 }
 
-function toSourceFiles(packageDir: string, sourceEntrypoints: readonly string[]): readonly string[] {
+function toSourceFiles(
+  packageDir: string,
+  sourceEntrypoints: readonly string[],
+): readonly string[] {
   return sourceEntrypoints.map((entrypoint) => resolve(packageDir, entrypoint));
 }
 
@@ -202,7 +217,12 @@ export async function runDeclarDeclarationLayer(
   const declarationStrategy = options.declarationStrategy ?? "emit";
 
   if (declarationStrategy === "off") {
-    return { diagnostics: [], emittedFiles: [], ok: true, skippedReason: "declaration strategy off" };
+    return {
+      diagnostics: [],
+      emittedFiles: [],
+      ok: true,
+      skippedReason: "declaration strategy off",
+    };
   }
 
   if (!(await fileExists(join(target.cwd, "tsconfig.json")))) {
@@ -214,7 +234,8 @@ export async function runDeclarDeclarationLayer(
     return { diagnostics: [], emittedFiles: [], ok: true, skippedReason: "missing package.json" };
   }
 
-  const declarPlan = createDeclarPackagePlan(packageJson) ?? (await ensureDefaultPackagePlan(target.cwd));
+  const declarPlan =
+    createDeclarPackagePlan(packageJson) ?? (await ensureDefaultPackagePlan(target.cwd));
 
   if (!declarPlan) {
     return {
@@ -238,7 +259,9 @@ export async function runDeclarDeclarationLayer(
     rootDir: await resolveDefaultRootDir(target.cwd),
     updatePackageJson: false,
   });
-  const ok = !result.emitSkipped && result.diagnostics.every((diagnostic) => diagnostic.severity !== "error");
+  const ok =
+    !result.emitSkipped &&
+    result.diagnostics.every((diagnostic) => diagnostic.severity !== "error");
 
   return {
     diagnostics: result.diagnostics,

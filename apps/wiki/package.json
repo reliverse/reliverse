@@ -16,24 +16,24 @@
   "dependencies": {
     "@repo/ui": "workspace:*",
     "fumadocs-core": "17.0.0",
-    "fumadocs-mdx": "14.3.2",
+    "fumadocs-mdx": "15.0.2",
     "fumadocs-ui": "17.0.0",
     "lucide-react": "^1.14.0",
-    "next": "16.2.4",
+    "next": "16.2.6",
     "react": "catalog:",
     "react-dom": "catalog:",
-    "tailwind-merge": "^3.5.0"
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
-    "@tailwindcss/postcss": "^4.2.4",
+    "@tailwindcss/postcss": "^4.3.0",
     "@types/bun": "catalog:",
     "@types/mdx": "^2.0.13",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.6.2",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
     "@typescript/native-preview": "catalog:",
-    "postcss": "^8.5.13",
-    "tailwindcss": "^4.2.4",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^4.3.0",
     "typescript": "catalog:"
   }
 }

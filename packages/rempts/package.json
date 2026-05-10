@@ -19,8 +19,8 @@
     "access": "public"
   },
   "dependencies": {
-    "@reliverse/reenv": "workspace:*",
     "@reliverse/parser": "workspace:*",
+    "@reliverse/reenv": "workspace:*",
     "@reliverse/relico": "workspace:*",
     "p-map": "catalog:",
     "valibot": "catalog:"

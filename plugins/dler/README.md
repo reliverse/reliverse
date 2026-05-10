@@ -49,7 +49,6 @@ Current command policy:
 - prefer preview-first behavior when operating release flows
 - keep help and result output automation-friendly and symmetric across `build` and `pub`
 
-
 ## Build strategy contract
 
 `rse build` is preview-first. Pass `--apply` to run the generated build plan.
@@ -104,17 +103,16 @@ Verbose text output shows a compact tarball preview. JSON output includes `publi
 
 Use this matrix when touching build, Declar, staging, or publish behavior.
 
-| Area | Command | Expected signal |
-| --- | --- | --- |
-| Build preview contract | `bun test plugins/dler/src/cmds/build/cmd.test.ts` | JSON/text preview shape stays stable |
-| Build plan/provider/declarations | `bun test plugins/dler/src/impl/build` | build command planning and Declar layer still pass |
-| Publish validation/staging/pack | `bun test plugins/dler/src/impl/pub plugins/dler/src/cmds/pub/cmd.test.ts` | metadata rewrite, staging, pack preview, and pack policy pass |
-| Plugin command discovery | `bun test packages/rempts/src/runtime/discover-command.test.ts packages/rempts/src/api/define-plugin.test.ts` | inline plugin commands still resolve after bundling |
-| dler typecheck | `bun run --cwd plugins/dler typecheck` | TypeScript contract is clean |
-| dler bundle smoke | `bun build plugins/dler/src/index.ts --outfile /tmp/dler-bundle-check/index.js --target bun --external @reliverse/rempts --external typescript` | plugin bundles into one entrypoint without embedding the host API or TypeScript compiler |
+| Area                             | Command                                                                                                                                         | Expected signal                                                                          |
+| -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| Build preview contract           | `bun test plugins/dler/src/cmds/build/cmd.test.ts`                                                                                              | JSON/text preview shape stays stable                                                     |
+| Build plan/provider/declarations | `bun test plugins/dler/src/impl/build`                                                                                                          | build command planning and Declar layer still pass                                       |
+| Publish validation/staging/pack  | `bun test plugins/dler/src/impl/pub plugins/dler/src/cmds/pub/cmd.test.ts`                                                                      | metadata rewrite, staging, pack preview, and pack policy pass                            |
+| Plugin command discovery         | `bun test packages/rempts/src/runtime/discover-command.test.ts packages/rempts/src/api/define-plugin.test.ts`                                   | inline plugin commands still resolve after bundling                                      |
+| dler typecheck                   | `bun run --cwd plugins/dler typecheck`                                                                                                          | TypeScript contract is clean                                                             |
+| dler bundle smoke                | `bun build plugins/dler/src/index.ts --outfile /tmp/dler-bundle-check/index.js --target bun --external @reliverse/rempts --external typescript` | plugin bundles into one entrypoint without embedding the host API or TypeScript compiler |
 
 For the bundle smoke, also verify the output does not contain the removed `internal-runner` path, does not contain a bundled `typescript/lib/typescript` compiler payload, and does contain the relevant command contract text for the feature being changed.
-
 
 ## Release checklist
 

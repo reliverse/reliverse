@@ -20,12 +20,7 @@ export const DLER_BUILD_DEFAULTS = {
 
 export const DLER_BUILD_BUNDLE_STRATEGIES = ["auto", "single", "split"] as const;
 
-export const DLER_BUILD_DECLARATION_STRATEGIES = [
-  "emit",
-  "fast",
-  "off",
-  "rollup",
-] as const;
+export const DLER_BUILD_DECLARATION_STRATEGIES = ["emit", "fast", "off", "rollup"] as const;
 
 export const DLER_PUBLISH_DEFAULTS = {
   publishFrom: "dist",

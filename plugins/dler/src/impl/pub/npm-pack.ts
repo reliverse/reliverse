@@ -45,11 +45,13 @@ function parsePackPreview(stdout: string): NpmPackPreview | undefined {
     ? first.files.flatMap((file): NpmPackFile[] => {
         if (!isRecord(file) || typeof file.path !== "string") return [];
 
-        return [{
-          mode: typeof file.mode === "number" ? file.mode : undefined,
-          path: file.path,
-          size: typeof file.size === "number" ? file.size : undefined,
-        }];
+        return [
+          {
+            mode: typeof file.mode === "number" ? file.mode : undefined,
+            path: file.path,
+            size: typeof file.size === "number" ? file.size : undefined,
+          },
+        ];
       })
     : [];
 

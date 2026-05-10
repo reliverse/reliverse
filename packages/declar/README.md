@@ -179,7 +179,6 @@ Fast-path diagnostics are structured and user-facing:
 
 Fast mode is **opt-in experimental complete** for M3. It is suitable for simple isolated packages, but TypeScript remains the correctness baseline.
 
-
 ## dler integration strategy contract
 
 `dler build` exposes Declar through a small declaration strategy contract:
