@@ -1,6 +1,6 @@
 {
-  "name": "@reliverse/rempts",
-  "version": "2.3.5",
+  "name": "@reliverse/config-rse-plugin",
+  "version": "0.1.0",
   "private": false,
   "files": [
     "dist",
@@ -22,11 +22,8 @@
     "typecheck": "tsgo --noEmit"
   },
   "dependencies": {
-    "@reliverse/parser": "workspace:*",
-    "@reliverse/reenv": "workspace:*",
-    "@reliverse/relico": "workspace:*",
-    "p-map": "catalog:",
-    "valibot": "catalog:"
+    "@reliverse/rempts": "workspace:*",
+    "jsonc-parser": "catalog:"
   },
   "devDependencies": {
     "@repo/tsconfig": "workspace:*",

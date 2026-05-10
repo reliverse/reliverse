@@ -6,10 +6,20 @@ import type { CommandDefinition } from "./define-command";
 
 export const REMPTS_PLUGIN_API_VERSION = 1;
 
+export type RemptsJsonSchema = boolean | { readonly [key: string]: unknown };
+
+export interface RemptsPluginConfigContribution {
+  /** JSON Schema fragment merged into the root Rse config schema. */
+  readonly schema?: RemptsJsonSchema | undefined;
+  /** Optional default values used by config generators. */
+  readonly defaults?: Record<string, unknown> | undefined;
+}
+
 export interface RemptsPlugin {
   readonly apiVersion: typeof REMPTS_PLUGIN_API_VERSION;
   readonly capabilities?: readonly string[] | undefined;
   readonly commands?: readonly RemptsPluginCommand[] | undefined;
+  readonly config?: RemptsPluginConfigContribution | undefined;
   readonly description?: string | undefined;
   readonly entry: string;
   readonly name: string;
@@ -60,6 +70,12 @@ export function definePlugin(plugin: RemptsPlugin): RemptsPlugin {
     capabilities: plugin.capabilities ? [...plugin.capabilities] : undefined,
     commands: plugin.commands
       ? plugin.commands.map((command) => ({ command: command.command, path: [...command.path] }))
+      : undefined,
+    config: plugin.config
+      ? {
+          defaults: plugin.config.defaults ? { ...plugin.config.defaults } : undefined,
+          schema: plugin.config.schema,
+        }
       : undefined,
     description: plugin.description,
     entry: plugin.entry,

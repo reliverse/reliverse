@@ -389,6 +389,157 @@ describe("dler pub command", () => {
     });
   });
 
+  test("when --targets is omitted at workspace root, pub uses dler.publishOrder from rse.config.json", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const firstDir = join(root, "packages", "first");
+    const secondDir = join(root, "packages", "second");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(firstDir, "dist"), { recursive: true });
+    await mkdir(join(secondDir, "dist"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "rse.config.json"),
+      `${JSON.stringify({ dler: { publishOrder: ["packages/second", "packages/first"] } }, null, 2)}\n`,
+      "utf8",
+    );
+    for (const [dir, name] of [
+      [firstDir, "first-pkg"],
+      [secondDir, "second-pkg"],
+    ] as const) {
+      await writeFile(
+        join(dir, "package.json"),
+        `${JSON.stringify({ name, version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+        "utf8",
+      );
+      await writeFile(join(dir, "dist", "index.js"), "export {}\n", "utf8");
+    }
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "view" ]; then\n  exit 1\nfi\nif [ "\${1:-}" = "pack" ]; then\n  node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); console.log(JSON.stringify([{ filename: pkg.name + "-" + pkg.version + ".tgz", name: pkg.name, version: pkg.version, size: 123, unpackedSize: 45, files: [{ path: "package.json", size: 2 }, { path: "dist/index.js", size: 10 }] }]));'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  printf 'publish dry-run ok\\n'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        publishFrom: "dist",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: true,
+      plannedTargets: [{ label: "packages/second" }, { label: "packages/first" }],
+      published: [{ label: "packages/second" }, { label: "packages/first" }],
+      summary: { planned: 2, published: 2, skipped: 0 },
+    });
+  });
+
+  test("when --targets is omitted at workspace root, pub fails fast when rse.config.json contains JSONC", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "rse.config.json"),
+      `{
+        // Comments are intentionally rejected in .json config files.
+        "dler": { "publishOrder": [] }
+      }\n`,
+      "utf8",
+    );
+
+    const { ctx } = createJsonCtx(root, {
+      publishFrom: "dist",
+    });
+
+    await expect(command.handler(ctx as never)).rejects.toThrow(
+      "Failed to read optional rse.config.json: JSON Parse error",
+    );
+  });
+
+  test("when --targets is omitted at workspace root, pub fails fast when both rse config files exist", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(join(root, "rse.config.json"), "{}\n", "utf8");
+    await writeFile(join(root, "rse.config.jsonc"), "{}\n", "utf8");
+
+    const { ctx } = createJsonCtx(root, {
+      publishFrom: "dist",
+    });
+
+    await expect(command.handler(ctx as never)).rejects.toThrow(
+      "Failed to read optional rse.config.json: Found both rse.config.json and rse.config.jsonc. Keep only one Rse config file.",
+    );
+  });
+
+  test("when --targets is omitted at workspace root, pub supports rse.config.jsonc", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const pkgDir = join(root, "packages", "jsonc");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(root, "package.json"),
+      JSON.stringify({ private: true, workspaces: { packages: ["packages/*"] } }),
+      "utf8",
+    );
+    await writeFile(
+      join(root, "rse.config.jsonc"),
+      `{
+        // JSONC is accepted for config; schema remains rse.schema.json.
+        "$schema": "./rse.schema.json",
+        "dler": {
+          "publishOrder": ["packages/jsonc",],
+        },
+      }\n`,
+      "utf8",
+    );
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "jsonc-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "view" ]; then\n  exit 1\nfi\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"jsonc-pkg-1.0.0.tgz","name":"jsonc-pkg","version":"1.0.0","size":123,"unpackedSize":45,"files":[{"path":"package.json","size":2},{"path":"dist/index.js","size":10}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  printf 'publish dry-run ok\\n'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        publishFrom: "dist",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: true,
+      plannedTargets: [{ label: "packages/jsonc" }],
+      published: [{ label: "packages/jsonc" }],
+      summary: { planned: 1, published: 1, skipped: 0 },
+    });
+  });
+
   test("build/pub previews stay aligned on the same package target boundary", async () => {
     const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
     const pkgDir = join(root, "packages", "aligned");
@@ -477,6 +628,50 @@ describe("dler pub command", () => {
           versionUpdated: true,
         },
       ],
+    });
+  });
+
+  test("apply skips package versions that are already published", async () => {
+    const root = await mkdtemp(join(tmpdir(), "dler-pub-"));
+    const binDir = join(root, "bin");
+    const pkgDir = join(root, "packages", "already");
+    await mkdir(binDir, { recursive: true });
+    await mkdir(join(pkgDir, "dist"), { recursive: true });
+    await writeFile(
+      join(pkgDir, "package.json"),
+      `${JSON.stringify({ name: "already-pkg", version: "1.0.0", type: "module", publishConfig: { access: "public" } }, null, 2)}\n`,
+      "utf8",
+    );
+    await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
+    await writeFile(
+      join(binDir, "npm"),
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "view" ] && [ "\${2:-}" = "already-pkg@1.0.0" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ] || [ "\${1:-}" = "publish" ]; then\n  echo "pack/publish should not run for already published versions" >&2\n  exit 2\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      "utf8",
+    );
+    await chmod(join(binDir, "npm"), 0o755);
+
+    const { ctx, resultCalls } = createJsonCtx(
+      root,
+      {
+        apply: true,
+        publishFrom: "dist",
+        targets: "packages/already",
+      },
+      { ...process.env, PATH: `${binDir}:${process.env.PATH ?? ""}` },
+    );
+
+    await command.handler(ctx as never);
+
+    expect(resultCalls[0]?.value).toMatchObject({
+      ok: true,
+      published: [],
+      skippedTargets: [
+        {
+          label: "packages/already",
+          reason: "version already published: already-pkg@1.0.0",
+        },
+      ],
+      summary: { failed: 0, planned: 1, published: 0, skipped: 1 },
     });
   });
 

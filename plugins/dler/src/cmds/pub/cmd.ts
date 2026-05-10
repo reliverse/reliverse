@@ -13,7 +13,7 @@ import {
 } from "../../impl/constants";
 import { runNpmPackDryRun } from "../../impl/pub/npm-pack";
 import type { NpmPackPreview } from "../../impl/pub/npm-pack";
-import { runNpmPublish } from "../../impl/pub/npm-publish";
+import { readNpmPublishedVersion, runNpmPublish } from "../../impl/pub/npm-publish";
 import { isSafeRelativePublishFrom } from "../../impl/pub/paths";
 import { syncPackageJsonVersion } from "../../impl/pub/source-version";
 import { createPublishStaging } from "../../impl/pub/staging";
@@ -25,6 +25,7 @@ import {
 } from "../../impl/pub/workspace-deps";
 import { createPublishExecutedTargets, createTargetSets } from "../../impl/report-helpers";
 import { createPublishSummary, createPublishSummaryFromResults } from "../../impl/result-contract";
+import { readOptionalRseConfig } from "../../impl/rse-config";
 import { pathIsDirectory, resolveRequestedTargets } from "../../impl/shared-targets";
 
 type PreviewStyle = (value: unknown) => string;
@@ -363,6 +364,10 @@ async function resolvePublishVersions(options: {
   return versions;
 }
 
+function isAlreadyPublishedReason(reason: string): boolean {
+  return reason.startsWith("version already published: ");
+}
+
 function pushNpmOutput(
   lines: string[],
   colors: PreviewColors,
@@ -506,7 +511,7 @@ export default defineCommand({
   },
   interactive: "never",
   conventions: {
-    idempotent: false,
+    idempotent: true,
     supportsApply: true,
   },
   safety: {
@@ -576,9 +581,23 @@ export default defineCommand({
         return ctx.exit(1, message);
       }
     })();
+    const rawTargets = await (async () => {
+      const cliTargets = ctx.options.targets?.trim();
+      if (cliTargets) return cliTargets;
+
+      try {
+        const config = await readOptionalRseConfig(ctx.cwd);
+        const publishOrder = config?.dler?.publishOrder ?? [];
+        return publishOrder.length > 0 ? publishOrder.join(",") : undefined;
+      } catch (error: unknown) {
+        const message = error instanceof Error ? error.message : String(error);
+        return ctx.exit(1, `Failed to read optional rse.config.json: ${message}`);
+      }
+    })();
+
     const requestedTargets = await resolveRequestedTargets({
       cwd: ctx.cwd,
-      rawTargets: ctx.options.targets,
+      rawTargets,
     }).catch((error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
       return ctx.exit(1, `Target discovery failed: ${message}`);
@@ -675,6 +694,23 @@ export default defineCommand({
           };
         }
 
+        if (publishVersion) {
+          const publishedVersion = await readNpmPublishedVersion({
+            env: ctx.env,
+            packageName: target.packageName,
+            version: publishVersion,
+          });
+
+          if (publishedVersion === publishVersion) {
+            return {
+              skipped: {
+                label,
+                reason: `version already published: ${target.packageName}@${publishVersion}`,
+              },
+            };
+          }
+        }
+
         let versionUpdated = false;
         if (apply) {
           ctx.safety.assertApplied("fs.write");
@@ -763,7 +799,15 @@ export default defineCommand({
     );
 
     const results = outcomes.flatMap((outcome) => ("result" in outcome ? [outcome.result] : []));
-    skipped.push(...outcomes.flatMap((outcome) => ("skipped" in outcome ? [outcome.skipped] : [])));
+    const outcomeSkipped = outcomes.flatMap((outcome) =>
+      "skipped" in outcome ? [outcome.skipped] : [],
+    );
+    const allPublishableTargetsAlreadyPublished =
+      validation.publishable.length > 0 &&
+      outcomeSkipped.length === validation.publishable.length &&
+      outcomeSkipped.every((target) => isAlreadyPublishedReason(target.reason));
+
+    skipped.push(...outcomeSkipped);
 
     if (results.length === 0) {
       const summary = createPublishSummary({
@@ -784,7 +828,7 @@ export default defineCommand({
             concurrency,
             preview,
             executedTargets: targetSets.executedTargets,
-            ok: false,
+            ok: allPublishableTargetsAlreadyPublished,
             plannedTargets: targetSets.plannedTargets,
             publishFrom,
             published: [],
@@ -813,7 +857,13 @@ export default defineCommand({
         ctx.out(line);
       }
 
-      ctx.exit(1, "No publishable workspace targets remain after validation and artifact checks.");
+      if (!allPublishableTargetsAlreadyPublished) {
+        ctx.exit(
+          1,
+          "No publishable workspace targets remain after validation and artifact checks.",
+        );
+      }
+      return;
     }
 
     if (ctx.output.mode === "json") {

@@ -25,6 +25,7 @@
     "check": "bun ./src/cli.ts --help"
   },
   "dependencies": {
+    "@reliverse/config-rse-plugin": "workspace:*",
     "@reliverse/rempts": "workspace:*"
   },
   "devDependencies": {

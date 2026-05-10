@@ -1,0 +1,21 @@
+{
+  "$schema": "./rse.schema.json",
+  "dler": {
+    "publishOrder": [
+      "packages/parser",
+      "packages/reenv",
+      "packages/relico",
+      "packages/rempts",
+      "packages/declar",
+      "plugins/config",
+      "plugins/os",
+      "plugins/pm",
+      "plugins/relpack",
+      "plugins/rempts",
+      "plugins/rspace",
+      "plugins/toolkit",
+      "plugins/dler",
+      "apps/rse",
+    ],
+  },
+}

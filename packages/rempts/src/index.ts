@@ -14,8 +14,10 @@ export {
 export {
   REMPTS_PLUGIN_API_VERSION,
   definePlugin,
+  type RemptsJsonSchema,
   type RemptsPlugin,
   type RemptsPluginCommand,
+  type RemptsPluginConfigContribution,
 } from "./api/define-plugin";
 export {
   inspectCommandTree,

@@ -11,6 +11,12 @@ export interface RunNpmPublishResult {
   readonly stdout: string;
 }
 
+export interface ReadNpmPublishedVersionOptions {
+  readonly env: NodeJS.ProcessEnv;
+  readonly packageName: string;
+  readonly version: string;
+}
+
 async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Promise<string> {
   if (!stream) {
     return "";
@@ -23,6 +29,29 @@ async function readProcessStream(stream: ReadableStream<Uint8Array> | null): Pro
  * Runs `npm publish` from `cwd` (staging directory). Caller must be logged into npm for real publishes.
  * Workspace protocol / catalog deps are not rewritten in v1 — real publishes may fail until versions are resolved.
  */
+export async function readNpmPublishedVersion(
+  options: ReadNpmPublishedVersionOptions,
+): Promise<string | undefined> {
+  const child = Bun.spawn(
+    ["npm", "view", `${options.packageName}@${options.version}`, "version", "--json"],
+    {
+      env: options.env,
+      stderr: "pipe",
+      stdout: "pipe",
+    },
+  );
+  const [stdout, exitCode] = await Promise.all([readProcessStream(child.stdout), child.exited]);
+
+  if (exitCode !== 0) return undefined;
+
+  try {
+    const parsed = JSON.parse(stdout) as unknown;
+    return typeof parsed === "string" ? parsed : undefined;
+  } catch {
+    return stdout.trim().replace(/^"|"$/g, "") || undefined;
+  }
+}
+
 export async function runNpmPublish(options: RunNpmPublishOptions): Promise<RunNpmPublishResult> {
   const args = ["publish", "--access", "public"];
   if (options.preview) {

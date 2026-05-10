@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Rse config",
+  "description": "Optional project-local configuration for the Rse CLI and loaded Rse plugins.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": {
+      "type": "string",
+      "description": "JSON Schema URL for editor IntelliSense."
+    },
+    "dler": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Configuration consumed by @reliverse/dler-rse-plugin.",
+      "properties": {
+        "publishOrder": {
+          "type": "array",
+          "description": "Workspace package paths, in the order dler pub should publish them when --targets is omitted.",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      }
+    }
+  }
+}

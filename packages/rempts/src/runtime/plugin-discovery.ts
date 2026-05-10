@@ -1,6 +1,6 @@
 import type { CommandOptionsRecord } from "@reliverse/parser";
 
-import type { RemptsPlugin } from "../api/define-plugin";
+import type { RemptsJsonSchema, RemptsPlugin } from "../api/define-plugin";
 import { RemptsUsageError } from "./errors";
 import {
   readGlobalHostPluginSpecifiers,
@@ -46,6 +46,12 @@ export interface PluginConflictPriorityMatch {
 export interface PluginDiscoveryLoadedPlugin {
   readonly apiVersion: number;
   readonly capabilities?: readonly string[] | undefined;
+  readonly config?:
+    | {
+        readonly defaults?: Record<string, unknown> | undefined;
+        readonly schema?: RemptsJsonSchema | undefined;
+      }
+    | undefined;
   readonly description?: string | undefined;
   readonly entry: string;
   readonly options?: CommandOptionsRecord | undefined;
@@ -146,6 +152,7 @@ function toLoadedPlugins(
   return entries.map((entry) => ({
     apiVersion: entry.plugin.apiVersion,
     capabilities: entry.plugin.capabilities,
+    config: entry.plugin.config,
     description: entry.plugin.description,
     entry: entry.plugin.entry,
     options: entry.plugin.options,

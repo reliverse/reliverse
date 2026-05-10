@@ -1,6 +1,6 @@
 {
   "name": "@repo/reliverse-root",
-  "version": "0.1.0",
+  "version": "2026.5.10",
   "private": true,
   "workspaces": {
     "catalog": {
