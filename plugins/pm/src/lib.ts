@@ -182,6 +182,31 @@ export async function restoreSnapshots(snapshots: readonly ManifestSnapshot[]): 
   await Promise.all(snapshots.map((snapshot) => writeFile(snapshot.path, snapshot.text, "utf8")));
 }
 
+export async function withSnapshotRollback<T>(
+  paths: readonly string[],
+  operation: () => Promise<T>,
+): Promise<T> {
+  const snapshots = await collectSnapshots(paths);
+
+  try {
+    return await operation();
+  } catch (error) {
+    try {
+      await restoreSnapshots(snapshots);
+    } catch (rollbackError) {
+      const originalMessage = error instanceof Error ? error.message : String(error);
+      const rollbackMessage =
+        rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+      throw new Error(
+        `Failed to roll back pm transaction after error: ${originalMessage}. Rollback error: ${rollbackMessage}`,
+        { cause: error },
+      );
+    }
+
+    throw error;
+  }
+}
+
 export async function writeManifest(path: string, manifest: PackageManifest): Promise<void> {
   await writeFile(path, `${JSON.stringify(manifest, null, 2)}\n`, "utf8");
 }

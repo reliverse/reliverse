@@ -18,4 +18,14 @@
       "apps/rse",
     ],
   },
+  "pm": {
+    "safeLatest": {
+      "allowFreshScopes": ["@reliverse/*"],
+      "blockDeprecated": true,
+      "blockInstallScripts": "unlessAllowlisted",
+      "installScriptAllowlist": [],
+      "maxFallbackDepth": 20,
+      "minimumReleaseAgeDays": 7,
+    },
+  },
 }

@@ -4,7 +4,6 @@ import pMap from "p-map";
 import {
   assertSupportedBunLockfileProject,
   cloneManifest,
-  collectSnapshots,
   getBunLockfilePath,
   createDesiredSpecifier,
   findDependencyLocation,
@@ -14,11 +13,11 @@ import {
   getRequestedSection,
   parsePackageInput,
   resolveTargetContext,
-  restoreSnapshots,
   runBunInstall,
   setCatalogEntry,
   setDependency,
   type PackageInput,
+  withSnapshotRollback,
   writeManifest,
 } from "../../lib";
 
@@ -80,6 +79,12 @@ function warnLabel(
   text: string,
 ): string {
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
+}
+
+class InstallFailedError extends Error {
+  constructor(readonly installResult: Awaited<ReturnType<typeof runBunInstall>>) {
+    super("bun install failed");
+  }
 }
 
 export default defineCommand({
@@ -382,28 +387,34 @@ export default defineCommand({
       getBunLockfilePath(context.installCwd),
       ...(rootChanged ? [context.repoRootManifestPath] : []),
     ];
-    const snapshots = await collectSnapshots(snapshotPaths);
+    const installResult = await withSnapshotRollback(snapshotPaths, async () => {
+      await writeManifest(context.targetManifestPath, nextTargetManifest);
 
-    await writeManifest(context.targetManifestPath, nextTargetManifest);
-
-    if (rootChanged) {
-      await writeManifest(context.repoRootManifestPath, nextRootManifest);
-    }
-
-    const installResult = autoinstall ? await runBunInstall(context.installCwd) : null;
-
-    if (installResult && !installResult.ok) {
-      await restoreSnapshots(snapshots);
-
-      if (installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
-        ctx.err(installResult.stderr.trim());
+      if (rootChanged) {
+        await writeManifest(context.repoRootManifestPath, nextRootManifest);
       }
 
-      ctx.exit(
-        1,
-        `bun install failed after updating ${context.targetLabel}. Changes were reverted.`,
-      );
-    }
+      const result = autoinstall ? await runBunInstall(context.installCwd) : null;
+
+      if (result && !result.ok) {
+        throw new InstallFailedError(result);
+      }
+
+      return result;
+    }).catch((error: unknown) => {
+      if (error instanceof InstallFailedError) {
+        if (error.installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
+          ctx.err(error.installResult.stderr.trim());
+        }
+
+        return ctx.exit(
+          1,
+          `bun install failed after updating ${context.targetLabel}. Changes were reverted. Command: ${error.installResult.command}. Cwd: ${error.installResult.cwd}. Exit code: ${error.installResult.exitCode}.`,
+        );
+      }
+
+      throw error;
+    });
 
     const successPayload = {
       ...resultPayload,

@@ -20,6 +20,7 @@
   },
   "dependencies": {
     "@reliverse/rempts": "workspace:*",
+    "jsonc-parser": "catalog:",
     "p-map": "catalog:"
   },
   "devDependencies": {

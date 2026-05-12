@@ -62,6 +62,7 @@ Legend:
 - [x] Support safe-latest release-age gates with `--age`
 - [x] Support safe-latest fresh scope bypasses with `--fresh-scope`
 - [x] Support safe-latest fallback depth control with `--max-fallback-depth`
+- [x] Support safe-latest policy defaults from `pm.safeLatest` in `rse.config.json` / `rse.config.jsonc`
 - [x] Support safe-latest decision explanations with `--explain` and JSON `safeDecision` payloads
 - [x] Support `--apply`
 - [x] Run only `bun install` after pm-controlled manifest/catalog changes
@@ -128,9 +129,9 @@ Legend:
 
 - [x] Snapshot `bun.lock` during apply flows so failed installs can restore lockfile state
 - [x] Split lockfile guard into a dedicated implementation module
-- [ ] Audit rollback behavior for all partial-failure scenarios beyond install failure
-- [ ] Make transaction phases more explicit in code structure
-- [ ] Improve failure messages around the final Bun step
+- [x] Audit rollback behavior for all partial-failure scenarios beyond install failure
+- [x] Make transaction phases more explicit in code structure
+- [x] Improve failure messages around the final Bun step
 
 ## v0.4.0, optional power-user workflows
 
@@ -154,6 +155,11 @@ Legend:
 - [ ] Document all supported workspace/catalog behaviors clearly in README/ROADMAP/docs
 - [ ] Reach strong test coverage for add/update core flows
 - [ ] Validate behavior against several real Bun monorepo layouts
+
+### Config integration
+
+- [x] Contribute `pm.safeLatest` schema/defaults for `rse config generate`
+- [x] Use precedence `explicit CLI flags > rse.config.json > built-in defaults` for safe-latest policy
 
 ### Supply-chain safety
 

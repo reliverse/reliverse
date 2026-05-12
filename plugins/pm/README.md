@@ -19,6 +19,7 @@ Current command families include:
 - preview-first mutating flows
 - `--apply` for real execution in mutating commands
 - rollback snapshots include package manifests and `bun.lock`
+- apply transactions restore snapshots after install failures or partial write failures
 - JSON-friendly result payloads for automation
 
 ## Safe latest updates
@@ -39,6 +40,23 @@ Current defaults:
 - max fallback depth: `20` stable versions
 - deprecated versions: blocked
 - install-script versions: blocked unless policy internals allowlist them
+
+These defaults can live in optional `rse.config.json` / `rse.config.jsonc` under `pm.safeLatest`. Explicit CLI flags win over config values, and config values win over built-in defaults.
+
+```json
+{
+  "pm": {
+    "safeLatest": {
+      "minimumReleaseAgeDays": 7,
+      "allowFreshScopes": ["@reliverse/*"],
+      "maxFallbackDepth": 20,
+      "blockDeprecated": true,
+      "blockInstallScripts": "unlessAllowlisted",
+      "installScriptAllowlist": []
+    }
+  }
+}
+```
 
 The JSON result includes a per-action `safeDecision` object with the selected version and skipped candidate reasons. Text output can show the same decision trail with `--explain`.
 

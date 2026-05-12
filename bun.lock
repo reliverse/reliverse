@@ -360,6 +360,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@reliverse/rempts": "workspace:*",
+        "jsonc-parser": "catalog:",
         "p-map": "catalog:",
       },
       "devDependencies": {

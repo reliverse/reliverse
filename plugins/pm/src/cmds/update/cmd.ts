@@ -5,7 +5,6 @@ import {
   assertSupportedBunLockfileProject,
   canRewriteSpecifier,
   cloneManifest,
-  collectSnapshots,
   createUpdatedSpecifier,
   type DependencySection,
   findCatalogEntry,
@@ -23,12 +22,13 @@ import {
   resolveSafeLatestVersion,
   resolveUpdateVersion,
   resolveTargetContext,
-  restoreSnapshots,
   runBunInstall,
   setCatalogEntry,
   setDependency,
+  withSnapshotRollback,
   writeManifest,
 } from "../../lib";
+import { mergeSafeLatestPolicy, readOptionalRseConfig } from "../../rse-config";
 
 interface UpdateAction {
   readonly action: "missing" | "noop" | "skipped" | "updated";
@@ -317,6 +317,12 @@ function warnLabel(
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
 }
 
+class InstallFailedError extends Error {
+  constructor(readonly installResult: Awaited<ReturnType<typeof runBunInstall>>) {
+    super("bun install failed");
+  }
+}
+
 export default defineCommand({
   meta: {
     name: "update",
@@ -382,22 +388,19 @@ export default defineCommand({
     },
     age: {
       type: "string",
-      defaultValue: "7d",
       description: "Minimum package release age for --safe-latest, for example 7d",
-      inputSources: ["flag", "default"],
+      inputSources: ["flag"],
     },
     freshScope: {
       type: "string",
-      defaultValue: "@reliverse/*",
       description:
         "Comma-separated package names/scopes allowed to bypass the --safe-latest age gate",
-      inputSources: ["flag", "default"],
+      inputSources: ["flag"],
     },
     maxFallbackDepth: {
       type: "number",
-      defaultValue: 20,
       description: "Maximum older stable versions checked by --safe-latest",
-      inputSources: ["flag", "default"],
+      inputSources: ["flag"],
     },
     explain: {
       type: "boolean",
@@ -447,8 +450,24 @@ export default defineCommand({
     await assertSupportedBunLockfileProject(context.installCwd);
 
     const safeLatest = ctx.options.safeLatest === true;
-    const safeLatestAgeDays = parseDurationDays(ctx.options.age, 7);
-    const safeLatestFreshScopes = parseListOption(ctx.options.freshScope);
+    const rseConfig = safeLatest
+      ? await readOptionalRseConfig(context.installCwd).catch((error: unknown) => {
+          const message = error instanceof Error ? error.message : String(error);
+          return ctx.exit(1, `Failed to read optional rse.config.json: ${message}`);
+        })
+      : undefined;
+    const cliSafeLatestPolicy = {
+      ...(ctx.options.freshScope === undefined
+        ? {}
+        : { allowFreshScopes: parseListOption(ctx.options.freshScope) }),
+      ...(ctx.options.maxFallbackDepth === undefined
+        ? {}
+        : { maxFallbackDepth: Number(ctx.options.maxFallbackDepth) }),
+      ...(ctx.options.age === undefined
+        ? {}
+        : { minimumReleaseAgeDays: parseDurationDays(ctx.options.age, 7) }),
+    };
+    const safeLatestPolicy = mergeSafeLatestPolicy(rseConfig?.pm?.safeLatest, cliSafeLatestPolicy);
 
     if (safeLatest && ctx.options.latest === false) {
       ctx.exit(
@@ -646,11 +665,7 @@ export default defineCommand({
               currentSpecifier: update.currentSpecifier,
               refresh: executionRequested,
               packageName: update.packageName,
-              policy: {
-                allowFreshScopes: safeLatestFreshScopes,
-                maxFallbackDepth: Number(ctx.options.maxFallbackDepth ?? 20),
-                minimumReleaseAgeDays: safeLatestAgeDays,
-              },
+              policy: safeLatestPolicy,
             })
           : {
               decision: undefined,
@@ -799,13 +814,7 @@ export default defineCommand({
       },
       latest: latestByDefault,
       safeLatest,
-      safeLatestPolicy: safeLatest
-        ? {
-            allowFreshScopes: safeLatestFreshScopes,
-            maxFallbackDepth: Number(ctx.options.maxFallbackDepth ?? 20),
-            minimumReleaseAgeDays: safeLatestAgeDays,
-          }
-        : undefined,
+      safeLatestPolicy: safeLatest ? safeLatestPolicy : undefined,
       recursive: updateAllWorkspaceManifests,
       smart: smartByDefault,
       strategy,
@@ -897,36 +906,42 @@ export default defineCommand({
         ...(rootChanged ? [context.repoRootManifestPath] : []),
       ]),
     ];
-    const snapshots = await collectSnapshots(snapshotPaths);
+    const installResult = await withSnapshotRollback(snapshotPaths, async () => {
+      for (const target of changedManifestTargets) {
+        const nextManifest = nextManifests.get(target.manifestPath);
 
-    for (const target of changedManifestTargets) {
-      const nextManifest = nextManifests.get(target.manifestPath);
+        if (!nextManifest) {
+          continue;
+        }
 
-      if (!nextManifest) {
-        continue;
+        await writeManifest(target.manifestPath, nextManifest);
       }
 
-      await writeManifest(target.manifestPath, nextManifest);
-    }
-
-    if (rootChanged) {
-      await writeManifest(context.repoRootManifestPath, nextRootManifest);
-    }
-
-    const installResult = autoinstall ? await runBunInstall(context.installCwd) : null;
-
-    if (installResult && !installResult.ok) {
-      await restoreSnapshots(snapshots);
-
-      if (installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
-        ctx.err(installResult.stderr.trim());
+      if (rootChanged) {
+        await writeManifest(context.repoRootManifestPath, nextRootManifest);
       }
 
-      ctx.exit(
-        1,
-        `bun install failed after updating ${context.targetLabel}. Changes were reverted.`,
-      );
-    }
+      const result = autoinstall ? await runBunInstall(context.installCwd) : null;
+
+      if (result && !result.ok) {
+        throw new InstallFailedError(result);
+      }
+
+      return result;
+    }).catch((error: unknown) => {
+      if (error instanceof InstallFailedError) {
+        if (error.installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
+          ctx.err(error.installResult.stderr.trim());
+        }
+
+        return ctx.exit(
+          1,
+          `bun install failed after updating ${context.targetLabel}. Changes were reverted. Command: ${error.installResult.command}. Cwd: ${error.installResult.cwd}. Exit code: ${error.installResult.exitCode}.`,
+        );
+      }
+
+      throw error;
+    });
 
     const successPayload = {
       ...resultPayload,

@@ -196,6 +196,44 @@ describe("pm update command", () => {
     }
   });
 
+  test("safe-latest reads rse.config.json and lets CLI flags override config policy", async () => {
+    const restoreFetch = mockNpmPackument();
+
+    try {
+      await withTempProject(async (dir) => {
+        await writeFile(
+          join(dir, "package.json"),
+          `${JSON.stringify({ name: "demo", version: "0.0.0", dependencies: { demo: "^0.9.0" } }, null, 2)}\n`,
+          "utf8",
+        );
+        await writeFile(
+          join(dir, "rse.config.json"),
+          `${JSON.stringify({ pm: { safeLatest: { allowFreshScopes: [], minimumReleaseAgeDays: 20, maxFallbackDepth: 4 } } }, null, 2)}\n`,
+          "utf8",
+        );
+
+        const { ctx, resultCalls } = createCtx(dir, {
+          args: ["demo"],
+          options: { age: "7d", safeLatest: true },
+        });
+
+        await command.handler(ctx as never);
+
+        const payload = resultCalls[0]?.value as {
+          actions: Array<{ safeDecision?: { selected?: string } }>;
+          safeLatestPolicy: { maxFallbackDepth: number; minimumReleaseAgeDays: number };
+        };
+        expect(payload.safeLatestPolicy).toMatchObject({
+          maxFallbackDepth: 4,
+          minimumReleaseAgeDays: 7,
+        });
+        expect(payload.actions[0]?.safeDecision?.selected).toBe("1.0.0");
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
   test("fails at command level when bun.lock is missing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pm-update-command-test-"));
 
