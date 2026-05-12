@@ -2,8 +2,10 @@ import { defineCommand } from "@reliverse/rempts";
 import pMap from "p-map";
 
 import {
+  assertSupportedBunLockfileProject,
   cloneManifest,
   collectSnapshots,
+  getBunLockfilePath,
   createDesiredSpecifier,
   findDependencyLocation,
   fetchLatestVersion,
@@ -59,14 +61,22 @@ function infoLabel(
 }
 
 function okLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
+  ctx: {
+    colors: {
+      stdout: { bold(text: string): string; green(text: string): string };
+    };
+  },
   text: string,
 ): string {
   return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
 }
 
 function warnLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } },
+  ctx: {
+    colors: {
+      stdout: { bold(text: string): string; yellow(text: string): string };
+    };
+  },
   text: string,
 ): string {
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
@@ -164,6 +174,8 @@ export default defineCommand({
       cwd: ctx.options.cwd,
       target: ctx.options.target,
     });
+    await assertSupportedBunLockfileProject(context.installCwd);
+
     const autoinstall = ctx.options.autoinstall !== false;
     const requestedCatalogName = ctx.options.catalog?.trim() || undefined;
 
@@ -367,6 +379,7 @@ export default defineCommand({
 
     const snapshotPaths = [
       context.targetManifestPath,
+      getBunLockfilePath(context.installCwd),
       ...(rootChanged ? [context.repoRootManifestPath] : []),
     ];
     const snapshots = await collectSnapshots(snapshotPaths);

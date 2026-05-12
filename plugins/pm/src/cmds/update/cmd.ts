@@ -2,6 +2,7 @@ import { defineCommand } from "@reliverse/rempts";
 import pMap from "p-map";
 
 import {
+  assertSupportedBunLockfileProject,
   canRewriteSpecifier,
   cloneManifest,
   collectSnapshots,
@@ -9,6 +10,7 @@ import {
   type DependencySection,
   findCatalogEntry,
   findDependencyLocation,
+  getBunLockfilePath,
   isCatalogProtocol,
   isWorkspaceProtocol,
   listManifestTargets,
@@ -17,6 +19,8 @@ import {
   parsePackageInput,
   type PackageInput,
   type ManifestTarget,
+  type SafeVersionDecision,
+  resolveSafeLatestVersion,
   resolveUpdateVersion,
   resolveTargetContext,
   restoreSnapshots,
@@ -34,6 +38,7 @@ interface UpdateAction {
   readonly previousSpecifier?: string | undefined;
   readonly reason?: string | undefined;
   readonly resolutionStrategy?: string | undefined;
+  readonly safeDecision?: SafeVersionDecision | undefined;
   readonly section?: string | undefined;
   readonly source: "catalog" | "target";
   readonly targetLabel?: string | undefined;
@@ -47,6 +52,32 @@ interface PendingUpdate {
   readonly source: "catalog" | "target";
   readonly targetLabel?: string | undefined;
   readonly targetManifestPath?: string | undefined;
+}
+
+function parseDurationDays(input: unknown, defaultDays: number): number {
+  if (input === undefined || input === null || input === "") {
+    return defaultDays;
+  }
+
+  const value = String(input).trim();
+  const match = /^(?<amount>\d+)(?<unit>d|day|days)?$/i.exec(value);
+
+  if (!match?.groups?.amount) {
+    throw new Error(`Invalid --age value "${value}". Use a day value like 7d.`);
+  }
+
+  return Number(match.groups.amount);
+}
+
+function parseListOption(value: unknown): readonly string[] {
+  if (typeof value !== "string") {
+    return [];
+  }
+
+  return value
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter((entry) => entry.length > 0);
 }
 
 function describeStrategy(options: { readonly latest: boolean; readonly smart: boolean }): {
@@ -195,22 +226,92 @@ function emitUpdateNotes(
   }
 }
 
+function emitSafeLatestDecisions(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        green(text: string): string;
+        magenta(text: string): string;
+        yellow(text: string): string;
+      };
+    };
+    out(...values: unknown[]): void;
+  },
+  options: {
+    readonly actions: readonly UpdateAction[];
+    readonly enabled: boolean;
+    readonly explain: boolean;
+  },
+): void {
+  if (!options.enabled) {
+    return;
+  }
+
+  const decisions = options.actions
+    .map((action) => action.safeDecision)
+    .filter((decision): decision is SafeVersionDecision => decision !== undefined);
+
+  if (decisions.length === 0) {
+    return;
+  }
+
+  ctx.out(warnLabel(ctx, options.explain ? "Safe-latest decisions:" : "Safe-latest summary:"));
+
+  for (const decision of decisions) {
+    const selected = decision.selected
+      ? ctx.colors.stdout.green(decision.selected)
+      : ctx.colors.stdout.yellow("none");
+    ctx.out(
+      `${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(decision.packageName)}: npm latest ${decision.npmLatest}, selected ${selected}`,
+    );
+
+    if (!options.explain) {
+      continue;
+    }
+
+    for (const skipped of decision.skipped.slice(0, 5)) {
+      ctx.out(`  skipped ${skipped.version}: ${skipped.reasons.join(", ")}`);
+    }
+
+    if (decision.accepted) {
+      ctx.out(`  accepted ${decision.accepted.version}: ${decision.accepted.reasons.join(", ")}`);
+    }
+  }
+
+  if (!options.explain) {
+    ctx.out(`  Use ${ctx.colors.stdout.bold("--explain")} to show skipped candidate reasons.`);
+  }
+}
+
 function infoLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; cyan(text: string): string } } },
+  ctx: {
+    colors: {
+      stdout: { bold(text: string): string; cyan(text: string): string };
+    };
+  },
   text: string,
 ): string {
   return ctx.colors.stdout.cyan(ctx.colors.stdout.bold(text));
 }
 
 function okLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; green(text: string): string } } },
+  ctx: {
+    colors: {
+      stdout: { bold(text: string): string; green(text: string): string };
+    };
+  },
   text: string,
 ): string {
   return ctx.colors.stdout.green(ctx.colors.stdout.bold(text));
 }
 
 function warnLabel(
-  ctx: { colors: { stdout: { bold(text: string): string; yellow(text: string): string } } },
+  ctx: {
+    colors: {
+      stdout: { bold(text: string): string; yellow(text: string): string };
+    };
+  },
   text: string,
 ): string {
   return ctx.colors.stdout.yellow(ctx.colors.stdout.bold(text));
@@ -247,10 +348,11 @@ export default defineCommand({
       "rse update typescript --json",
       "rse update typescript --no-latest --json",
       "rse update vite --no-smart --json",
+      "rse update react --safe-latest --age 7d --explain",
       "rse update --cwd /path/to/project --target /path/to/project --apply --json",
       "rse update --apply",
     ],
-    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--no-smart` to disable this strategy. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to write pm-controlled manifest/catalog changes and then run `bun install`. Preview output shows grouped specifier diffs and the final install command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--safe-latest` to select the newest stable version that passes Rse's npm metadata policy: release age, deprecated package, and install-script gates. Pass `--no-smart` to disable smart version selection. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to write pm-controlled manifest/catalog changes and then run `bun install`. Preview output shows grouped specifier diffs and the final install command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
   },
   options: {
     autoinstall: {
@@ -270,6 +372,36 @@ export default defineCommand({
       type: "boolean",
       description:
         "Enabled by default; pass --no-latest to stay within the current semver range instead of jumping to the newest published version",
+      inputSources: ["flag"],
+    },
+    safeLatest: {
+      type: "boolean",
+      description:
+        "Select the newest stable version that passes Rse's safe-latest npm metadata policy",
+      inputSources: ["flag"],
+    },
+    age: {
+      type: "string",
+      defaultValue: "7d",
+      description: "Minimum package release age for --safe-latest, for example 7d",
+      inputSources: ["flag", "default"],
+    },
+    freshScope: {
+      type: "string",
+      defaultValue: "@reliverse/*",
+      description:
+        "Comma-separated package names/scopes allowed to bypass the --safe-latest age gate",
+      inputSources: ["flag", "default"],
+    },
+    maxFallbackDepth: {
+      type: "number",
+      defaultValue: 20,
+      description: "Maximum older stable versions checked by --safe-latest",
+      inputSources: ["flag", "default"],
+    },
+    explain: {
+      type: "boolean",
+      description: "Show per-package safe-latest decision details in text output",
       inputSources: ["flag"],
     },
     recursive: {
@@ -312,6 +444,19 @@ export default defineCommand({
       cwd: ctx.options.cwd,
       target: ctx.options.target,
     });
+    await assertSupportedBunLockfileProject(context.installCwd);
+
+    const safeLatest = ctx.options.safeLatest === true;
+    const safeLatestAgeDays = parseDurationDays(ctx.options.age, 7);
+    const safeLatestFreshScopes = parseListOption(ctx.options.freshScope);
+
+    if (safeLatest && ctx.options.latest === false) {
+      ctx.exit(
+        1,
+        "Choose either --safe-latest or --no-latest; safe-latest is a latest-mode resolver.",
+      );
+    }
+
     const smartByDefault = ctx.options.smart !== false;
     const latestByDefault = ctx.options.latest !== false;
     const executionRequested = ctx.safety.apply;
@@ -319,10 +464,15 @@ export default defineCommand({
     const preview = !apply;
     const autoinstall = ctx.options.autoinstall !== false;
     const verbose = ctx.options.verbose === true;
-    const strategy = describeStrategy({
-      latest: latestByDefault,
-      smart: smartByDefault,
-    });
+    const strategy = safeLatest
+      ? {
+          label: "safe-latest",
+          text: "newest stable version passing Rse safe-latest policy",
+        }
+      : describeStrategy({
+          latest: latestByDefault,
+          smart: smartByDefault,
+        });
     const recursiveByDefault = context.usesWorkspaces && context.targetDir === context.repoRootDir;
     const updateAllWorkspaceManifests = recursiveByDefault && ctx.options.recursive !== false;
     const manifestTargets: readonly ManifestTarget[] = await listManifestTargets(context, {
@@ -491,13 +641,28 @@ export default defineCommand({
     const resolvedUpdates = await pMap(
       pendingUpdates,
       async (update) => {
-        const nextVersion = await resolveUpdateVersion({
-          currentSpecifier: update.currentSpecifier,
-          refresh: executionRequested,
-          latest: latestByDefault,
-          packageName: update.packageName,
-          smart: smartByDefault,
-        });
+        const resolution = safeLatest
+          ? await resolveSafeLatestVersion({
+              currentSpecifier: update.currentSpecifier,
+              refresh: executionRequested,
+              packageName: update.packageName,
+              policy: {
+                allowFreshScopes: safeLatestFreshScopes,
+                maxFallbackDepth: Number(ctx.options.maxFallbackDepth ?? 20),
+                minimumReleaseAgeDays: safeLatestAgeDays,
+              },
+            })
+          : {
+              decision: undefined,
+              version: await resolveUpdateVersion({
+                currentSpecifier: update.currentSpecifier,
+                refresh: executionRequested,
+                latest: latestByDefault,
+                packageName: update.packageName,
+                smart: smartByDefault,
+              }),
+            };
+        const nextVersion = resolution.version;
         const nextSpecifier = createUpdatedSpecifier({
           currentSpecifier: update.currentSpecifier,
           version: nextVersion,
@@ -506,6 +671,7 @@ export default defineCommand({
           ...update,
           nextSpecifier,
           resolutionStrategy: strategy.label,
+          safeDecision: resolution.decision,
         };
       },
       { concurrency: 8 },
@@ -523,6 +689,7 @@ export default defineCommand({
               ? "catalog entry is already up to date"
               : "catalog entry uses a non-rewritable specifier; Bun install will refresh lockfile metadata",
             resolutionStrategy: update.resolutionStrategy,
+            safeDecision: update.safeDecision,
             section: update.section,
             source: "catalog",
             targetLabel: update.targetLabel,
@@ -544,6 +711,7 @@ export default defineCommand({
           previousSpecifier: update.currentSpecifier,
           reason: "updated repo catalog entry",
           resolutionStrategy: update.resolutionStrategy,
+          safeDecision: update.safeDecision,
           section: update.section,
           source: "catalog",
           targetLabel: update.targetLabel,
@@ -569,6 +737,7 @@ export default defineCommand({
             ? "already up to date"
             : "specifier is not rewritten; Bun install will refresh lockfile metadata",
           resolutionStrategy: update.resolutionStrategy,
+          safeDecision: update.safeDecision,
           section: update.section,
           source: "target",
           targetLabel: update.targetLabel,
@@ -589,6 +758,7 @@ export default defineCommand({
         packageName: update.packageName,
         previousSpecifier: update.currentSpecifier,
         resolutionStrategy: update.resolutionStrategy,
+        safeDecision: update.safeDecision,
         section: update.section,
         source: "target",
         targetLabel: update.targetLabel,
@@ -628,6 +798,14 @@ export default defineCommand({
         executed: false,
       },
       latest: latestByDefault,
+      safeLatest,
+      safeLatestPolicy: safeLatest
+        ? {
+            allowFreshScopes: safeLatestFreshScopes,
+            maxFallbackDepth: Number(ctx.options.maxFallbackDepth ?? 20),
+            minimumReleaseAgeDays: safeLatestAgeDays,
+          }
+        : undefined,
       recursive: updateAllWorkspaceManifests,
       smart: smartByDefault,
       strategy,
@@ -652,6 +830,11 @@ export default defineCommand({
 
       ctx.out(`${warnLabel(ctx, "No dependency updates:")} ${context.targetLabel}.`);
       ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
+      emitSafeLatestDecisions(ctx, {
+        actions,
+        enabled: safeLatest,
+        explain: ctx.options.explain === true,
+      });
       ctx.out(`${infoLabel(ctx, "Install step:")} ${installCommand} (not needed).`);
       return;
     }
@@ -685,7 +868,16 @@ export default defineCommand({
         }
       }
 
-      emitUpdateNotes(ctx, { actions, fallbackLabel: context.targetLabel, verbose });
+      emitUpdateNotes(ctx, {
+        actions,
+        fallbackLabel: context.targetLabel,
+        verbose,
+      });
+      emitSafeLatestDecisions(ctx, {
+        actions,
+        enabled: safeLatest,
+        explain: ctx.options.explain === true,
+      });
 
       ctx.out(
         `${infoLabel(ctx, "Install step:")} ${autoinstall ? `${installCommand} (after --apply)` : "disabled (--no-autoinstall)"}`,
@@ -701,6 +893,7 @@ export default defineCommand({
     const snapshotPaths = [
       ...new Set([
         ...changedManifestTargets.map((target) => target.manifestPath),
+        getBunLockfilePath(context.installCwd),
         ...(rootChanged ? [context.repoRootManifestPath] : []),
       ]),
     ];
@@ -775,7 +968,16 @@ export default defineCommand({
       }
     }
 
-    emitUpdateNotes(ctx, { actions, fallbackLabel: context.targetLabel, verbose });
+    emitUpdateNotes(ctx, {
+      actions,
+      fallbackLabel: context.targetLabel,
+      verbose,
+    });
+    emitSafeLatestDecisions(ctx, {
+      actions,
+      enabled: safeLatest,
+      explain: ctx.options.explain === true,
+    });
 
     if (installResult) {
       ctx.out(

@@ -43,7 +43,9 @@ Legend:
 - [x] Support named catalogs via `--catalog <name>`
 - [x] Avoid silently changing version when dep already exists, and point callers to `pm update`
 - [x] Run final `bun install`
-- [x] Roll back manifest changes if final install fails
+- [x] Require modern Bun projects with `bun.lock` before mutating or resolving installs
+- [x] Reject legacy/foreign lockfiles (`bun.lockb`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`)
+- [x] Roll back manifest and `bun.lock` changes if final install fails
 
 ### `pm update`
 
@@ -56,9 +58,16 @@ Legend:
 - [x] Support `--no-latest` to stay within current semver range
 - [x] Support smart update mode by default
 - [x] Support `--no-smart`
+- [x] Support `--safe-latest` npm metadata policy mode
+- [x] Support safe-latest release-age gates with `--age`
+- [x] Support safe-latest fresh scope bypasses with `--fresh-scope`
+- [x] Support safe-latest fallback depth control with `--max-fallback-depth`
+- [x] Support safe-latest decision explanations with `--explain` and JSON `safeDecision` payloads
 - [x] Support `--apply`
 - [x] Run only `bun install` after pm-controlled manifest/catalog changes
-- [x] Roll back manifest changes if final install fails
+- [x] Require modern Bun projects with `bun.lock` before mutating or resolving installs
+- [x] Reject legacy/foreign lockfiles (`bun.lockb`, `package-lock.json`, `pnpm-lock.yaml`, `yarn.lock`)
+- [x] Roll back manifest and `bun.lock` changes if final install fails
 
 ### Current output and UX
 
@@ -74,8 +83,11 @@ Legend:
 
 ### Output and testing
 
-- [ ] Add focused tests for `pm add`
-- [ ] Add focused tests for `pm update`
+- [x] Add focused tests for pm lockfile safety
+- [x] Add focused tests for safe-latest resolution policy
+- [x] Add focused tests for transaction snapshot rollback including `bun.lock`
+- [ ] Add command-level focused tests for `pm add`
+- [ ] Add command-level focused tests for `pm update`
 - [ ] Add snapshot-like tests for JSON result payloads
 - [ ] Add snapshot-like tests for human-readable preview output
 - [ ] Normalize wording and payload shapes across `pm add` and `pm update`
@@ -89,8 +101,10 @@ Legend:
 
 ### Strategy clarity
 
-- [ ] Include clearer per-package strategy reasons in JSON output
-- [ ] Include clearer per-package strategy reasons in text output
+- [x] Include safe-latest per-package strategy reasons in JSON output
+- [x] Include safe-latest per-package strategy reasons in text output via `--explain`
+- [ ] Include clearer non-safe-latest per-package strategy reasons in JSON output
+- [ ] Include clearer non-safe-latest per-package strategy reasons in text output
 - [ ] Refine help text around `smart`, `latest`, and range-based resolution
 
 ## v0.3.0, safer large-repo update flows
@@ -110,7 +124,9 @@ Legend:
 
 ### Operational safety
 
-- [ ] Audit rollback behavior for all partial-failure scenarios
+- [x] Snapshot `bun.lock` during apply flows so failed installs can restore lockfile state
+- [x] Split lockfile guard into a dedicated implementation module
+- [ ] Audit rollback behavior for all partial-failure scenarios beyond install failure
 - [ ] Make transaction phases more explicit in code structure
 - [ ] Improve failure messages around the final Bun step
 
@@ -136,6 +152,13 @@ Legend:
 - [ ] Document all supported workspace/catalog behaviors clearly in README/ROADMAP/docs
 - [ ] Reach strong test coverage for add/update core flows
 - [ ] Validate behavior against several real Bun monorepo layouts
+
+### Supply-chain safety
+
+- [ ] Add optional Socket shallow checks for safe-latest candidates
+- [ ] Add `--require-socket` for CI-grade safe-latest runs
+- [ ] Add resolved-tree verification after `bun install`
+- [ ] Add `rse verify-lock --socket --json` for existing lockfiles
 
 ### Nice-to-have, not committed
 

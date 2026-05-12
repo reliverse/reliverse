@@ -2,6 +2,9 @@ import { constants } from "node:fs";
 import { access, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 
+export { assertSupportedBunLockfileProject, getBunLockfilePath } from "./lockfile";
+export { resolveSafeLatestVersion, type SafeVersionDecision } from "./safe/latest";
+
 export type DependencySection =
   | "dependencies"
   | "devDependencies"
@@ -336,9 +339,11 @@ async function findNearestPackageDir(startDir: string): Promise<string | null> {
   }
 }
 
-async function findWorkspaceRoot(
-  startDir: string,
-): Promise<{ dir: string; manifest: PackageManifest; manifestPath: string } | null> {
+async function findWorkspaceRoot(startDir: string): Promise<{
+  dir: string;
+  manifest: PackageManifest;
+  manifestPath: string;
+} | null> {
   let currentDir = resolve(startDir);
 
   while (true) {
