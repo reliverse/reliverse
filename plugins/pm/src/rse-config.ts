@@ -3,14 +3,19 @@ import { resolve } from "node:path";
 
 import { parse, printParseErrorCode, type ParseError } from "jsonc-parser";
 
-import { DEFAULT_SAFE_LATEST_POLICY, type SafeLatestPolicy } from "./safe/latest";
+import {
+  DEFAULT_SAFE_LATEST_POLICY,
+  type SafeLatestPolicy,
+  type SafeLatestPolicyInput,
+  type SocketSeverity,
+} from "./safe/latest";
 
 export const RSE_CONFIG_FILE = "rse.config.json";
 export const RSE_CONFIG_JSONC_FILE = "rse.config.jsonc";
 export const RSE_CONFIG_FILES = [RSE_CONFIG_FILE, RSE_CONFIG_JSONC_FILE] as const;
 
 export interface PmRseConfig {
-  readonly safeLatest?: Partial<SafeLatestPolicy> | undefined;
+  readonly safeLatest?: SafeLatestPolicyInput | undefined;
 }
 
 export interface RseConfig {
@@ -43,6 +48,39 @@ function optionalStringArray(value: unknown, path: string): readonly string[] | 
   return value;
 }
 
+function optionalSocketSeverity(value: unknown): SocketSeverity | undefined {
+  if (value === undefined) return undefined;
+  if (value === "middle") return "medium";
+  if (value === "low" || value === "medium" || value === "high" || value === "critical") {
+    return value;
+  }
+  throw new Error(
+    'rse.config.json: pm.safeLatest.socket.severityThreshold must be "low", "medium"/"middle", "high", or "critical".',
+  );
+}
+
+function parseSocketConfig(value: unknown): Partial<SafeLatestPolicy["socket"]> | undefined {
+  if (value === undefined) return undefined;
+  if (!isObject(value)) {
+    throw new Error("rse.config.json: pm.safeLatest.socket must be an object when provided.");
+  }
+
+  const socket: {
+    enabled?: boolean;
+    require?: boolean;
+    severityThreshold?: SocketSeverity;
+  } = {};
+  const enabled = optionalBoolean(value.enabled, "rse.config.json: pm.safeLatest.socket.enabled");
+  const require = optionalBoolean(value.require, "rse.config.json: pm.safeLatest.socket.require");
+  const severityThreshold = optionalSocketSeverity(value.severityThreshold);
+
+  if (enabled !== undefined) socket.enabled = enabled;
+  if (require !== undefined) socket.require = require;
+  if (severityThreshold !== undefined) socket.severityThreshold = severityThreshold;
+
+  return socket;
+}
+
 function optionalInstallScriptPolicy(
   value: unknown,
 ): SafeLatestPolicy["blockInstallScripts"] | undefined {
@@ -53,7 +91,7 @@ function optionalInstallScriptPolicy(
   );
 }
 
-function parseSafeLatestConfig(value: unknown): Partial<SafeLatestPolicy> | undefined {
+function parseSafeLatestConfig(value: unknown): SafeLatestPolicyInput | undefined {
   if (value === undefined) return undefined;
   if (!isObject(value)) {
     throw new Error("rse.config.json: pm.safeLatest must be an object when provided.");
@@ -66,6 +104,7 @@ function parseSafeLatestConfig(value: unknown): Partial<SafeLatestPolicy> | unde
     installScriptAllowlist?: readonly string[];
     maxFallbackDepth?: number;
     minimumReleaseAgeDays?: number;
+    socket?: Partial<SafeLatestPolicy["socket"]>;
   } = {};
   const allowFreshScopes = optionalStringArray(
     value.allowFreshScopes,
@@ -88,6 +127,7 @@ function parseSafeLatestConfig(value: unknown): Partial<SafeLatestPolicy> | unde
     value.minimumReleaseAgeDays,
     "rse.config.json: pm.safeLatest.minimumReleaseAgeDays",
   );
+  const socket = parseSocketConfig(value.socket);
 
   if (allowFreshScopes !== undefined) policy.allowFreshScopes = allowFreshScopes;
   if (blockDeprecated !== undefined) policy.blockDeprecated = blockDeprecated;
@@ -95,13 +135,14 @@ function parseSafeLatestConfig(value: unknown): Partial<SafeLatestPolicy> | unde
   if (installScriptAllowlist !== undefined) policy.installScriptAllowlist = installScriptAllowlist;
   if (maxFallbackDepth !== undefined) policy.maxFallbackDepth = maxFallbackDepth;
   if (minimumReleaseAgeDays !== undefined) policy.minimumReleaseAgeDays = minimumReleaseAgeDays;
+  if (socket !== undefined) policy.socket = socket;
 
   return policy;
 }
 
 export function mergeSafeLatestPolicy(
-  configPolicy: Partial<SafeLatestPolicy> | undefined,
-  cliPolicy: Partial<SafeLatestPolicy>,
+  configPolicy: SafeLatestPolicyInput | undefined,
+  cliPolicy: SafeLatestPolicyInput,
 ): SafeLatestPolicy {
   return {
     allowFreshScopes:
@@ -128,6 +169,20 @@ export function mergeSafeLatestPolicy(
       cliPolicy.minimumReleaseAgeDays ??
       configPolicy?.minimumReleaseAgeDays ??
       DEFAULT_SAFE_LATEST_POLICY.minimumReleaseAgeDays,
+    socket: {
+      enabled:
+        cliPolicy.socket?.enabled ??
+        configPolicy?.socket?.enabled ??
+        DEFAULT_SAFE_LATEST_POLICY.socket.enabled,
+      require:
+        cliPolicy.socket?.require ??
+        configPolicy?.socket?.require ??
+        DEFAULT_SAFE_LATEST_POLICY.socket.require,
+      severityThreshold:
+        cliPolicy.socket?.severityThreshold ??
+        configPolicy?.socket?.severityThreshold ??
+        DEFAULT_SAFE_LATEST_POLICY.socket.severityThreshold,
+    },
   };
 }
 

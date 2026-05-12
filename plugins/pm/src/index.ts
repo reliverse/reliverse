@@ -13,6 +13,11 @@ export default definePlugin({
           installScriptAllowlist: [],
           maxFallbackDepth: 20,
           minimumReleaseAgeDays: 7,
+          socket: {
+            enabled: false,
+            require: false,
+            severityThreshold: "high",
+          },
         },
       },
     },
@@ -64,6 +69,32 @@ export default definePlugin({
                   description: "Minimum candidate release age in days.",
                   minimum: 0,
                   default: 7,
+                },
+                socket: {
+                  type: "object",
+                  additionalProperties: false,
+                  description:
+                    "Optional Socket.dev shallow checks for safe-latest candidate versions.",
+                  properties: {
+                    enabled: {
+                      type: "boolean",
+                      description:
+                        "Run Socket shallow checks when selecting safe-latest candidates.",
+                      default: false,
+                    },
+                    require: {
+                      type: "boolean",
+                      description:
+                        "Fail candidate selection when Socket checks are unavailable or fail.",
+                      default: false,
+                    },
+                    severityThreshold: {
+                      type: "string",
+                      description: "Lowest Socket alert severity that blocks a candidate.",
+                      enum: ["low", "medium", "middle", "high", "critical"],
+                      default: "high",
+                    },
+                  },
                 },
               },
             },

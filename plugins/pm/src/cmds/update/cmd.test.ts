@@ -234,6 +234,51 @@ describe("pm update command", () => {
     }
   });
 
+  test("normalizes Socket middle severity alias from CLI", async () => {
+    const restoreFetch = mockNpmPackument();
+
+    try {
+      await withTempProject(async (dir) => {
+        await writeFile(
+          join(dir, "package.json"),
+          `${JSON.stringify({ name: "demo", version: "0.0.0", dependencies: { demo: "^0.9.0" } }, null, 2)}\n`,
+          "utf8",
+        );
+        const { ctx, resultCalls } = createCtx(dir, {
+          args: ["demo"],
+          options: { safeLatest: true, socketSeverityThreshold: "middle" },
+        });
+
+        await command.handler(ctx as never);
+
+        const payload = resultCalls[0]?.value as {
+          safeLatestPolicy: { socket: { severityThreshold: string } };
+        };
+        expect(payload.safeLatestPolicy.socket.severityThreshold).toBe("medium");
+      });
+    } finally {
+      restoreFetch();
+    }
+  });
+
+  test("rejects invalid Socket severity threshold", async () => {
+    await withTempProject(async (dir) => {
+      await writeFile(
+        join(dir, "package.json"),
+        `${JSON.stringify({ name: "demo", version: "0.0.0", dependencies: { demo: "^1.0.0" } }, null, 2)}\n`,
+        "utf8",
+      );
+      const { ctx } = createCtx(dir, {
+        args: ["demo"],
+        options: { safeLatest: true, socketSeverityThreshold: "severe" },
+      });
+
+      await expect(command.handler(ctx as never)).rejects.toThrow(
+        /Invalid --socket-severity-threshold/,
+      );
+    });
+  });
+
   test("fails at command level when bun.lock is missing", async () => {
     const dir = await mkdtemp(join(tmpdir(), "pm-update-command-test-"));
 

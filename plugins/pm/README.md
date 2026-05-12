@@ -24,13 +24,15 @@ Current command families include:
 
 ## Safe latest updates
 
-`rse update --safe-latest` selects the newest stable version that passes Rse's npm metadata policy instead of blindly taking the newest publish. The current policy checks release age, deprecated package metadata, and install-script risk before choosing a candidate.
+`rse update --safe-latest` selects the newest stable version that passes Rse's package metadata policy instead of blindly taking the newest publish. The current policy checks npm release age, deprecated package metadata, install-script risk, and optionally Socket.dev shallow alerts before choosing a candidate.
 
 Useful flags:
 
 ```bash
 rse update react --safe-latest --age 7d --explain
 rse update --target packages/ui --safe-latest --fresh-scope @reliverse/* --json
+rse update zod --safe-latest --socket --socket-severity-threshold high
+rse update zod --safe-latest --require-socket --json
 ```
 
 Current defaults:
@@ -40,6 +42,7 @@ Current defaults:
 - max fallback depth: `20` stable versions
 - deprecated versions: blocked
 - install-script versions: blocked unless policy internals allowlist them
+- Socket shallow checks: disabled by default, optional with `--socket`, required with `--require-socket`; these use the local Socket CLI (`socket package shallow npm <pkg>@<version> --json`)
 
 These defaults can live in optional `rse.config.json` / `rse.config.jsonc` under `pm.safeLatest`. Explicit CLI flags win over config values, and config values win over built-in defaults.
 
@@ -52,7 +55,12 @@ These defaults can live in optional `rse.config.json` / `rse.config.jsonc` under
       "maxFallbackDepth": 20,
       "blockDeprecated": true,
       "blockInstallScripts": "unlessAllowlisted",
-      "installScriptAllowlist": []
+      "installScriptAllowlist": [],
+      "socket": {
+        "enabled": false,
+        "require": false,
+        "severityThreshold": "high"
+      }
     }
   }
 }

@@ -163,8 +163,8 @@ Legend:
 
 ### Supply-chain safety
 
-- [ ] Add optional Socket shallow checks for safe-latest candidates
-- [ ] Add `--require-socket` for CI-grade safe-latest runs
+- [x] Add optional Socket shallow checks for safe-latest candidates
+- [x] Add `--require-socket` for CI-grade safe-latest runs
 - [ ] Add resolved-tree verification after `bun install`
 - [ ] Add `rse verify-lock --socket --json` for existing lockfiles
 

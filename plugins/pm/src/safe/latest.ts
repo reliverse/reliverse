@@ -1,3 +1,11 @@
+export type SocketSeverity = "low" | "medium" | "high" | "critical";
+
+export interface SafeLatestSocketPolicy {
+  readonly enabled: boolean;
+  readonly require: boolean;
+  readonly severityThreshold: SocketSeverity;
+}
+
 export interface SafeLatestPolicy {
   readonly allowFreshScopes: readonly string[];
   readonly blockDeprecated: boolean;
@@ -5,6 +13,30 @@ export interface SafeLatestPolicy {
   readonly installScriptAllowlist: readonly string[];
   readonly maxFallbackDepth: number;
   readonly minimumReleaseAgeDays: number;
+  readonly socket: SafeLatestSocketPolicy;
+}
+
+export type SafeLatestPolicyInput = Partial<Omit<SafeLatestPolicy, "socket">> & {
+  readonly socket?: Partial<SafeLatestSocketPolicy> | undefined;
+};
+
+export interface SocketAlertSummary {
+  readonly category?: string | undefined;
+  readonly severity: SocketSeverity;
+  readonly title?: string | undefined;
+}
+
+export interface SocketShallowCheckResult {
+  readonly alerts: readonly SocketAlertSummary[];
+  readonly ok: boolean;
+  readonly unavailableReason?: string | undefined;
+}
+
+export interface SocketShallowChecker {
+  (input: {
+    readonly packageName: string;
+    readonly version: string;
+  }): Promise<SocketShallowCheckResult>;
 }
 
 export interface SafeVersionDecision {
@@ -44,6 +76,12 @@ export interface SafeLatestPackageMetadata {
   readonly versions: readonly string[];
 }
 
+export const DEFAULT_SAFE_LATEST_SOCKET_POLICY: SafeLatestSocketPolicy = {
+  enabled: false,
+  require: false,
+  severityThreshold: "high",
+};
+
 export const DEFAULT_SAFE_LATEST_POLICY: SafeLatestPolicy = {
   allowFreshScopes: ["@reliverse/*"],
   blockDeprecated: true,
@@ -51,10 +89,17 @@ export const DEFAULT_SAFE_LATEST_POLICY: SafeLatestPolicy = {
   installScriptAllowlist: [],
   maxFallbackDepth: 20,
   minimumReleaseAgeDays: 7,
+  socket: DEFAULT_SAFE_LATEST_SOCKET_POLICY,
 };
 
 const INSTALL_SCRIPT_NAMES = new Set(["preinstall", "install", "postinstall", "prepare"]);
 const packageMetadataCache = new Map<string, Promise<SafeLatestPackageMetadata>>();
+const SEVERITY_RANK: Record<SocketSeverity, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  critical: 4,
+};
 
 function parseSemver(version: string): { prerelease?: string | undefined } | null {
   const match = /^\d+\.\d+\.\d+(?:-(?<prerelease>[0-9A-Za-z.-]+))?(?:\+[0-9A-Za-z.-]+)?$/.exec(
@@ -123,22 +168,159 @@ function hasBlockingInstallScript(
   );
 }
 
-function normalizeSafeLatestPolicy(policy?: Partial<SafeLatestPolicy>): SafeLatestPolicy {
+function normalizeSafeLatestPolicy(policy?: SafeLatestPolicyInput): SafeLatestPolicy {
   return {
     ...DEFAULT_SAFE_LATEST_POLICY,
     ...policy,
     allowFreshScopes: policy?.allowFreshScopes ?? DEFAULT_SAFE_LATEST_POLICY.allowFreshScopes,
     installScriptAllowlist:
       policy?.installScriptAllowlist ?? DEFAULT_SAFE_LATEST_POLICY.installScriptAllowlist,
+    socket: {
+      ...DEFAULT_SAFE_LATEST_SOCKET_POLICY,
+      ...(policy?.socket ?? {}),
+    },
   };
 }
 
-export function resolveSafeLatestFromMetadata(options: {
+function normalizeSocketSeverity(value: unknown): SocketSeverity | undefined {
+  if (value === "middle") return "medium";
+  if (value === "low" || value === "medium" || value === "high" || value === "critical") {
+    return value;
+  }
+  return undefined;
+}
+
+function shouldBlockSocketAlert(alert: SocketAlertSummary, threshold: SocketSeverity): boolean {
+  return SEVERITY_RANK[alert.severity] >= SEVERITY_RANK[threshold];
+}
+
+function collectSocketAlerts(value: unknown): SocketAlertSummary[] {
+  const alerts: SocketAlertSummary[] = [];
+  const seen = new Set<unknown>();
+
+  function visit(node: unknown): void {
+    if (!node || typeof node !== "object") return;
+    if (seen.has(node)) return;
+    seen.add(node);
+
+    if (Array.isArray(node)) {
+      for (const item of node) visit(item);
+      return;
+    }
+
+    const record = node as Record<string, unknown>;
+    const severity = normalizeSocketSeverity(record.severity);
+
+    if (severity) {
+      alerts.push({
+        category:
+          typeof record.type === "string"
+            ? record.type
+            : typeof record.category === "string"
+              ? record.category
+              : undefined,
+        severity,
+        title:
+          typeof record.title === "string"
+            ? record.title
+            : typeof record.message === "string"
+              ? record.message
+              : undefined,
+      });
+    }
+
+    for (const child of Object.values(record)) visit(child);
+  }
+
+  visit(value);
+  return alerts;
+}
+
+export async function defaultSocketShallowChecker(input: {
+  readonly packageName: string;
+  readonly version: string;
+}): Promise<SocketShallowCheckResult> {
+  try {
+    const processHandle = Bun.spawn(
+      ["socket", "package", "shallow", "npm", `${input.packageName}@${input.version}`, "--json"],
+      {
+        stderr: "pipe",
+        stdout: "pipe",
+      },
+    );
+    const [stdout, stderr, exitCode] = await Promise.all([
+      new Response(processHandle.stdout).text(),
+      new Response(processHandle.stderr).text(),
+      processHandle.exited,
+    ]);
+
+    if (exitCode !== 0) {
+      return {
+        alerts: [],
+        ok: false,
+        unavailableReason: stderr.trim() || stdout.trim() || `socket CLI exited ${exitCode}`,
+      };
+    }
+
+    const payload = stdout.trim().length > 0 ? (JSON.parse(stdout) as unknown) : undefined;
+    return {
+      alerts: collectSocketAlerts(payload),
+      ok: true,
+    };
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return {
+      alerts: [],
+      ok: false,
+      unavailableReason: message,
+    };
+  }
+}
+
+async function evaluateSocketPolicy(options: {
+  readonly checker?: SocketShallowChecker | undefined;
+  readonly packageName: string;
+  readonly policy: SafeLatestPolicy;
+  readonly version: string;
+}): Promise<{
+  readonly acceptedReasons: readonly string[];
+  readonly blockReasons: readonly string[];
+}> {
+  if (!options.policy.socket.enabled && !options.policy.socket.require) {
+    return { acceptedReasons: [], blockReasons: [] };
+  }
+
+  const checker = options.checker ?? defaultSocketShallowChecker;
+  const result = await checker({ packageName: options.packageName, version: options.version });
+
+  if (!result.ok) {
+    const reason = `socketUnavailable:${result.unavailableReason ?? "unknown"}`;
+    return options.policy.socket.require
+      ? { acceptedReasons: [], blockReasons: [reason] }
+      : { acceptedReasons: [reason], blockReasons: [] };
+  }
+
+  const blockReasons = result.alerts
+    .filter((alert) => shouldBlockSocketAlert(alert, options.policy.socket.severityThreshold))
+    .map((alert) =>
+      ["socketAlert", alert.severity, alert.category, alert.title]
+        .filter((part) => part && String(part).trim().length > 0)
+        .join(":"),
+    );
+
+  return {
+    acceptedReasons: blockReasons.length === 0 ? ["socketShallowOk"] : [],
+    blockReasons,
+  };
+}
+
+export async function resolveSafeLatestFromMetadata(options: {
   readonly metadata: SafeLatestPackageMetadata;
   readonly nowMs?: number | undefined;
   readonly packageName: string;
-  readonly policy?: Partial<SafeLatestPolicy> | undefined;
-}): SafeUpdateResolution {
+  readonly policy?: SafeLatestPolicyInput | undefined;
+  readonly socketChecker?: SocketShallowChecker | undefined;
+}): Promise<SafeUpdateResolution> {
   const policy = normalizeSafeLatestPolicy(options.policy);
   const candidates = options.metadata.versions
     .filter((version) => parseSemver(version)?.prerelease === undefined)
@@ -169,6 +351,17 @@ export function resolveSafeLatestFromMetadata(options: {
       reasons.push("installScript");
     }
 
+    const socketEvaluation =
+      reasons.length === 0
+        ? await evaluateSocketPolicy({
+            checker: options.socketChecker,
+            packageName: options.packageName,
+            policy,
+            version,
+          })
+        : { acceptedReasons: [], blockReasons: [] };
+    reasons.push(...socketEvaluation.blockReasons);
+
     if (reasons.length > 0) {
       skipped.push({ reasons, version });
       continue;
@@ -179,6 +372,7 @@ export function resolveSafeLatestFromMetadata(options: {
         reasons: [
           releaseAgeDays === null ? "releaseAgeUnknown" : `age:${Math.floor(releaseAgeDays)}d`,
           "npmMetadataOk",
+          ...socketEvaluation.acceptedReasons,
         ],
         version,
       },
@@ -254,8 +448,9 @@ async function fetchSafeLatestPackageMetadata(
 export async function resolveSafeLatestVersion(options: {
   readonly currentSpecifier: string;
   readonly packageName: string;
-  readonly policy?: Partial<SafeLatestPolicy> | undefined;
+  readonly policy?: SafeLatestPolicyInput | undefined;
   readonly refresh?: boolean | undefined;
+  readonly socketChecker?: SocketShallowChecker | undefined;
 }): Promise<SafeUpdateResolution> {
   const metadata = await fetchSafeLatestPackageMetadata(options.packageName, {
     refresh: options.refresh,
@@ -265,5 +460,6 @@ export async function resolveSafeLatestVersion(options: {
     metadata,
     packageName: options.packageName,
     policy: options.policy,
+    socketChecker: options.socketChecker,
   });
 }

@@ -26,6 +26,11 @@
       "installScriptAllowlist": [],
       "maxFallbackDepth": 20,
       "minimumReleaseAgeDays": 7,
+      "socket": {
+        "enabled": false,
+        "require": false,
+        "severityThreshold": "high",
+      },
     },
   },
 }

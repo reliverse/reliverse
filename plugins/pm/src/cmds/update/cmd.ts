@@ -402,6 +402,22 @@ export default defineCommand({
       description: "Maximum older stable versions checked by --safe-latest",
       inputSources: ["flag"],
     },
+    socket: {
+      type: "boolean",
+      description: "Run optional Socket shallow checks for --safe-latest candidates",
+      inputSources: ["flag"],
+    },
+    requireSocket: {
+      type: "boolean",
+      description: "Require Socket shallow checks for --safe-latest candidate selection",
+      inputSources: ["flag"],
+    },
+    socketSeverityThreshold: {
+      type: "string",
+      description: "Lowest Socket alert severity that blocks a safe-latest candidate",
+      hint: "low | medium | middle | high | critical",
+      inputSources: ["flag"],
+    },
     explain: {
       type: "boolean",
       description: "Show per-package safe-latest decision details in text output",
@@ -456,6 +472,18 @@ export default defineCommand({
           return ctx.exit(1, `Failed to read optional rse.config.json: ${message}`);
         })
       : undefined;
+    const socketSeverityThreshold = ((): "low" | "medium" | "high" | "critical" | undefined => {
+      if (ctx.options.socketSeverityThreshold === undefined) return undefined;
+      const value = ctx.options.socketSeverityThreshold.trim();
+      if (value === "middle") return "medium";
+      if (value === "low" || value === "medium" || value === "high" || value === "critical") {
+        return value;
+      }
+      return ctx.exit(
+        1,
+        'Invalid --socket-severity-threshold: use "low", "medium"/"middle", "high", or "critical".',
+      );
+    })();
     const cliSafeLatestPolicy = {
       ...(ctx.options.freshScope === undefined
         ? {}
@@ -466,6 +494,21 @@ export default defineCommand({
       ...(ctx.options.age === undefined
         ? {}
         : { minimumReleaseAgeDays: parseDurationDays(ctx.options.age, 7) }),
+      ...(ctx.options.socket === true ||
+      ctx.options.requireSocket === true ||
+      socketSeverityThreshold !== undefined
+        ? {
+            socket: {
+              ...(ctx.options.socket === true || ctx.options.requireSocket === true
+                ? { enabled: true }
+                : {}),
+              ...(ctx.options.requireSocket === true ? { require: true } : {}),
+              ...(socketSeverityThreshold === undefined
+                ? {}
+                : { severityThreshold: socketSeverityThreshold }),
+            },
+          }
+        : {}),
     };
     const safeLatestPolicy = mergeSafeLatestPolicy(rseConfig?.pm?.safeLatest, cliSafeLatestPolicy);
 
