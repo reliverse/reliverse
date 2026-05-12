@@ -86,10 +86,12 @@ Legend:
 - [x] Add focused tests for pm lockfile safety
 - [x] Add focused tests for safe-latest resolution policy
 - [x] Add focused tests for transaction snapshot rollback including `bun.lock`
-- [ ] Add command-level focused tests for `pm add`
-- [ ] Add command-level focused tests for `pm update`
-- [ ] Add snapshot-like tests for JSON result payloads
-- [ ] Add snapshot-like tests for human-readable preview output
+- [x] Add command-level focused tests for `pm add`
+- [x] Add command-level focused tests for `pm update`
+- [x] Add focused JSON result payload coverage for safe-latest update previews
+- [x] Add focused human-readable output coverage for safe-latest `--explain` previews
+- [ ] Add broader snapshot-like tests for JSON result payloads
+- [ ] Add broader snapshot-like tests for human-readable preview output
 - [ ] Normalize wording and payload shapes across `pm add` and `pm update`
 
 ### Update controls
