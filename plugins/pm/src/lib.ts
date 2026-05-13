@@ -4,12 +4,15 @@ import { dirname, join, relative, resolve } from "node:path";
 
 export { assertSupportedBunLockfileProject, getBunLockfilePath } from "./lockfile";
 export { resolveSafeLatestVersion, type SafeVersionDecision } from "./safe/latest";
+export { verifyBunLock, type VerifyLockResult } from "./verify-lock";
 
 export type DependencySection =
   | "dependencies"
   | "devDependencies"
   | "optionalDependencies"
   | "peerDependencies";
+
+export type VersionPolicy = "minor-only" | "no-major" | "patch-only";
 
 export interface PackageManifest {
   readonly catalog?: Record<string, string> | undefined;
@@ -735,16 +738,84 @@ function findLatestStableVersion(metadata: RegistryPackageMetadata): string | nu
   return null;
 }
 
+function resolveVersionPolicyVersion(options: {
+  readonly currentSpecifier: string;
+  readonly metadata: RegistryPackageMetadata;
+  readonly policy: VersionPolicy;
+}): string | null {
+  const baseVersion = extractBaseSpecifierVersion(options.currentSpecifier);
+
+  if (!baseVersion) {
+    return null;
+  }
+
+  const currentVersion = parseSemver(baseVersion);
+
+  if (!currentVersion) {
+    return null;
+  }
+
+  return (
+    options.metadata.versions
+      .filter((version) => {
+        const parsed = parseSemver(version);
+
+        if (!parsed || parsed.prerelease) {
+          return false;
+        }
+
+        if (parsed.major !== currentVersion.major) {
+          return false;
+        }
+
+        const isNewer =
+          parsed.major > currentVersion.major ||
+          (parsed.major === currentVersion.major && parsed.minor > currentVersion.minor) ||
+          (parsed.major === currentVersion.major &&
+            parsed.minor === currentVersion.minor &&
+            parsed.patch > currentVersion.patch);
+
+        if (!isNewer) {
+          return false;
+        }
+
+        if (options.policy === "patch-only") {
+          return parsed.minor === currentVersion.minor;
+        }
+
+        if (options.policy === "minor-only") {
+          return parsed.minor > currentVersion.minor;
+        }
+
+        return true;
+      })
+      .at(-1) ?? null
+  );
+}
+
 export async function resolveUpdateVersion(options: {
   readonly currentSpecifier: string;
   readonly refresh?: boolean | undefined;
   readonly latest?: boolean | undefined;
   readonly packageName: string;
   readonly smart?: boolean | undefined;
+  readonly versionPolicy?: VersionPolicy | undefined;
 }): Promise<string> {
   const metadata = await fetchRegistryPackageMetadata(options.packageName, {
     refresh: options.refresh,
   });
+
+  if (options.versionPolicy) {
+    const policyVersion = resolveVersionPolicyVersion({
+      currentSpecifier: options.currentSpecifier,
+      metadata,
+      policy: options.versionPolicy,
+    });
+
+    if (policyVersion) {
+      return policyVersion;
+    }
+  }
 
   if (options.smart === true) {
     if (options.latest) {

@@ -15,6 +15,7 @@ Legend:
 - [x] File-based Rempts plugin wired into `rse`
 - [x] `pm add` command
 - [x] `pm update` command
+- [x] `pm verify-lock` command
 - [x] Bun-first execution model
 - [x] JSON-friendly command results
 - [x] Dry-run support for mutating flows
@@ -79,6 +80,7 @@ Legend:
 - [x] Explicit update strategy reporting
 - [x] Explicit final Bun command reporting
 - [x] Explicit install cwd reporting
+- [x] Explicit lockfile verification reporting
 
 ## v0.2.0, near-term quality upgrades
 
@@ -91,39 +93,39 @@ Legend:
 - [x] Add command-level focused tests for `pm update`
 - [x] Add focused JSON result payload coverage for safe-latest update previews
 - [x] Add focused human-readable output coverage for safe-latest `--explain` previews
-- [ ] Add broader snapshot-like tests for JSON result payloads
-- [ ] Add broader snapshot-like tests for human-readable preview output
-- [ ] Normalize wording and payload shapes across `pm add` and `pm update`
+- [x] Add broader snapshot-like tests for JSON result payloads
+- [x] Add broader snapshot-like tests for human-readable preview output
+- [x] Normalize wording and payload shapes across `pm add` and `pm update`
 
 ### Update controls
 
-- [ ] Add `--section <dependencies|devDependencies|peerDependencies|optionalDependencies>` filter for `pm update`
-- [ ] Add `--ignore <pkg1,pkg2,...>` filter for `pm update`
-- [ ] Add `--only <pkg1,pkg2,...>` style alternative if it proves clearer than positional args in some workflows
-- [ ] Improve not-found diagnostics by showing where the command searched
+- [x] Add `--section <dependencies|devDependencies|peerDependencies|optionalDependencies>` filter for `pm update`
+- [x] Add `--ignore <pkg1,pkg2,...>` filter for `pm update`
+- [x] Add `--only <pkg1,pkg2,...>` style alternative if it proves clearer than positional args in some workflows
+- [x] Improve not-found diagnostics by showing where the command searched
 
 ### Strategy clarity
 
 - [x] Include safe-latest per-package strategy reasons in JSON output
 - [x] Include safe-latest per-package strategy reasons in text output via `--explain`
-- [ ] Include clearer non-safe-latest per-package strategy reasons in JSON output
-- [ ] Include clearer non-safe-latest per-package strategy reasons in text output
-- [ ] Refine help text around `smart`, `latest`, and range-based resolution
+- [x] Include clearer non-safe-latest per-package strategy reasons in JSON output
+- [x] Include clearer non-safe-latest per-package strategy reasons in text output
+- [x] Refine help text around `smart`, `latest`, and range-based resolution
 
 ## v0.3.0, safer large-repo update flows
 
 ### Version policy controls
 
-- [ ] Add `--patch-only`
-- [ ] Add `--minor-only`
-- [ ] Add `--no-major`
-- [ ] Decide whether peer dependency updates should have separate policy controls
+- [x] Add `--patch-only`
+- [x] Add `--minor-only`
+- [x] Add `--no-major`
+- [-] Decide whether peer dependency updates should have separate policy controls (deferred; `--section peerDependencies` is enough for now)
 
 ### Planning and preview
 
-- [ ] Show grouped manifest-level diffs even more compactly for large runs
-- [ ] Add a clearer execution plan section before writes happen
-- [ ] Improve repo-root recursive update reporting so workspace summaries stay compact
+- [x] Show grouped manifest-level diffs even more compactly for large runs
+- [x] Add a clearer execution plan section before writes happen
+- [x] Improve repo-root recursive update reporting so workspace summaries stay compact
 
 ### Operational safety
 
@@ -132,6 +134,7 @@ Legend:
 - [x] Audit rollback behavior for all partial-failure scenarios beyond install failure
 - [x] Make transaction phases more explicit in code structure
 - [x] Improve failure messages around the final Bun step
+- [x] Verify `bun.lock` after successful apply installs and roll back on verification failure
 
 ## v0.4.0, optional power-user workflows
 
@@ -150,10 +153,10 @@ Legend:
 
 ### Production readiness
 
-- [ ] Stabilize JSON payload contracts for external automation
-- [ ] Stabilize command help and examples
-- [ ] Document all supported workspace/catalog behaviors clearly in README/ROADMAP/docs
-- [ ] Reach strong test coverage for add/update core flows
+- [x] Stabilize JSON payload contracts for external automation
+- [x] Stabilize command help and examples
+- [x] Document all supported workspace/catalog behaviors clearly in README/ROADMAP/docs
+- [x] Reach strong test coverage for add/update core flows
 - [ ] Validate behavior against several real Bun monorepo layouts
 
 ### Config integration
@@ -165,8 +168,8 @@ Legend:
 
 - [x] Add optional Socket shallow checks for safe-latest candidates
 - [x] Add `--require-socket` for CI-grade safe-latest runs
-- [ ] Add resolved-tree verification after `bun install`
-- [ ] Add `rse verify-lock --socket --json` for existing lockfiles
+- [x] Add resolved-tree verification after `bun install`
+- [x] Add `rse verify-lock --socket --json` for existing lockfiles
 
 ### Nice-to-have, not committed
 

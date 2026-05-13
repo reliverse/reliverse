@@ -19,12 +19,15 @@ import {
   type PackageInput,
   type ManifestTarget,
   type SafeVersionDecision,
+  type VerifyLockResult,
+  type VersionPolicy,
   resolveSafeLatestVersion,
   resolveUpdateVersion,
   resolveTargetContext,
   runBunInstall,
   setCatalogEntry,
   setDependency,
+  verifyBunLock,
   withSnapshotRollback,
   writeManifest,
 } from "../../lib";
@@ -80,6 +83,28 @@ function parseListOption(value: unknown): readonly string[] {
     .filter((entry) => entry.length > 0);
 }
 
+function parseDependencySectionOption(
+  value: unknown,
+  exit: (code: number, message: string) => never,
+): DependencySection | undefined {
+  if (value === undefined) return undefined;
+  const section = String(value).trim();
+
+  if (
+    section === "dependencies" ||
+    section === "devDependencies" ||
+    section === "peerDependencies" ||
+    section === "optionalDependencies"
+  ) {
+    return section;
+  }
+
+  return exit(
+    1,
+    "Invalid --section: use dependencies, devDependencies, peerDependencies, or optionalDependencies.",
+  );
+}
+
 function describeStrategy(options: { readonly latest: boolean; readonly smart: boolean }): {
   label: string;
   text: string;
@@ -109,6 +134,45 @@ function describeStrategy(options: { readonly latest: boolean; readonly smart: b
     label: "range",
     text: "current semver range",
   };
+}
+
+function describeNonSafeResolutionReason(options: {
+  readonly currentSpecifier: string;
+  readonly nextSpecifier: string;
+  readonly strategyLabel: string;
+  readonly versionPolicy?: VersionPolicy | undefined;
+}): string {
+  if (options.nextSpecifier === options.currentSpecifier) {
+    return canRewriteSpecifier(options.currentSpecifier)
+      ? "resolved version already matches current specifier"
+      : "specifier is not rewritable; Bun install refreshes lockfile metadata";
+  }
+
+  if (options.versionPolicy === "patch-only") {
+    return "selected newest patch within current major/minor line";
+  }
+
+  if (options.versionPolicy === "minor-only") {
+    return "selected newest newer minor within current major line";
+  }
+
+  if (options.versionPolicy === "no-major") {
+    return "selected newest version within current major line";
+  }
+
+  if (options.strategyLabel === "smart-latest-stable") {
+    return "selected newest stable overall using smart latest strategy";
+  }
+
+  if (options.strategyLabel === "smart-range") {
+    return "selected best version within current range/prerelease line using smart strategy";
+  }
+
+  if (options.strategyLabel === "latest") {
+    return "selected npm dist-tags.latest";
+  }
+
+  return "selected newest version satisfying current semver range";
 }
 
 function formatActionTarget(action: UpdateAction, fallbackLabel: string): string {
@@ -156,6 +220,92 @@ function groupUpdatedActions(actions: readonly UpdateAction[], fallbackLabel: st
   }
 
   return grouped;
+}
+
+function createExecutionPlan(options: {
+  readonly autoinstall: boolean;
+  readonly changedManifestTargets: readonly ManifestTarget[];
+  readonly installCommand: string;
+  readonly installCwd: string;
+  readonly manifestTargets: readonly ManifestTarget[];
+  readonly recursive: boolean;
+  readonly rootChanged: boolean;
+}) {
+  return {
+    changedManifests: options.changedManifestTargets.length + (options.rootChanged ? 1 : 0),
+    install: {
+      command: options.installCommand,
+      cwd: options.installCwd,
+      enabled: options.autoinstall,
+      verification: options.autoinstall ? "bun.lock" : undefined,
+    },
+    recursive: options.recursive,
+    rootCatalogChanged: options.rootChanged,
+    scannedManifests: options.manifestTargets.length,
+  };
+}
+
+function emitExecutionPlan(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        cyan(text: string): string;
+        magenta(text: string): string;
+      };
+    };
+    out(...values: unknown[]): void;
+  },
+  plan: ReturnType<typeof createExecutionPlan>,
+  options: { readonly apply: boolean },
+): void {
+  ctx.out(infoLabel(ctx, options.apply ? "Execution plan" : "Execution plan after --apply"));
+  ctx.out(
+    `${ctx.colors.stdout.magenta("-")} manifests: ${plan.changedManifests} changed / ${plan.scannedManifests} scanned${plan.recursive ? " (recursive)" : ""}`,
+  );
+  ctx.out(
+    `${ctx.colors.stdout.magenta("-")} writes: ${plan.changedManifests} manifest/catalog file(s) + bun.lock snapshot`,
+  );
+  ctx.out(
+    `${ctx.colors.stdout.magenta("-")} install: ${plan.install.enabled ? `${plan.install.command} (${plan.install.cwd})` : "disabled (--no-autoinstall)"}`,
+  );
+  if (plan.install.verification) {
+    ctx.out(`${ctx.colors.stdout.magenta("-")} verify: ${plan.install.verification} after install`);
+  }
+}
+
+function emitGroupedUpdatedActions(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        green(text: string): string;
+        magenta(text: string): string;
+      };
+    };
+    out(...values: unknown[]): void;
+  },
+  grouped: Map<string, UpdateAction[]>,
+  options: { readonly limitPerGroup?: number | undefined },
+): void {
+  const limitPerGroup = options.limitPerGroup ?? 8;
+
+  for (const [targetLabel, targetActions] of grouped) {
+    const suffix =
+      targetActions.length > limitPerGroup ? ` (${targetActions.length} update(s))` : "";
+    ctx.out(`${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(targetLabel)}${suffix}`);
+
+    for (const action of targetActions.slice(0, limitPerGroup)) {
+      ctx.out(
+        `  ${ctx.colors.stdout.bold(action.packageName)}: ${action.previousSpecifier} -> ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
+      );
+    }
+
+    const remaining = targetActions.length - limitPerGroup;
+    if (remaining > 0) {
+      ctx.out(`  … ${remaining} more update(s); use --json for the full action list`);
+    }
+  }
 }
 
 function groupNoteActions(actions: readonly UpdateAction[]) {
@@ -223,6 +373,52 @@ function emitUpdateNotes(
     ctx.out(
       `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, options.fallbackLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
     );
+  }
+}
+
+function emitStrategyReasons(
+  ctx: {
+    colors: {
+      stdout: {
+        bold(text: string): string;
+        magenta(text: string): string;
+        yellow(text: string): string;
+      };
+    };
+    out(...values: unknown[]): void;
+  },
+  options: {
+    readonly actions: readonly UpdateAction[];
+    readonly enabled: boolean;
+    readonly fallbackLabel: string;
+  },
+): void {
+  if (!options.enabled) {
+    return;
+  }
+
+  const resolvedActions = options.actions.filter(
+    (action) =>
+      (action.action === "updated" || action.action === "noop") &&
+      action.safeDecision === undefined &&
+      action.reason,
+  );
+
+  if (resolvedActions.length === 0) {
+    return;
+  }
+
+  ctx.out(warnLabel(ctx, "Strategy decisions:"));
+
+  for (const action of resolvedActions.slice(0, 20)) {
+    ctx.out(
+      `${ctx.colors.stdout.magenta("-")} ${formatActionTarget(action, options.fallbackLabel)} :: ${ctx.colors.stdout.bold(action.packageName)} :: ${action.reason}`,
+    );
+  }
+
+  const remaining = resolvedActions.length - 20;
+  if (remaining > 0) {
+    ctx.out(`  … ${remaining} more decision(s); use --json for the full action list`);
   }
 }
 
@@ -323,6 +519,12 @@ class InstallFailedError extends Error {
   }
 }
 
+class VerifyLockFailedError extends Error {
+  constructor(readonly verification: VerifyLockResult) {
+    super("bun.lock verification failed");
+  }
+}
+
 export default defineCommand({
   meta: {
     name: "update",
@@ -354,11 +556,13 @@ export default defineCommand({
       "rse update typescript --json",
       "rse update typescript --no-latest --json",
       "rse update vite --no-smart --json",
+      "rse update --section dependencies --ignore react,react-dom --json",
+      "rse update --only vite,typescript --no-major --json",
       "rse update react --safe-latest --age 7d --explain",
       "rse update --cwd /path/to/project --target /path/to/project --apply --json",
       "rse update --apply",
     ],
-    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current prerelease release line and promotes to matching stable when available. Pass `--safe-latest` to select the newest stable version that passes Rse's npm metadata policy: release age, deprecated package, and install-script gates. Pass `--no-smart` to disable smart version selection. Pass `--no-latest` to stay within the current semver range. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to write pm-controlled manifest/catalog changes and then run `bun install`. Preview output shows grouped specifier diffs and the final install command that would run. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
+    text: "By default this command previews updates to the newest stable version. Smart mode is enabled by default: with `latest=true` it selects the newest stable overall, and with `latest=false` it follows the current semver/prerelease line. Pass `--safe-latest` to select the newest stable version that passes Rse's npm metadata policy: release age, deprecated package, install-script gates, and optional Socket checks. Pass `--no-smart` to disable smart version selection. Pass `--no-latest` to stay within the current semver range. Use `--patch-only`, `--minor-only`, or `--no-major` for explicit version policy limits; these are mutually exclusive and do not combine with `--safe-latest`. Use `--section`, `--ignore`, or `--only` for focused large-repo runs. When the target is a monorepo root, workspace manifests are swept recursively by default; use `--no-recursive` to limit the run to the root manifest. Pass `--apply` to write pm-controlled manifest/catalog changes and then run `bun install`. Preview output shows manifest scan counts, an execution plan, and compact grouped specifier diffs. Catalog-backed dependencies are updated through the Bun catalog in the repo root.",
   },
   options: {
     autoinstall: {
@@ -390,6 +594,40 @@ export default defineCommand({
       type: "string",
       description: "Minimum package release age for --safe-latest, for example 7d",
       inputSources: ["flag"],
+    },
+    section: {
+      type: "string",
+      description:
+        "Limit updates to one dependency section: dependencies, devDependencies, peerDependencies, or optionalDependencies",
+      inputSources: ["flag"],
+    },
+    ignore: {
+      type: "string",
+      description: "Comma-separated package names to skip during update discovery",
+      inputSources: ["flag"],
+    },
+    only: {
+      type: "string",
+      description:
+        "Comma-separated package names to update; alternative to positional package args",
+      inputSources: ["flag"],
+    },
+    patchOnly: {
+      type: "boolean",
+      description: "Update only within the current major/minor line",
+      inputSources: ["flag"],
+    },
+    minorOnly: {
+      type: "boolean",
+      description: "Update only to newer minor versions within the current major line",
+      inputSources: ["flag"],
+    },
+    major: {
+      type: "boolean",
+      defaultValue: true,
+      description:
+        "Allow major-version updates; pass --no-major to stay within the current major line",
+      inputSources: ["flag", "default"],
     },
     freshScope: {
       type: "string",
@@ -447,7 +685,14 @@ export default defineCommand({
     },
   },
   async handler(ctx) {
-    const requestedInputs: PackageInput[] = (ctx.args as string[]).map(parsePackageInput);
+    const positionalInputs: PackageInput[] = (ctx.args as string[]).map(parsePackageInput);
+    const onlyInputs: PackageInput[] = parseListOption(ctx.options.only).map(parsePackageInput);
+
+    if (positionalInputs.length > 0 && onlyInputs.length > 0) {
+      ctx.exit(1, "Choose either positional package args or --only, not both.");
+    }
+
+    const requestedInputs = onlyInputs.length > 0 ? onlyInputs : positionalInputs;
 
     for (const input of requestedInputs) {
       if (input.requestedSpecifier) {
@@ -459,6 +704,19 @@ export default defineCommand({
     }
 
     const requestedPackages = [...new Set(requestedInputs.map((input) => input.name))];
+    const ignoredPackages = new Set(parseListOption(ctx.options.ignore));
+    const sectionFilter = parseDependencySectionOption(ctx.options.section, ctx.exit);
+    const versionPolicyFlags = [
+      ctx.options.patchOnly === true ? "patch-only" : undefined,
+      ctx.options.minorOnly === true ? "minor-only" : undefined,
+      ctx.options.major === false ? "no-major" : undefined,
+    ].filter((policy): policy is VersionPolicy => policy !== undefined);
+
+    if (versionPolicyFlags.length > 1) {
+      ctx.exit(1, "Choose only one of --patch-only, --minor-only, or --no-major.");
+    }
+
+    const versionPolicy = versionPolicyFlags[0];
     const context = await resolveTargetContext({
       cwd: ctx.options.cwd,
       target: ctx.options.target,
@@ -519,6 +777,13 @@ export default defineCommand({
       );
     }
 
+    if (safeLatest && versionPolicy) {
+      ctx.exit(
+        1,
+        "Choose either --safe-latest or a version policy flag; --safe-latest owns candidate selection.",
+      );
+    }
+
     const smartByDefault = ctx.options.smart !== false;
     const latestByDefault = ctx.options.latest !== false;
     const executionRequested = ctx.safety.apply;
@@ -531,10 +796,20 @@ export default defineCommand({
           label: "safe-latest",
           text: "newest stable version passing Rse safe-latest policy",
         }
-      : describeStrategy({
-          latest: latestByDefault,
-          smart: smartByDefault,
-        });
+      : versionPolicy
+        ? {
+            label: versionPolicy,
+            text:
+              versionPolicy === "patch-only"
+                ? "newest patch version within the current major/minor line"
+                : versionPolicy === "minor-only"
+                  ? "newest newer minor version within the current major line"
+                  : "newest version within the current major line",
+          }
+        : describeStrategy({
+            latest: latestByDefault,
+            smart: smartByDefault,
+          });
     const recursiveByDefault = context.usesWorkspaces && context.targetDir === context.repoRootDir;
     const updateAllWorkspaceManifests = recursiveByDefault && ctx.options.recursive !== false;
     const manifestTargets: readonly ManifestTarget[] = await listManifestTargets(context, {
@@ -550,15 +825,24 @@ export default defineCommand({
       requestedPackages.length > 0
         ? requestedPackages
         : manifestTargets.flatMap((target) => listTargetDependencies(target.manifest));
+    const effectiveTargetPackages = targetPackages.filter(
+      (packageName) => !ignoredPackages.has(packageName),
+    );
     const installCommand = buildInstallCommand();
 
-    if (targetPackages.length === 0) {
+    if (effectiveTargetPackages.length === 0) {
       if (ctx.output.mode === "json") {
         ctx.output.result(
           {
             actions: [],
             apply,
             preview,
+            controls: {
+              ignoredPackages: [...ignoredPackages],
+              onlyPackages: onlyInputs.map((input) => input.name),
+              section: sectionFilter,
+              versionPolicy,
+            },
             install: {
               command: installCommand,
               cwd: context.installCwd,
@@ -594,10 +878,11 @@ export default defineCommand({
         continue;
       }
 
-      const manifestPackages =
+      const manifestPackages = (
         requestedPackages.length > 0
           ? requestedPackages
-          : [...listTargetDependencies(nextTargetManifest)];
+          : [...listTargetDependencies(nextTargetManifest)]
+      ).filter((packageName) => !ignoredPackages.has(packageName));
 
       for (const packageName of manifestPackages) {
         const targetLocation = findDependencyLocation(nextTargetManifest, packageName);
@@ -606,7 +891,15 @@ export default defineCommand({
           foundRequestedPackages.add(packageName);
         }
 
+        if (targetLocation && sectionFilter && targetLocation.section !== sectionFilter) {
+          continue;
+        }
+
         if (!targetLocation && requestedPackages.length > 0) {
+          if (sectionFilter) {
+            continue;
+          }
+
           const catalogEntry = findCatalogEntry(nextRootManifest, packageName);
 
           if (!catalogEntry) {
@@ -652,6 +945,10 @@ export default defineCommand({
 
         if (isCatalogProtocol(targetLocation.specifier)) {
           const catalogName = parseCatalogProtocol(targetLocation.specifier) ?? undefined;
+          if (sectionFilter && targetLocation.section !== sectionFilter) {
+            continue;
+          }
+
           const catalogEntry = findCatalogEntry(nextRootManifest, packageName, catalogName);
 
           if (!catalogEntry) {
@@ -718,6 +1015,7 @@ export default defineCommand({
                 latest: latestByDefault,
                 packageName: update.packageName,
                 smart: smartByDefault,
+                versionPolicy,
               }),
             };
         const nextVersion = resolution.version;
@@ -728,6 +1026,14 @@ export default defineCommand({
         return {
           ...update,
           nextSpecifier,
+          reason: resolution.decision
+            ? undefined
+            : describeNonSafeResolutionReason({
+                currentSpecifier: update.currentSpecifier,
+                nextSpecifier,
+                strategyLabel: strategy.label,
+                versionPolicy,
+              }),
           resolutionStrategy: strategy.label,
           safeDecision: resolution.decision,
         };
@@ -743,9 +1049,11 @@ export default defineCommand({
             catalogName: update.catalogName,
             packageName: update.packageName,
             previousSpecifier: update.currentSpecifier,
-            reason: canRewriteSpecifier(update.currentSpecifier)
-              ? "catalog entry is already up to date"
-              : "catalog entry uses a non-rewritable specifier; Bun install will refresh lockfile metadata",
+            reason:
+              update.reason ??
+              (canRewriteSpecifier(update.currentSpecifier)
+                ? "catalog entry is already up to date"
+                : "catalog entry uses a non-rewritable specifier; Bun install will refresh lockfile metadata"),
             resolutionStrategy: update.resolutionStrategy,
             safeDecision: update.safeDecision,
             section: update.section,
@@ -767,7 +1075,7 @@ export default defineCommand({
           nextSpecifier: update.nextSpecifier,
           packageName: update.packageName,
           previousSpecifier: update.currentSpecifier,
-          reason: "updated repo catalog entry",
+          reason: update.reason ?? "updated repo catalog entry",
           resolutionStrategy: update.resolutionStrategy,
           safeDecision: update.safeDecision,
           section: update.section,
@@ -791,9 +1099,11 @@ export default defineCommand({
           action: "noop",
           packageName: update.packageName,
           previousSpecifier: update.currentSpecifier,
-          reason: canRewriteSpecifier(update.currentSpecifier)
-            ? "already up to date"
-            : "specifier is not rewritten; Bun install will refresh lockfile metadata",
+          reason:
+            update.reason ??
+            (canRewriteSpecifier(update.currentSpecifier)
+              ? "already up to date"
+              : "specifier is not rewritten; Bun install will refresh lockfile metadata"),
           resolutionStrategy: update.resolutionStrategy,
           safeDecision: update.safeDecision,
           section: update.section,
@@ -815,6 +1125,7 @@ export default defineCommand({
         nextSpecifier: update.nextSpecifier,
         packageName: update.packageName,
         previousSpecifier: update.currentSpecifier,
+        reason: update.reason,
         resolutionStrategy: update.resolutionStrategy,
         safeDecision: update.safeDecision,
         section: update.section,
@@ -824,13 +1135,17 @@ export default defineCommand({
     }
 
     const missingRequestedPackages = requestedPackages.filter(
-      (packageName) => !foundRequestedPackages.has(packageName),
+      (packageName) =>
+        !ignoredPackages.has(packageName) && !foundRequestedPackages.has(packageName),
     );
 
     if (missingRequestedPackages.length > 0) {
+      const sectionText = sectionFilter ? ` section ${sectionFilter}` : " all dependency sections";
+      const ignoredText =
+        ignoredPackages.size > 0 ? ` Ignored: ${[...ignoredPackages].join(", ")}.` : "";
       ctx.exit(
         1,
-        `Some requested packages were not found for ${context.targetLabel}: ${missingRequestedPackages.join(", ")}.`,
+        `Some requested packages were not found for ${context.targetLabel}: ${missingRequestedPackages.join(", ")}. Searched ${manifestTargets.length} manifest(s) in${sectionText}${updateAllWorkspaceManifests ? " recursively" : ""}.${ignoredText}`,
       );
     }
 
@@ -845,16 +1160,32 @@ export default defineCommand({
     const rootChanged =
       JSON.stringify(nextRootManifest) !== JSON.stringify(context.repoRootManifest);
     const summary = createActionSummary(actions);
+    const executionPlan = createExecutionPlan({
+      autoinstall,
+      changedManifestTargets,
+      installCommand,
+      installCwd: context.installCwd,
+      manifestTargets,
+      recursive: updateAllWorkspaceManifests,
+      rootChanged,
+    });
     const resultPayload = {
       actions,
       apply,
       preview,
+      controls: {
+        ignoredPackages: [...ignoredPackages],
+        onlyPackages: onlyInputs.map((input) => input.name),
+        section: sectionFilter,
+        versionPolicy,
+      },
       install: {
         command: installCommand,
         cwd: context.installCwd,
         enabled: autoinstall,
         executed: false,
       },
+      executionPlan,
       latest: latestByDefault,
       safeLatest,
       safeLatestPolicy: safeLatest ? safeLatestPolicy : undefined,
@@ -882,6 +1213,14 @@ export default defineCommand({
 
       ctx.out(`${warnLabel(ctx, "No dependency updates:")} ${context.targetLabel}.`);
       ctx.out(`${infoLabel(ctx, "Strategy:")} ${strategy.text}.`);
+      ctx.out(
+        `${infoLabel(ctx, "Manifest scan:")} ${manifestTargets.length} manifest(s)${updateAllWorkspaceManifests ? " recursively" : ""}.`,
+      );
+      emitStrategyReasons(ctx, {
+        actions,
+        enabled: !safeLatest && ctx.options.explain === true,
+        fallbackLabel: context.targetLabel,
+      });
       emitSafeLatestDecisions(ctx, {
         actions,
         enabled: safeLatest,
@@ -903,21 +1242,17 @@ export default defineCommand({
       ctx.out(
         `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
       );
+      ctx.out(
+        `${infoLabel(ctx, "Manifest scan:")} ${changedManifestTargets.length} changed / ${manifestTargets.length} scanned${updateAllWorkspaceManifests ? " recursively" : ""}.`,
+      );
+      emitExecutionPlan(ctx, executionPlan, { apply: false });
 
       const grouped = groupUpdatedActions(actions, context.targetLabel);
 
       if (grouped.size > 0) {
         ctx.out(infoLabel(ctx, "Planned specifier changes:"));
 
-        for (const [targetLabel, targetActions] of grouped) {
-          ctx.out(`${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(targetLabel)}`);
-
-          for (const action of targetActions) {
-            ctx.out(
-              `  ${ctx.colors.stdout.bold(action.packageName)}: ${action.previousSpecifier} -> ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
-            );
-          }
-        }
+        emitGroupedUpdatedActions(ctx, grouped, { limitPerGroup: 8 });
       }
 
       emitUpdateNotes(ctx, {
@@ -925,18 +1260,17 @@ export default defineCommand({
         fallbackLabel: context.targetLabel,
         verbose,
       });
+      emitStrategyReasons(ctx, {
+        actions,
+        enabled: !safeLatest && ctx.options.explain === true,
+        fallbackLabel: context.targetLabel,
+      });
       emitSafeLatestDecisions(ctx, {
         actions,
         enabled: safeLatest,
         explain: ctx.options.explain === true,
       });
 
-      ctx.out(
-        `${infoLabel(ctx, "Install step:")} ${autoinstall ? `${installCommand} (after --apply)` : "disabled (--no-autoinstall)"}`,
-      );
-      if (autoinstall) {
-        ctx.out(`${infoLabel(ctx, "Install cwd:")} ${ctx.colors.stdout.bold(context.installCwd)}`);
-      }
       return;
     }
 
@@ -949,7 +1283,7 @@ export default defineCommand({
         ...(rootChanged ? [context.repoRootManifestPath] : []),
       ]),
     ];
-    const installResult = await withSnapshotRollback(snapshotPaths, async () => {
+    const transactionResult = await withSnapshotRollback(snapshotPaths, async () => {
       for (const target of changedManifestTargets) {
         const nextManifest = nextManifests.get(target.manifestPath);
 
@@ -970,7 +1304,20 @@ export default defineCommand({
         throw new InstallFailedError(result);
       }
 
-      return result;
+      const verification = result
+        ? await verifyBunLock({
+            cwd: context.installCwd,
+            requireSocket: safeLatestPolicy.socket.require,
+            socket: safeLatestPolicy.socket.enabled,
+            socketSeverityThreshold: safeLatestPolicy.socket.severityThreshold,
+          })
+        : null;
+
+      if (verification && !verification.ok) {
+        throw new VerifyLockFailedError(verification);
+      }
+
+      return { installResult: result, verification };
     }).catch((error: unknown) => {
       if (error instanceof InstallFailedError) {
         if (error.installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
@@ -983,22 +1330,44 @@ export default defineCommand({
         );
       }
 
+      if (error instanceof VerifyLockFailedError) {
+        return ctx.exit(
+          1,
+          `bun.lock verification failed after updating ${context.targetLabel}. Changes were reverted. Issues: ${error.verification.issues
+            .slice(0, 5)
+            .map(
+              (issue) =>
+                `${issue.packageName ?? "lockfile"}${issue.version ? `@${issue.version}` : ""}:${issue.reason}`,
+            )
+            .join(", ")}`,
+        );
+      }
+
       throw error;
     });
 
     const successPayload = {
       ...resultPayload,
-      install: installResult
+      install: transactionResult.installResult
         ? {
-            ...installResult,
+            ...transactionResult.installResult,
             enabled: true,
             executed: true,
+            verification: transactionResult.verification
+              ? {
+                  checkedPackages: transactionResult.verification.checkedPackages,
+                  issues: transactionResult.verification.issues,
+                  ok: transactionResult.verification.ok,
+                  socket: transactionResult.verification.socket,
+                }
+              : undefined,
           }
         : {
             command: installCommand,
             cwd: context.installCwd,
             enabled: false,
             executed: false,
+            verification: undefined,
           },
     };
 
@@ -1013,23 +1382,24 @@ export default defineCommand({
     ctx.out(
       `${infoLabel(ctx, "Summary:")} ${summary.updated} update(s), ${summary.noop} unchanged, ${summary.skipped} skipped, ${summary.missing} missing.`,
     );
+    ctx.out(
+      `${infoLabel(ctx, "Manifest scan:")} ${changedManifestTargets.length} changed / ${manifestTargets.length} scanned${updateAllWorkspaceManifests ? " recursively" : ""}.`,
+    );
+    emitExecutionPlan(ctx, executionPlan, { apply: true });
 
     const grouped = groupUpdatedActions(actions, context.targetLabel);
 
-    for (const [targetLabel, targetActions] of grouped) {
-      ctx.out(`${ctx.colors.stdout.magenta("-")} ${ctx.colors.stdout.bold(targetLabel)}`);
-
-      for (const action of targetActions) {
-        ctx.out(
-          `  ${ctx.colors.stdout.bold(action.packageName)}: ${action.previousSpecifier} -> ${ctx.colors.stdout.green(action.nextSpecifier ?? "")}`,
-        );
-      }
-    }
+    emitGroupedUpdatedActions(ctx, grouped, { limitPerGroup: 8 });
 
     emitUpdateNotes(ctx, {
       actions,
       fallbackLabel: context.targetLabel,
       verbose,
+    });
+    emitStrategyReasons(ctx, {
+      actions,
+      enabled: !safeLatest && ctx.options.explain === true,
+      fallbackLabel: context.targetLabel,
     });
     emitSafeLatestDecisions(ctx, {
       actions,
@@ -1037,10 +1407,15 @@ export default defineCommand({
       explain: ctx.options.explain === true,
     });
 
-    if (installResult) {
+    if (transactionResult.installResult) {
       ctx.out(
-        `${okLabel(ctx, "Ran:")} ${installResult.command} (${ctx.colors.stdout.bold(context.installCwd)})`,
+        `${okLabel(ctx, "Ran:")} ${transactionResult.installResult.command} (${ctx.colors.stdout.bold(context.installCwd)})`,
       );
+      if (transactionResult.verification) {
+        ctx.out(
+          `${okLabel(ctx, "Verified bun.lock:")} ${transactionResult.verification.checkedPackages} package(s)`,
+        );
+      }
     } else {
       ctx.out(`${warnLabel(ctx, "Install skipped:")} --no-autoinstall`);
     }

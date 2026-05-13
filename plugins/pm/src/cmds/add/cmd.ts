@@ -17,6 +17,8 @@ import {
   setCatalogEntry,
   setDependency,
   type PackageInput,
+  type VerifyLockResult,
+  verifyBunLock,
   withSnapshotRollback,
   writeManifest,
 } from "../../lib";
@@ -84,6 +86,12 @@ function warnLabel(
 class InstallFailedError extends Error {
   constructor(readonly installResult: Awaited<ReturnType<typeof runBunInstall>>) {
     super("bun install failed");
+  }
+}
+
+class VerifyLockFailedError extends Error {
+  constructor(readonly verification: VerifyLockResult) {
+    super("bun.lock verification failed");
   }
 }
 
@@ -314,6 +322,7 @@ export default defineCommand({
       JSON.stringify(nextTargetManifest) !== JSON.stringify(context.targetManifest);
     const rootChanged =
       JSON.stringify(nextRootManifest) !== JSON.stringify(context.repoRootManifest);
+    const summary = createAddSummary(actions);
     const resultPayload = {
       actions,
       apply: ctx.safety.apply,
@@ -325,6 +334,7 @@ export default defineCommand({
         executed: false,
       },
       section: dependencySection,
+      summary,
       target: {
         cwd: context.targetDir,
         usesCatalog: shouldUseCatalog,
@@ -340,7 +350,6 @@ export default defineCommand({
         return;
       }
 
-      const summary = createAddSummary(actions);
       ctx.out(warnLabel(ctx, "pm add"));
       ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
       ctx.out(`${infoLabel(ctx, "Summary:")} ${formatSummary(summary)}.`);
@@ -361,7 +370,6 @@ export default defineCommand({
         return;
       }
 
-      const summary = createAddSummary(actions);
       ctx.out(infoLabel(ctx, "pm add preview"));
       ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
       ctx.out(`${infoLabel(ctx, "Section:")} ${dependencySection}`);
@@ -387,7 +395,7 @@ export default defineCommand({
       getBunLockfilePath(context.installCwd),
       ...(rootChanged ? [context.repoRootManifestPath] : []),
     ];
-    const installResult = await withSnapshotRollback(snapshotPaths, async () => {
+    const transactionResult = await withSnapshotRollback(snapshotPaths, async () => {
       await writeManifest(context.targetManifestPath, nextTargetManifest);
 
       if (rootChanged) {
@@ -400,7 +408,13 @@ export default defineCommand({
         throw new InstallFailedError(result);
       }
 
-      return result;
+      const verification = result ? await verifyBunLock({ cwd: context.installCwd }) : null;
+
+      if (verification && !verification.ok) {
+        throw new VerifyLockFailedError(verification);
+      }
+
+      return { installResult: result, verification };
     }).catch((error: unknown) => {
       if (error instanceof InstallFailedError) {
         if (error.installResult.stderr.trim().length > 0 && ctx.output.mode !== "json") {
@@ -413,22 +427,43 @@ export default defineCommand({
         );
       }
 
+      if (error instanceof VerifyLockFailedError) {
+        return ctx.exit(
+          1,
+          `bun.lock verification failed after updating ${context.targetLabel}. Changes were reverted. Issues: ${error.verification.issues
+            .slice(0, 5)
+            .map(
+              (issue) =>
+                `${issue.packageName ?? "lockfile"}${issue.version ? `@${issue.version}` : ""}:${issue.reason}`,
+            )
+            .join(", ")}`,
+        );
+      }
+
       throw error;
     });
 
     const successPayload = {
       ...resultPayload,
-      install: installResult
+      install: transactionResult.installResult
         ? {
-            ...installResult,
+            ...transactionResult.installResult,
             enabled: true,
             executed: true,
+            verification: transactionResult.verification
+              ? {
+                  checkedPackages: transactionResult.verification.checkedPackages,
+                  issues: transactionResult.verification.issues,
+                  ok: transactionResult.verification.ok,
+                }
+              : undefined,
           }
         : {
             command: "bun install",
             cwd: context.installCwd,
             enabled: false,
             executed: false,
+            verification: undefined,
           },
     };
 
@@ -437,7 +472,6 @@ export default defineCommand({
       return;
     }
 
-    const summary = createAddSummary(actions);
     ctx.out(okLabel(ctx, "pm add"));
     ctx.out(`${infoLabel(ctx, "Target:")} ${context.targetLabel}`);
     ctx.out(`${infoLabel(ctx, "Summary:")} ${formatSummary(summary)}.`);
@@ -448,10 +482,15 @@ export default defineCommand({
       );
     }
 
-    if (installResult) {
+    if (transactionResult.installResult) {
       ctx.out(
         `${okLabel(ctx, "Ran:")} bun install (${ctx.colors.stdout.bold(context.installCwd)})`,
       );
+      if (transactionResult.verification) {
+        ctx.out(
+          `${okLabel(ctx, "Verified bun.lock:")} ${transactionResult.verification.checkedPackages} package(s)`,
+        );
+      }
     } else {
       ctx.out(`${warnLabel(ctx, "Install skipped:")} --no-autoinstall`);
     }

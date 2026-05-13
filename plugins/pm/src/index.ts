@@ -106,5 +106,5 @@ export default definePlugin({
   entry: import.meta.url,
   name: "pm-rse-plugin",
   description: "Bun-first package management plugin for Rse",
-  provides: ["add", "update"],
+  provides: ["add", "update", "verify-lock"],
 });
