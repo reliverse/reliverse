@@ -477,6 +477,44 @@ test("fails fast when a command defines a Rempts-reserved option", async () => {
   expect(stderr.text()).toContain("JSON output is handled by the Rempts runtime");
 });
 
+test("fails fast when a boolean command option would generate a --no-no flag", async () => {
+  const root = await mkdtemp(join(tmpdir(), "rempts-double-negative-option-"));
+  const entryPath = join(root, "cli.ts");
+  const commandDir = join(root, "cmds", "bad");
+  await mkdir(commandDir, { recursive: true });
+  await writeFile(entryPath, "#!/usr/bin/env bun\n", "utf8");
+  await writeFile(
+    join(commandDir, "cmd.ts"),
+    [
+      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      "",
+      "export default defineCommand({",
+      "  options: { noMajor: { type: 'boolean', description: 'bad negative flag' } },",
+      "  async handler() { return undefined; },",
+      "});",
+      "",
+    ].join("\n"),
+    "utf8",
+  );
+
+  const stderr = createBufferStream();
+  const result = await createCLI({
+    argv: ["bad"],
+    cwd: root,
+    entry: entryPath,
+    meta: { name: "double-negative-option-test" },
+    stdin: { isTTY: false } as never,
+    stdout: createBufferStream().stream as never,
+    stderr: stderr.stream as never,
+  });
+
+  expect(result.ok).toBe(false);
+  expect(stderr.text()).toContain("Command boolean option --no-major starts with --no-");
+  expect(stderr.text()).toContain("would generate invalid double-negative --no-no-major");
+  expect(stderr.text()).toContain("Define boolean options in positive form instead");
+  expect(stderr.text()).toContain('use `major: { type: "boolean", defaultValue: true }`');
+});
+
 test("fails fast when inherited CLI options define Rempts-reserved flags", async () => {
   const root = await mkdtemp(join(tmpdir(), "rempts-reserved-cli-option-"));
   const entryPath = join(root, "cli.ts");

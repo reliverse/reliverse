@@ -29,7 +29,7 @@ import {
 import { executeCommand } from "../runtime/execute";
 import { createFileCommandSource } from "../runtime/file-source";
 import {
-  assertNoReservedOptionCollisions,
+  assertValidOptionDefinitions,
   getGlobalFlagDefinitions,
   parseGlobalFlags,
   type GlobalFlagConfig,
@@ -534,15 +534,15 @@ export async function createCLI(options: CreateCLIOptions): Promise<CLIExecution
       resolvedCommandNode.sourceKind === "plugin"
         ? effectivePlugins.find((plugin) => plugin.name === resolvedCommandNode.sourceId)
         : undefined;
-    assertNoReservedOptionCollisions(options.options, {
+    assertValidOptionDefinitions(options.options, {
       config: options.globalFlags,
       owner: "CLI inherited",
     });
-    assertNoReservedOptionCollisions(owningPlugin?.options, {
+    assertValidOptionDefinitions(owningPlugin?.options, {
       config: options.globalFlags,
       owner: owningPlugin ? `Plugin "${owningPlugin.name}"` : "Plugin",
     });
-    assertNoReservedOptionCollisions(command.options, {
+    assertValidOptionDefinitions(command.options, {
       config: options.globalFlags,
       owner: "Command",
     });

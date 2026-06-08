@@ -161,6 +161,17 @@ export function getReservedOptionLongNames(): readonly string[] {
   ];
 }
 
+export function assertValidOptionDefinitions(
+  optionDefinitions: CommandOptionsRecord | undefined,
+  options?: {
+    readonly config?: GlobalFlagConfig | undefined;
+    readonly owner?: string | undefined;
+  },
+): void {
+  assertNoReservedOptionCollisions(optionDefinitions, options);
+  assertNoBooleanDoubleNegativeOptions(optionDefinitions, options);
+}
+
 export function assertNoReservedOptionCollisions(
   optionDefinitions: CommandOptionsRecord | undefined,
   options?: {
@@ -219,6 +230,37 @@ export function assertNoReservedOptionCollisions(
 }
 
 export const assertNoGlobalFlagCollisions = assertNoReservedOptionCollisions;
+
+function assertNoBooleanDoubleNegativeOptions(
+  optionDefinitions: CommandOptionsRecord | undefined,
+  options?: {
+    readonly owner?: string | undefined;
+  },
+): void {
+  if (!optionDefinitions) {
+    return;
+  }
+
+  const owner = options?.owner ?? "Command";
+  const invalidFlags = Object.entries(optionDefinitions)
+    .filter(([, definition]) => definition.type === "boolean")
+    .map(([optionName]) => toFlagName(optionName))
+    .filter((flagName) => flagName === "no" || flagName.startsWith("no-"));
+
+  if (invalidFlags.length === 0) {
+    return;
+  }
+
+  const labels = invalidFlags.map((flagName) => `--${flagName}`);
+  const generatedLabels = invalidFlags.map((flagName) => `--no-${flagName}`);
+  const noun = invalidFlags.length === 1 ? "option" : "options";
+  const verb = invalidFlags.length === 1 ? "starts" : "start";
+
+  throw new RemptsUsageError(
+    `${owner} boolean ${noun} ${formatReservedOptionList(labels)} ${verb} with --no-, which would generate invalid double-negative ${formatReservedOptionList(generatedLabels)}. ` +
+      'Define boolean options in positive form instead, then use defaultValue: true when the default should be enabled. Example: use `major: { type: "boolean", defaultValue: true }` to expose `--major, --no-major`, not `noMajor`.',
+  );
+}
 
 function dedupeReservedOptionCollisions(
   collisions: readonly { readonly flagName: string; readonly label: string }[],
