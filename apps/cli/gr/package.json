@@ -1,0 +1,59 @@
+{
+  "name": "@reliverse/gr-cli",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Rempts-based Git Reliverse CLI for typed repository-state evidence, patches, recovery, restore, and snapshot sandboxes.",
+  "license": "MIT",
+  "bin": {
+    "gr": "./src/cli.ts"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./src/cli.ts",
+  "exports": {
+    ".": {
+      "types": "./src/cli.ts",
+      "import": "./src/cli.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "check": "bun ./src/cli.ts --help",
+    "profile:generate": "bun ./scripts/generate-rempts-profile.ts",
+    "test": "bun test ./src",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:install:dev": "bun ../../../scripts/ts/build-development-cli.ts gr",
+    "build:update:common": "bun ./scripts/update-common-toolchain.ts"
+  },
+  "dependencies": {
+    "@reliverse/auth": "workspace:*",
+    "@reliverse/auth-bun": "workspace:*",
+    "@reliverse/gatehouse-protocol": "workspace:*",
+    "@reliverse/gatehouse-runtime": "workspace:*",
+    "@reliverse/gatehouse-p256": "workspace:*",
+    "@reliverse/rvs-systemd-ubuntu": "workspace:*",
+    "@reliverse/gr": "workspace:*",
+    "@reliverse/gr-action-runtime": "workspace:*",
+    "@reliverse/rempts": "workspace:*",
+    "@reliverse/repo-index": "workspace:*",
+    "@reliverse/rpr-cli": "workspace:*",
+    "@reliverse/rpr-toolchain-materialization": "workspace:*",
+    "@reliverse/rse-handoff": "workspace:*"
+  },
+  "devDependencies": {
+    "@reliverse/dler-build": "workspace:*",
+    "@reliverse/quality": "workspace:*",
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.4.2"
+  }
+}
