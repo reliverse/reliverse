@@ -1,0 +1,44 @@
+{
+  "name": "@reliverse/quality",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Typed quality capability, suite, diagnostic, provider, and read-only check runtime contracts for Reliverse Quality.",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./package.json": "./package.json",
+    "./rempts": {
+      "types": "./src/rempts.ts",
+      "default": "./src/rempts.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test ./src",
+    "typecheck": "tsc -p ./tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@reliverse/rempts": "workspace:*",
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  },
+  "peerDependencies": {
+    "@reliverse/rempts": "workspace:*"
+  },
+  "peerDependenciesMeta": {
+    "@reliverse/rempts": {
+      "optional": true
+    }
+  }
+}

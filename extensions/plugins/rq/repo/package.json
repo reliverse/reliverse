@@ -1,0 +1,52 @@
+{
+  "name": "@reliverse/repo-rq-plugin",
+  "version": "0.1.0",
+  "private": false,
+  "description": "Repository quality suites for Reliverse Quality.",
+  "type": "module",
+  "sideEffects": false,
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./suite": {
+      "types": "./src/suite.ts",
+      "import": "./src/suite.ts"
+    },
+    "./config": {
+      "types": "./src/config.ts",
+      "import": "./src/config.ts"
+    },
+    "./policy": {
+      "types": "./src/policy.ts",
+      "import": "./src/policy.ts"
+    },
+    "./internal/rempts/parity": {
+      "types": "./src/rempts/parity.ts",
+      "import": "./src/rempts/parity.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test ./src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/dependency-update": "workspace:*",
+    "@reliverse/naming": "workspace:*",
+    "@reliverse/quality": "workspace:*",
+    "@reliverse/rempts": "workspace:*",
+    "@reliverse/repo-index": "workspace:*",
+    "@reliverse/spec": "workspace:*"
+  },
+  "devDependencies": {
+    "@reliverse/quality-testkit": "workspace:*",
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  }
+}
