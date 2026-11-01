@@ -69,6 +69,8 @@ describe("@reliverse/reenv", () => {
 
   test("reports tty and stream-specific native color levels", () => {
     const options = {
+      env: {},
+      argv: [],
       stdout: { getColorDepth: () => 24, isTTY: true },
       stderr: { getColorDepth: () => 8, isTTY: true },
     };

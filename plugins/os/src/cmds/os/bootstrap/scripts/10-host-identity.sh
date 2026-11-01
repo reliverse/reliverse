@@ -17,11 +17,11 @@ set -Eeuo pipefail
 
 APPLY=0
 EXPECTED_HOSTNAME="${RELIVERSE_EXPECT_HOSTNAME:-reliverse-os}"
-BLEFNK_USER="${RELIVERSE_BLEFNK_USER:-blefnk}"
+DEV_USER="${RELIVERSE_DEV_USER:-${RELIVERSE_BLEFNK_USER:-dev}}"
 DEPLOY_USER="${RELIVERSE_DEPLOY_USER:-deploy}"
-BLEFNK_HOME="${RELIVERSE_BLEFNK_HOME:-/home/blefnk}"
+DEV_HOME="${RELIVERSE_DEV_HOME:-${RELIVERSE_BLEFNK_HOME:-}}"
 DEPLOY_HOME="${RELIVERSE_DEPLOY_HOME:-/home/deploy}"
-BLEFNK_SHELL="${RELIVERSE_BLEFNK_SHELL:-/usr/bin/zsh}"
+DEV_SHELL="${RELIVERSE_DEV_SHELL:-${RELIVERSE_BLEFNK_SHELL:-/usr/bin/zsh}}"
 DEPLOY_SHELL="${RELIVERSE_DEPLOY_SHELL:-/usr/bin/zsh}"
 
 PASS_COUNT=0
@@ -36,21 +36,21 @@ Usage: 10-host-identity.sh [options]
 Options:
   --apply                    Perform mutations. Default is preview.
   --hostname <name>          Expected hostname (default: reliverse-os)
-  --blefnk-user <name>       Dev/maintenance user (default: blefnk)
+  --dev-user <name>          Dev/maintenance user (default: dev)
   --deploy-user <name>       Prod/runtime user (default: deploy)
-  --blefnk-home <path>       Home path for blefnk user
+  --dev-home <path>          Maintenance home (default: /home/<dev-user>)
   --deploy-home <path>       Home path for deploy user
-  --blefnk-shell <path>      Login shell for blefnk user
+  --dev-shell <path>         Login shell for maintenance user
   --deploy-shell <path>      Login shell for deploy user
   -h, --help                 Show this help.
 
 Environment overrides:
   RELIVERSE_EXPECT_HOSTNAME
-  RELIVERSE_BLEFNK_USER
+  RELIVERSE_DEV_USER
   RELIVERSE_DEPLOY_USER
-  RELIVERSE_BLEFNK_HOME
+  RELIVERSE_DEV_HOME
   RELIVERSE_DEPLOY_HOME
-  RELIVERSE_BLEFNK_SHELL
+  RELIVERSE_DEV_SHELL
   RELIVERSE_DEPLOY_SHELL
 
 Notes:
@@ -70,24 +70,24 @@ while [[ $# -gt 0 ]]; do
       EXPECTED_HOSTNAME="$2"
       shift 2
       ;;
-    --blefnk-user)
-      BLEFNK_USER="$2"
+    --dev-user|--blefnk-user)
+      DEV_USER="$2"
       shift 2
       ;;
     --deploy-user)
       DEPLOY_USER="$2"
       shift 2
       ;;
-    --blefnk-home)
-      BLEFNK_HOME="$2"
+    --dev-home|--blefnk-home)
+      DEV_HOME="$2"
       shift 2
       ;;
     --deploy-home)
       DEPLOY_HOME="$2"
       shift 2
       ;;
-    --blefnk-shell)
-      BLEFNK_SHELL="$2"
+    --dev-shell|--blefnk-shell)
+      DEV_SHELL="$2"
       shift 2
       ;;
     --deploy-shell)
@@ -105,6 +105,8 @@ while [[ $# -gt 0 ]]; do
       ;;
   esac
 done
+
+DEV_HOME="${DEV_HOME:-/home/$DEV_USER}"
 
 if [[ -t 1 ]]; then
   C_RESET=$'\033[0m'
@@ -368,12 +370,12 @@ main() {
   ensure_hostname
 
   section "Canonical users"
-  ensure_user "$BLEFNK_USER" "$BLEFNK_HOME" "$BLEFNK_SHELL" "sudo,users"
+  ensure_user "$DEV_USER" "$DEV_HOME" "$DEV_SHELL" "sudo,users"
   ensure_user "$DEPLOY_USER" "$DEPLOY_HOME" "$DEPLOY_SHELL" "users"
 
   section "Linger"
-  if id "$BLEFNK_USER" >/dev/null 2>&1; then
-    ensure_linger "$BLEFNK_USER"
+  if id "$DEV_USER" >/dev/null 2>&1; then
+    ensure_linger "$DEV_USER"
   fi
   if id "$DEPLOY_USER" >/dev/null 2>&1; then
     ensure_linger "$DEPLOY_USER"

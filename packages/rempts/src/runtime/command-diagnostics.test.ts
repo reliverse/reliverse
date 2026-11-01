@@ -9,8 +9,7 @@ import { createFileCommandSource } from "./file-source";
 import { createPluginCommandSource } from "./plugin-source";
 import { resolveEntry } from "./resolve-entry";
 
-const defineCommandModulePath =
-  "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/api/define-command.ts";
+const defineCommandModulePath = new URL("../api/define-command.ts", import.meta.url).href;
 
 async function writeCommandFile(
   filePath: string,

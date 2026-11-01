@@ -13,6 +13,8 @@ set -Eeuo pipefail
 EXPECTED_OS_ID="ubuntu"
 EXPECTED_OS_VERSION_PREFIX="24.04"
 EXPECTED_HOSTNAME="${RELIVERSE_EXPECT_HOSTNAME:-}"
+DEV_USER="${RELIVERSE_DEV_USER:-dev}"
+DEV_HOME="${RELIVERSE_DEV_HOME:-/home/$DEV_USER}"
 STRICT=0
 
 PASS_COUNT=0
@@ -31,6 +33,8 @@ Options:
 
 Environment:
   RELIVERSE_EXPECT_HOSTNAME  Alternative way to set expected hostname.
+  RELIVERSE_DEV_USER         Maintenance user (default: dev).
+  RELIVERSE_DEV_HOME         Maintenance home (default: /home/<maintenance-user>).
 EOF
 }
 
@@ -132,13 +136,13 @@ PY
 }
 
 classify_host() {
-  [[ -d /home/blefnk/dev ]] && HOST_ARTIFACTS+=("/home/blefnk/dev")
+  [[ -d "${DEV_HOME}/dev" ]] && HOST_ARTIFACTS+=("${DEV_HOME}/dev")
   [[ -d /home/deploy/prod ]] && HOST_ARTIFACTS+=("/home/deploy/prod")
-  [[ -d /home/blefnk/.config/systemd/user ]] && HOST_ARTIFACTS+=("blefnk-user-units")
+  [[ -d "${DEV_HOME}/.config/systemd/user" ]] && HOST_ARTIFACTS+=("dev-user-units")
   [[ -d /home/deploy/.config/systemd/user ]] && HOST_ARTIFACTS+=("deploy-user-units")
   [[ -f /etc/ferron.kdl ]] && HOST_ARTIFACTS+=("/etc/ferron.kdl")
   path_exists_via_context /home/deploy/.config/bleverse/deploy.json && HOST_ARTIFACTS+=("deploy-registry")
-  [[ -d /home/blefnk/.openclaw ]] && HOST_ARTIFACTS+=("openclaw-home")
+  [[ -d "${DEV_HOME}/.openclaw" ]] && HOST_ARTIFACTS+=("openclaw-home")
 
   if (( ${#HOST_ARTIFACTS[@]} == 0 )); then
     HOST_MODE="fresh"
@@ -291,7 +295,7 @@ check_host_classification() {
 }
 
 check_user_model() {
-  local users=(blefnk deploy)
+  local users=("$DEV_USER" deploy)
   local user
   for user in "${users[@]}"; do
     if id "$user" >/dev/null 2>&1; then
@@ -321,7 +325,7 @@ check_user_model() {
 }
 
 check_canonical_paths() {
-  local paths=(/home/blefnk/dev /home/deploy/prod /var/www)
+  local paths=("$DEV_HOME/dev" /home/deploy/prod /var/www)
   local path
   for path in "${paths[@]}"; do
     if [[ -e "$path" ]]; then

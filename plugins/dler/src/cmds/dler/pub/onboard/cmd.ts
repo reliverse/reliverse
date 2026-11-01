@@ -252,7 +252,7 @@ export function createNpmOnboardingLines(
     "",
     heading("Example token settings"),
     `  ${key("Token name:")} ${colors.green("dler-reliverse-os")}`,
-    `  ${key("Description:")} Publishes packages via rse pub. Intended only for blefnk@reliverse-os.`,
+    `  ${key("Description:")} Publishes packages via rse pub. Requires explicit operator configuration.`,
     `  ${key("Bypass 2FA:")} ${colors.green("true")}`,
     `  ${key("Allowed IP ranges:")}`,
     info?.ipRanges.ipv4
@@ -336,7 +336,7 @@ export default defineCommand({
         browser2faNote:
           "If npm 2FA popups fail on Windows in Firefox-like browsers, try generating the token in a Chromium-based browser.",
         bypass2fa: true,
-        description: "Publishes packages via rse pub. Intended only for blefnk@reliverse-os.",
+        description: "Publishes packages via rse pub. Requires explicit operator configuration.",
         expiration: "90 days",
         organizationPermissions: "Read and write",
         organizations: ["reliverse"],

@@ -82,7 +82,7 @@ rse ptc rempts-context.patched.txt --unpack --overwrite --apply
 Unpack while explicitly passing the original project root:
 
 ```sh
-rse ptc rempts-context.patched.txt --unpack -o /home/blefnk/dev/reliverse/reliverse --overwrite --apply
+rse ptc rempts-context.patched.txt --unpack -o ./restored-workspace --overwrite --apply
 ```
 
 ## Safety model

@@ -22,6 +22,8 @@ function createBufferStream() {
   };
 }
 
+const remptsModuleUrl = new URL("../index.ts", import.meta.url).href;
+
 describe("createCLI", () => {
   test("shows launcher help instead of failing when plugin discovery is enabled but no plugins are installed", async () => {
     const root = await mkdtemp(join(tmpdir(), "rempts-empty-cli-"));
@@ -140,7 +142,7 @@ describe("createCLI", () => {
     await writeFile(
       join(pluginRoot, "index.ts"),
       [
-        'import { definePlugin, REMPTS_PLUGIN_API_VERSION } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+        `import { definePlugin, REMPTS_PLUGIN_API_VERSION } from ${JSON.stringify(remptsModuleUrl)};`,
         "export default definePlugin({",
         "  apiVersion: REMPTS_PLUGIN_API_VERSION,",
         "  entry: import.meta.url,",
@@ -150,7 +152,7 @@ describe("createCLI", () => {
       "utf8",
     );
     const commandFile = [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "export default defineCommand({ async handler(ctx) { ctx.out('ok'); } });",
     ].join("\n");
     await writeFile(join(pluginRoot, "cmds", "build", "cmd.ts"), commandFile, "utf8");
@@ -231,7 +233,7 @@ describe("createCLI", () => {
     await writeFile(
       join(commandDir, "cmd.ts"),
       [
-        'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+        `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
         "",
         "export default defineCommand({",
         "  options: {",
@@ -279,7 +281,7 @@ describe("createCLI", () => {
     await writeFile(
       join(commandDir, "cmd.ts"),
       [
-        'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+        `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
         "",
         "export default defineCommand({",
         "  options: {",
@@ -339,7 +341,7 @@ test("injects --apply for commands that require apply and exposes ctx.safety", a
   await writeFile(
     join(commandDir, "cmd.ts"),
     [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "",
       "export default defineCommand({",
       "  safety: { defaultMode: 'preview', requiresApply: true, effects: ['fs.delete'] },",
@@ -393,7 +395,7 @@ test("ctx.safety.assertApplied blocks side effects without --apply", async () =>
   await writeFile(
     join(commandDir, "cmd.ts"),
     [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "",
       "export default defineCommand({",
       "  safety: { defaultMode: 'preview', requiresApply: true, effects: ['fs.delete'] },",
@@ -446,7 +448,7 @@ test("fails fast when a command defines a Rempts-reserved option", async () => {
   await writeFile(
     join(commandDir, "cmd.ts"),
     [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "",
       "export default defineCommand({",
       "  options: { apply: { type: 'boolean' }, help: { type: 'boolean' }, json: { type: 'boolean' } },",
@@ -486,7 +488,7 @@ test("fails fast when a boolean command option would generate a --no-no flag", a
   await writeFile(
     join(commandDir, "cmd.ts"),
     [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "",
       "export default defineCommand({",
       "  options: { noMajor: { type: 'boolean', description: 'bad negative flag' } },",
@@ -524,7 +526,7 @@ test("fails fast when inherited CLI options define Rempts-reserved flags", async
   await writeFile(
     join(commandDir, "cmd.ts"),
     [
-      'import { defineCommand } from "/home/blefnk/dev/reliverse/reliverse/packages/rempts/src/index.ts";',
+      `import { defineCommand } from ${JSON.stringify(remptsModuleUrl)};`,
       "",
       "export default defineCommand({",
       "  async handler() { return undefined; },",

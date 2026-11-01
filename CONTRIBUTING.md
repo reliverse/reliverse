@@ -12,7 +12,7 @@ Reliverse is a monorepo for:
 
 Core tools:
 
-- Bun
+- Bun 1.4.4 (the exact root `packageManager` pin)
 - TypeScript
 - Turborepo
 
@@ -40,17 +40,22 @@ General direction:
 
 ## Testing
 
-Run all tests:
+Start with reproducible installation and the supported baseline checks:
 
-```bash
-bun test
+```sh
+bun install --frozen-lockfile
+bun run test
+bun run --cwd packages/rempts typecheck
 ```
 
-Or run a specific workspace or file set:
+`bun run test` runs the portable leaf tests and bootstrap smoke tests, not every
+workspace suite. Smoke checks only invoke read-only CLI help in an isolated
+environment; they never install dependencies, build, publish, or deploy.
 
-```bash
-bun test plugins/dler
-```
+For a change in another package, run its relevant tests/typecheck separately.
+The broad `bun test` suite and full application builds are not implied by a
+successful baseline check. Some older fixtures still need reconciliation with
+the public layout; do not hide failures by treating the baseline as a full suite.
 
 Before opening a PR:
 
@@ -74,14 +79,14 @@ Before opening a PR:
 - `packages/tailwind` - shared design preset
 - `packages/tsconfig` - shared TS config
 - `packages/ui` - UI primitives
-- `packages/ui-utils` - small shared UI utilities
+
 - `packages/blocks` - higher-level web blocks
 
 ### Plugins
 
 - `plugins/dler` - build and publish flows
 - `plugins/pm` - package-management helpers
-- `plugins/tools` - file-related helpers
+- `plugins/toolkit` - file-related helpers
 - `plugins/os` - OS automation commands
 
 ## Reporting Issues

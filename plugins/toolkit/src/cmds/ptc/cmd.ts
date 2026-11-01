@@ -33,7 +33,7 @@ export default defineCommand({
       "rse ptc packages/rempts -o rempts-context.txt --apply",
       "rse ptc packages/rempts -o rempts-context.txt --overwrite --apply",
       "rse ptc rempts-context.patched.txt --unpack --overwrite --apply",
-      "rse ptc rempts-context.patched.txt --unpack -o /home/blefnk/dev/reliverse/reliverse --overwrite --apply",
+      "rse ptc rempts-context.patched.txt --unpack -o ./restored-workspace --overwrite --apply",
       "rse ptc packages/rempts -o rempts-context.txt --ext ts,tsx,json,md",
       "rse ptc packages/rempts -o rempts-context.txt --ignore tmp,logs",
       "rse ptc packages/rempts -o rempts-context.txt --max-size 500kb",

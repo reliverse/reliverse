@@ -626,7 +626,7 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
     await writeFile(
       join(binDir, "npm"),
-      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "whoami" ]; then\n  printf 'blefnk\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "view" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"ok-pkg-1.0.1.tgz","name":"ok-pkg","version":"1.0.1","size":123,"unpackedSize":45,"files":[{"path":"package.json","size":2},{"path":"dist/index.js","size":10}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); console.log(pkg.name + "@" + pkg.version);'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "whoami" ]; then\n  printf 'fixture-user\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "view" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ]; then\n  printf '[{"filename":"ok-pkg-1.0.1.tgz","name":"ok-pkg","version":"1.0.1","size":123,"unpackedSize":45,"files":[{"path":"package.json","size":2},{"path":"dist/index.js","size":10}]}]\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "publish" ]; then\n  node -e 'const fs = require("node:fs"); const pkg = JSON.parse(fs.readFileSync("package.json", "utf8")); console.log(pkg.name + "@" + pkg.version);'\n  exit 0\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
       "utf8",
     );
     await chmod(join(binDir, "npm"), 0o755);
@@ -683,7 +683,7 @@ describe("dler pub command", () => {
     await writeFile(join(pkgDir, "dist", "index.js"), "export {}\n", "utf8");
     await writeFile(
       join(binDir, "npm"),
-      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "whoami" ]; then\n  printf 'blefnk\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "view" ] && [ "\${2:-}" = "already-pkg@1.0.0" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ] || [ "\${1:-}" = "publish" ]; then\n  echo "pack/publish should not run for already published versions" >&2\n  exit 2\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
+      `#!/usr/bin/env bash\nset -euo pipefail\nif [ "\${1:-}" = "whoami" ]; then\n  printf 'fixture-user\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "view" ] && [ "\${2:-}" = "already-pkg@1.0.0" ]; then\n  printf '"1.0.0"\\n'\n  exit 0\nfi\nif [ "\${1:-}" = "pack" ] || [ "\${1:-}" = "publish" ]; then\n  echo "pack/publish should not run for already published versions" >&2\n  exit 2\nfi\necho "unexpected npm args: $*" >&2\nexit 1\n`,
       "utf8",
     );
     await chmod(join(binDir, "npm"), 0o755);
