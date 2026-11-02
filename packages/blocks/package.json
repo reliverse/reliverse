@@ -16,7 +16,6 @@
   "dependencies": {
     "@ai-sdk/react": "catalog:",
     "@base-ui/react": "catalog:",
-    "@fumadocs/ui": "^17.0.0",
     "@hookform/resolvers": "catalog:",
     "@remixicon/react": "catalog:",
     "@repo/ui": "workspace:*",
@@ -37,9 +36,6 @@
     "cmdk": "^1.1.1",
     "date-fns": "catalog:",
     "embla-carousel-react": "^8.6.0",
-    "fumadocs-core": "^17.0.0",
-    "fumadocs-mdx": "^15.0.2",
-    "fumadocs-ui": "^17.0.0",
     "input-otp": "^1.4.2",
     "lucide-react": "^1.14.0",
     "motion": "catalog:",
