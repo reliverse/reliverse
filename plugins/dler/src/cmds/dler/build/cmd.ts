@@ -7,20 +7,20 @@ import {
   createBuildProviderRegistry,
   createBuilderRuntime,
   createBunBuildProvider,
-} from "../../impl/build";
-import type { DlerDeclarationStrategy } from "../../impl/build/declaration-layer";
-import type { BunBundleStrategy } from "../../impl/build/package-build-command";
-import { resolveConcurrency } from "../../impl/concurrency";
+} from "../../../impl/build";
+import type { DlerDeclarationStrategy } from "../../../impl/build/declaration-layer";
+import type { BunBundleStrategy } from "../../../impl/build/package-build-command";
+import { resolveConcurrency } from "../../../impl/concurrency";
 import {
   DLER_BUILD_BUNDLE_STRATEGIES,
   DLER_BUILD_DECLARATION_STRATEGIES,
   DLER_BUILD_DEFAULTS,
   DLER_COMMAND_NAMES,
   DLER_CONCURRENCY_DEFAULTS,
-} from "../../impl/constants";
-import { createTargetSets, formatSkippedMessages } from "../../impl/report-helpers";
-import { createBuildSummary, formatBuildSummary } from "../../impl/result-contract";
-import { resolveRequestedTargets } from "../../impl/shared-targets";
+} from "../../../impl/constants";
+import { createTargetSets, formatSkippedMessages } from "../../../impl/report-helpers";
+import { createBuildSummary, formatBuildSummary } from "../../../impl/result-contract";
+import { resolveRequestedTargets } from "../../../impl/shared-targets";
 
 function formatBuildResultLine(result: { durationMs: number; label: string; ok: boolean }): string {
   return `${result.ok ? "Built" : "Failed"}: ${result.label} (${result.durationMs}ms)`;

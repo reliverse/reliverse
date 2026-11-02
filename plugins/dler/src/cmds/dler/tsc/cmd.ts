@@ -5,7 +5,7 @@ import { basename, dirname, extname, isAbsolute, join, resolve } from "node:path
 import { defineCommand } from "@reliverse/rempts";
 import { parse as parseJsonc } from "jsonc-parser";
 
-import { mapWithConcurrency, resolveConcurrency } from "../../impl/concurrency";
+import { mapWithConcurrency, resolveConcurrency } from "../../../impl/concurrency";
 import {
   DLER_COMMAND_NAMES,
   DLER_CONCURRENCY_DEFAULTS,
@@ -13,15 +13,15 @@ import {
   DLER_TSC_DEFAULTS,
   DLER_TSC_NO_EMIT_ARGS,
   DLER_TSC_RUNNER_MODES,
-} from "../../impl/constants";
-import { createTargetSets } from "../../impl/report-helpers";
+} from "../../../impl/constants";
+import { createTargetSets } from "../../../impl/report-helpers";
 import {
   fileExists,
   resolveDirectoryTargets,
   resolveRequestedTargets,
   type RequestedTarget,
   type SkippedTarget,
-} from "../../impl/shared-targets";
+} from "../../../impl/shared-targets";
 
 interface TscTarget extends RequestedTarget {
   readonly command: readonly string[];

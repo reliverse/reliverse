@@ -35,17 +35,7 @@ const result = await createCLI({
     name: "rse",
   },
   help: {
-    examples: [
-      "rse escape --input README.md",
-      "rse add zod --target packages/rempts --json",
-      "rse build --targets plugins/pm,plugins/dler,apps/rse",
-      "rse build --help",
-      "rse rempts plugins doctor --json",
-      "rse relpack doctor",
-      "rse relpack unpack './rse-*.zip' './relpack-*.zip' -o ./apps/rse ./plugins/relpack --overwrite-mode clean --backup --rollback-on-fail --post-check-command 'bun test apps/rse plugins/relpack' --delete-archive --apply",
-      "rse update typescript --json",
-      "rse build --targets plugins/dler --provider bun --json",
-    ],
+    examples: ["rse --help", "rse dler build --help", "rse dler tsc --help"],
     format: "auto",
   },
   interactionMode: "never",
