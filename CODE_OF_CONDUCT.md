@@ -44,10 +44,9 @@ This policy applies to:
 
 ## Reporting
 
-If something violates this Code of Conduct, please report it privately through **one** of the following channels:
+Report community conduct concerns privately to [blefnk@gmail.com](mailto:blefnk@gmail.com). Do not post a sensitive report in a public issue or PR.
 
-- **GitHub Security Advisories**: open a private report via the repository's Security tab
-- **Email** (preferred for now): contact the project author at [blefnk@gmail.com](mailto:blefnk@gmail.com)
+For a software vulnerability, use [SECURITY.md](./SECURITY.md) instead. GitHub Security Advisories are for vulnerability reporting, not the default channel for moderation complaints.
 
 When reporting, helpful details include:
 
@@ -56,7 +55,9 @@ When reporting, helpful details include:
 - Who was involved
 - Any context that may clarify the situation
 
-Reports will be handled respectfully and confidentially whenever possible.
+Share only the information needed to understand the concern; redact unrelated personal data, credentials and private logs. Never obtain additional evidence by accessing someone else's account or data without permission.
+
+Reports will be handled respectfully, with information shared only as needed to assess and address the concern. Absolute confidentiality cannot be guaranteed. This is a small independently maintained project, not a staffed emergency service; if there is an immediate threat to safety, contact the appropriate local emergency service.
 
 ## Enforcement
 

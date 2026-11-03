@@ -1,108 +1,79 @@
 # Reliverse
 
-Reliverse is an open-source ecosystem of tools for building and operating modern software systems without unnecessary complexity.
+**Open-source Bun and TypeScript tooling for inspectable, reproducible developer workflows.**
 
-> **Clear by design. Modular by architecture.**
+> Clear by design. Modular by architecture.
 
-Built for clarity and long-term maintainability.
+Reliverse helps maintainers inspect repository state, check changes, and build reviewable automation instead of relying on opaque, uncontrolled steps. It combines CLI tools, reusable packages, and developer infrastructure; parts also underpin [Bleverse](https://github.com/reliverse).
 
-## What is Reliverse
+The modern monorepo is being **opened progressively**. A published source file is not automatically an installable tool, a running service, or a supported release.
 
-Reliverse is not just a tooling monorepo. It is:
+## What is here?
 
-- A modular ecosystem of developer-first tools
-- A Bun and TypeScript infrastructure for modern systems
-- A foundation for building maintainable developer ecosystems
-- A reference implementation of transparent tooling architecture
+| Area | Purpose | Public status |
+| --- | --- | --- |
+| **[GR](#first-look-read-only-gr-inspection)** (Git-backed repository workflows) | Inspect repository state and prepare bounded, reviewable changes. | **Preview:** source inspection below; the full CLI and protected host are separate. |
+| **RQ** (Reliverse Quality) | Check and explain repository and code-quality findings. | **Planned:** standalone public first-run; not part of the inspection smoke check below. |
+| **Rse** | Compose developer tools and optional agent workflows. | **Preview:** active development; some features require unpublished or separately installed components. |
 
-Reliverse powers multiple systems, including parts of the Bleverse ecosystem.
+These are **capabilities**, not a promise that every package or hosted service is production-ready. Read [OPEN-SOURCING.md](./OPEN-SOURCING.md) for the publication model and limitations.
 
-## Design Goals
+## First look: read-only GR inspection
 
-- Developer-first architecture
-- Modules instead of monoliths
-- Explicit system behavior
-- Clear system boundaries
-- Long-term maintainability
-- Low cognitive overhead
-- Consent-first automation
+Prerequisites: **Git** and the Bun version in the **checked-out** root `packageManager` field. This preview runs GR's existing source inspection module directly; it is not an installation of the full `gr` CLI or `@reliverse/gr` package. It needs no dependency installation, GR login, SSH key, sudo or protected Native setup.
 
-## Principles
-
-- Modular by design
-- Open by architecture
-- Automation with explicit control
-- System behavior must be understandable
-- Tooling should reduce complexity, not hide it
-
-## Philosophy
-
-Reliverse tooling follows several guiding ideas:
-
-- No dark patterns in developer tools
-- Accessibility and clarity by default
-- Consent precedes automation
-- System actions are visible and reversible
-- Configuration is explicit and developer-controlled
-
-## Conventions
-
-- Bun-first tooling
-- TypeScript-first implementation
-- Favor production-ready fixes over brittle patches
-- Prefer explicit configuration over hidden behavior
-- Prefer file-based command trees over large programmatic manifests
-
-## Quick start
-
-Use **Bun 1.4.4**, matching `packageManager` in the root manifest.
+In a checkout containing [`examples/gr/inspect.ts`](./examples/gr/inspect.ts):
 
 ```sh
-git clone https://github.com/reliverse/reliverse.git
-cd reliverse
-bun install --frozen-lockfile
-bun run rse --help
-bun run rse dler build --help
-bun test scripts/bootstrap-smoke.test.ts
-bun run test
+bun --no-install --no-env-file examples/gr/inspect.ts .
 ```
 
-The baseline checks cover installation, CLI discovery, and selected portable
-packages. They do not execute builds, publish packages, deploy services, or
-certify every plugin operation. See [CONTRIBUTING.md](./CONTRIBUTING.md) for
-scoped validation.
+For a clean checkout on a local branch with an existing commit, the output is:
 
-## Public source scope
+```text
+GR source inspection (read-only)
+HEAD: attached
+Workspace: clean
+Changes: 0 staged, 0 unstaged, 0 untracked, 0 conflicted
+```
 
-This checkout retains RSE, its plugins, the portable packages, and the web/wiki
-source. Additional modern subsystems are published incrementally with their
-complete dependencies; do not assume an unpublished CLI or package is available.
-The absence of a subsystem in this release is not its deprecation.
+A dirty checkout reports its actual counts without staging, resetting, committing, pushing or changing file contents. An empty Git repository reports `HEAD: unborn`. You can pass another repository root instead of `.`. Paths are inspected locally; no remote Git operation is requested.
 
-Website and documentation development commands are `bun run dev:web` and
-`bun run dev:docs`. Production builds and deployment have separate requirements;
-installation and CLI help are not production acceptance. Deployment is an
-explicit manual workflow, never a side effect of pushing source to `main`.
+Run the focused smoke check with no dependency installation:
 
-## Contributing
+```sh
+bun --no-install --no-env-file test examples/gr/inspect.test.ts
+```
 
-We welcome contributions ❤️
+[The smoke workflow](./.github/workflows/gr-inspect-smoke.yml) checks this source example and preservation of staged/unstaged/untracked data; it does **not** certify a full-monorepo install, the full CLI, signing or publication. Public `main` may not yet contain this preview while staged publication is in progress. If the example is absent, do not reconstruct it from private dependencies or assume that `bun run gr status` is available. See [CONTRIBUTING.md](./CONTRIBUTING.md) for broader development guidance.
 
-- Read [`CONTRIBUTING.md`](./CONTRIBUTING.md)
-- Open an issue: <https://github.com/reliverse/reliverse/issues>
-- Support development: <https://github.com/sponsors/blefnk>
+## Repository map
 
-If you discover a security issue, report it privately. See [`SECURITY.md`](./SECURITY.md).
+| Path | Role |
+| --- | --- |
+| `apps/cli/` | CLI entry points, including `gr`, `rq`, `rse`, and supporting tools. |
+| `apps/web/` | Web applications and public-facing surfaces. |
+| `packages/` | Reusable libraries, domain packages, and infrastructure components. |
+| `extensions/` | Plugin and extension implementations. |
+| `tests/` | Cross-package and repository tests. |
+| `.agents/` | Repository-authored agent guidance; local agent state is not public source. |
 
-## Wiki
+Some directories contain work in progress or unpublished dependencies. The presence of source code is not a release, package publication, or support guarantee.
 
-- Docs: <https://wiki.reliverse.org/docs>
-- Blog: <https://wiki.reliverse.org/blog>
+## Contributing and support
 
-## License
+- [Contribution guide](./CONTRIBUTING.md): ways to contribute, setup, and focused testing.
+- [Support](./SUPPORT.md): where to ask questions and report problems.
+- [Code of conduct](./CODE_OF_CONDUCT.md): community expectations.
+- [Security policy](./SECURITY.md): **privately** report vulnerabilities; do not open public security issues.
+- [Open-sourcing status](./OPEN-SOURCING.md): scope and trust boundaries.
 
-<https://github.com/reliverse/reliverse>
+Issues: <https://github.com/reliverse/reliverse/issues>
 
-Copyright © 2026-present Nazarii Korniienko
+## Support ongoing development
 
-Licensed under the [MIT License](./LICENSE). Some packages may define additional licenses in their own directories.
+Reliverse is independently maintained. If its work is useful to you, consider [GitHub Sponsors](https://github.com/sponsors/blefnk). Sponsorship is optional and does not affect access to MIT-licensed source code.
+
+## License and branding
+
+The repository root uses the [MIT License](./LICENSE); some components may carry their own license terms. Project names and logos are covered separately by the [trademark policy](./TRADEMARK.md).

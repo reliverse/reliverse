@@ -1,103 +1,93 @@
 # Contributing to Reliverse
 
-Thanks for contributing.
+Thanks for your interest in Reliverse. Small, understandable improvements and concrete bug reports are very welcome.
 
-Reliverse is a monorepo for:
+Reliverse is being open-sourced in stages. **Check the currently published source** before assuming that every module, service, and dependency is available to external contributors.
 
-- developer packages and reliverse tooling
-- the Rse core/CLI/UI and its implementation
-- the web presence and docs for reliverse tools
+## Before starting
 
-## Tooling
+- Search [existing issues](https://github.com/reliverse/reliverse/issues) for duplicates.
+- Good first contributions include minimal public reproductions, focused tests, and corrections to commands or examples that can be checked without privileged infrastructure.
+- For small, well-scoped fixes, open a focused pull request explaining the behavior and its verification.
+- For large features, new APIs, protected workflows, or architectural changes, discuss the proposal in an issue first. An unsolicited large PR may be difficult for a small maintainer team to review.
+- Never paste secrets, private operational receipts, credentials, personal host information, or sensitive logs into issues and pull requests.
 
-Core tools:
+## Development setup
 
-- Bun 1.4.4 (the exact root `packageManager` pin)
-- TypeScript
-- Turborepo
-
-## Documentation
-
-Docs live in `apps/wiki/` and are published at <https://wiki.reliverse.org/docs>.
-
-If your change affects behavior, configuration, UX, or public APIs, update the relevant docs.
-
-## Architecture Overview
-
-```bash
-apps/       → deployable surfaces (web, wiki, cli)
-packages/   → reusable packages (UI, blocks, rempts, reliverse libs)
-plugins/    → Rse plugins such as build/publish and package-management helpers
-scripts/    → automation helpers
-```
-
-General direction:
-
-- apps can depend on packages
-- packages should not depend on apps
-- plugins should stay automation-friendly and dry-run-first when possible
-- Reliverse stays tool-first, not product-backend-first
-
-## Testing
-
-Start with reproducible installation and the supported baseline checks:
+Use the Bun version specified in the **checked-out** root `package.json` (`packageManager`) and have Git on your PATH. Local development snapshots and public `main` may contain different source subsets.
 
 ```sh
-bun install --frozen-lockfile
-bun run test
-bun run --cwd packages/rempts typecheck
+git clone https://github.com/reliverse/reliverse.git
+cd reliverse
 ```
 
-`bun run test` runs the portable leaf tests and bootstrap smoke tests, not every
-workspace suite. Smoke checks only invoke read-only CLI help in an isolated
-environment; they never install dependencies, build, publish, or deploy.
+### Start with the source inspection preview
 
-For a change in another package, run its relevant tests/typecheck separately.
-The broad `bun test` suite and full application builds are not implied by a
-successful baseline check. Some older fixtures still need reconciliation with
-the public layout; do not hide failures by treating the baseline as a full suite.
+If your checkout contains `examples/gr/inspect.ts`, these commands require no dependency installation, GR login, SSH key, sudo or protected host:
 
-Before opening a PR:
+```sh
+bun --no-install --no-env-file examples/gr/inspect.ts .
+bun --no-install --no-env-file test examples/gr/inspect.test.ts
+```
 
-- ensure the relevant build works
-- ensure TypeScript compiles cleanly
-- ensure tests pass where applicable
+See the [README](./README.md#first-look-read-only-gr-inspection) for expected output and limitations. This exercises GR's source inspection module, not an installed full CLI. If the example is absent from your checkout, it has not arrived in that public source state; do not reconstruct it from private dependencies.
 
-## Folder Structure
+### Work on a broader package
 
-### Apps
+Read the package's available setup instructions and check that its dependencies are in the public checkout. When that workflow actually needs dependencies, a conservative starting point is:
 
-- `apps/rse` - `rse`, the Reliverse developer CLI
-- `apps/web` - marketing site and tool landing pages
-- `apps/wiki` - docs and blog surface
+```sh
+bun install --frozen-lockfile --ignore-scripts
+```
 
-### Packages
+This is **not** certification of a whole-monorepo clean install. `--ignore-scripts` skips dependency lifecycle scripts; some packages may need separately documented generated artifacts or builds. Do not regenerate the lockfile or enable scripts merely to hide a missing public dependency. Report the public commit and first actionable error instead. See [the publication model](./OPEN-SOURCING.md).
 
-- `packages/rempts` - Bun-first file-based CLI foundation
-- `packages/relico` - terminal color helpers
-- `packages/reenv` - env helpers
-- `packages/tailwind` - shared design preset
-- `packages/tsconfig` - shared TS config
-- `packages/ui` - UI primitives
+### Repository structure
 
-- `packages/blocks` - higher-level web blocks
+This is the larger workspace map, not a guarantee that every directory or command is present in a particular public checkout:
 
-### Plugins
+- `apps/cli/`: command-line applications such as `rse`, `gr`, and `rq`.
+- `apps/web/`: web applications and project surfaces.
+- `packages/`: reusable libraries and domain packages.
+- `extensions/`: plugins and extensions.
+- `scripts/`: source-controlled tooling scripts.
+- `tests/`: cross-cutting test fixtures and checks.
 
-- `plugins/dler` - build and publish flows
-- `plugins/pm` - package-management helpers
-- `plugins/toolkit` - file-related helpers
-- `plugins/os` - OS automation commands
+## Verification
 
-## Reporting Issues
+Start with the smallest check that covers your change. For the source inspection preview:
 
-Helpful issue reports include:
+```sh
+bun --no-install --no-env-file test examples/gr/inspect.test.ts
+```
 
-- steps to reproduce
-- logs or screenshots
-- environment details
-- expected vs actual behavior
+For other packages, use checks that are actually present in your checkout and install only their supported dependencies.
 
-## Security
+Use package-owned typecheck/lint commands when available. Explain what you ran and what you could **not** run. Do not treat a whole-monorepo test/build as mandatory for a focused documentation fix; broad checks are appropriate only when the change's actual risk warrants them.
 
-If you discover a vulnerability, follow the corresponding guidance in `SECURITY.md`.
+For behavior changes, add a relevant regression test. For documentation changes, check paths, links, commands, and the distinction between implemented behavior and planned features. Global `bun run test` and `bun run typecheck` are broader orchestration entry points; do not use them as an automatic requirement for a narrow change without confirming their current public dependencies and scope.
+
+## Pull requests
+
+Please keep one coherent objective per PR. Describe:
+
+1. What changed and why.
+2. Which source paths, public contracts, and behavior are affected.
+3. Focused tests or manual checks, including known limitations.
+4. Whether AI assistance was used to author substantive code or prose, and what you personally reviewed.
+
+AI-assisted contributions are welcome when the contributor understands and verifies them. Do not bulk-submit unreviewed agent-generated issues or PRs. Maintainers may ask for a smaller, reproducible scope before reviewing a large contribution.
+
+If your contribution affects sensitive Git mutation, approvals, authentication, publication, or recovery, follow the existing owning contracts. A contributor may use ordinary Git in their fork; maintainers' protected publication through GR is a separate authorization boundary, not a rule to forbid everyday local Git use.
+
+## Documentation and disclosure
+
+Keep public documentation focused on reproducible contributor-facing behavior. Do not copy private deployment history or operator-specific information into public Markdown.
+
+Changes involving `docs/**` require a separate maintainer-approved publication/disclosure review during the current staged release. **This is a project publication constraint, not a built-in global GR rejection rule.** Do not include that directory in a proposed public campaign without an explicit reviewed policy change.
+
+## Getting help and reporting security issues
+
+Use [SUPPORT.md](./SUPPORT.md) for questions and [SECURITY.md](./SECURITY.md) for private vulnerability reporting. Please don't disclose security issues in public issues, PRs, or discussions.
+
+By participating, you agree to the [Code of Conduct](./CODE_OF_CONDUCT.md).

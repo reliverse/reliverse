@@ -9,7 +9,14 @@ This document explains how the **Reliverse™** name and branding may be used.
 > - This policy describes the project's claimed brand identifiers and aims to prevent user confusion.
 > - Reliverse™ is an unregistered trademark of Nazarii Korniienko.
 > - Reliverse may be registered as a trademark in the future.
-> - This document is not legal advice.
+> - _This document is not legal advice._
+
+## Quick guide
+
+- You may truthfully refer to Reliverse in compatibility statements, tutorials and descriptions of an independent fork, without implying endorsement.
+- Give modified distributions their own primary name and branding. Identify them clearly as independent.
+- Uses listed in section 5, such as branded product UI, marketing and merchandise, require written permission.
+- The code license and these branding rules are separate. This summary does not expand or replace the terms below.
 
 ## 1) What this covers
 
