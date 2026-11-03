@@ -1,0 +1,26 @@
+name: GR source inspection smoke
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  source-inspection:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.4.4"
+      - name: Verify the repository Bun pin
+        run: bun --no-env-file -e 'if ("bun@" + Bun.version !== (await Bun.file("package.json").json()).packageManager) process.exit(1)'
+      - name: Inspect this checkout without installing dependencies
+        run: bun --no-install --no-env-file examples/gr/inspect.ts .
+      - name: Check read-only behavior without installing dependencies
+        run: bun --no-install --no-env-file test examples/gr/inspect.test.ts
