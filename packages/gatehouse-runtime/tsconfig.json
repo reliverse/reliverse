@@ -1,0 +1,10 @@
+{
+  "extends": "@repo/tsconfig/ts-only.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "dist",
+    "types": ["bun"]
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

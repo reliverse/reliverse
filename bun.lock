@@ -257,6 +257,40 @@
         "typescript",
       ],
     },
+    "packages/gatehouse-p256": {
+      "name": "@reliverse/gatehouse-p256",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reliverse/gatehouse-protocol": "workspace:*",
+        "@reliverse/gatehouse-runtime": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
+      },
+    },
+    "packages/gatehouse-protocol": {
+      "name": "@reliverse/gatehouse-protocol",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
+      },
+    },
+    "packages/gatehouse-runtime": {
+      "name": "@reliverse/gatehouse-runtime",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reliverse/gatehouse-protocol": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
+      },
+    },
     "packages/home": {
       "name": "@reliverse/home",
       "version": "0.1.0",
@@ -1170,6 +1204,12 @@
     "@reliverse/declar": ["@reliverse/declar@workspace:packages/declar"],
 
     "@reliverse/dler-rse-plugin": ["@reliverse/dler-rse-plugin@workspace:plugins/dler"],
+
+    "@reliverse/gatehouse-p256": ["@reliverse/gatehouse-p256@workspace:packages/gatehouse-p256"],
+
+    "@reliverse/gatehouse-protocol": ["@reliverse/gatehouse-protocol@workspace:packages/gatehouse-protocol"],
+
+    "@reliverse/gatehouse-runtime": ["@reliverse/gatehouse-runtime@workspace:packages/gatehouse-runtime"],
 
     "@reliverse/home": ["@reliverse/home@workspace:packages/home"],
 

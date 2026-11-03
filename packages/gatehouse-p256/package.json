@@ -1,0 +1,39 @@
+{
+  "name": "@reliverse/gatehouse-p256",
+  "version": "0.1.0",
+  "private": false,
+  "author": "reliverse",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./internal/delegation.fixture": {
+      "types": "./src/delegation.fixture.ts",
+      "import": "./src/delegation.fixture.ts"
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test ./src",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/gatehouse-protocol": "workspace:*",
+    "@reliverse/gatehouse-runtime": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  }
+}
