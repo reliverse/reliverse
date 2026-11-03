@@ -1,0 +1,80 @@
+{
+  "$dcs": {
+    "contractVersion": 1,
+    "documentVersion": 1,
+    "fileStem": "demo-tool",
+    "id": "org.reliverse.demo-tool",
+    "specVersion": "0.0.1"
+  },
+  "defaults": { "editor": { "fontSize": 14, "theme": "dark" }, "plugins": [], "telemetry": false },
+  "fields": {
+    "/editor": {
+      "merge": "deep",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "secret": false
+    },
+    "/editor/fontSize": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "secret": false
+    },
+    "/editor/theme": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "secret": false
+    },
+    "/plugins": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "secret": false
+    },
+    "/telemetry": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace"],
+      "secret": false
+    },
+    "/token": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "secret": true
+    }
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "additionalProperties": false,
+    "properties": {
+      "editor": {
+        "additionalProperties": false,
+        "properties": { "fontSize": { "type": "number" }, "theme": { "enum": ["dark", "light"] } },
+        "required": ["fontSize", "theme"],
+        "type": "object"
+      },
+      "plugins": { "items": { "type": "string" }, "type": "array" },
+      "telemetry": { "type": "boolean" },
+      "token": {
+        "additionalProperties": false,
+        "properties": {
+          "$secret": {
+            "additionalProperties": false,
+            "properties": {
+              "key": { "minLength": 1, "type": "string" },
+              "provider": { "pattern": "^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)*$", "type": "string" }
+            },
+            "required": ["provider", "key"],
+            "type": "object"
+          }
+        },
+        "required": ["$secret"],
+        "type": "object"
+      }
+    },
+    "required": ["editor", "plugins", "telemetry"],
+    "type": "object"
+  }
+}

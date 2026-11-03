@@ -1,0 +1,49 @@
+{
+  "name": "@reliverse/dcs",
+  "version": "0.1.0",
+  "private": false,
+  "description": "High-level TypeScript SDK for Define Config Standard authoring and browser-safe integration.",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./secrets": {
+      "types": "./src/secrets.ts",
+      "default": "./src/secrets.ts"
+    },
+    "./node": {
+      "types": "./src/node/index.ts",
+      "default": "./src/node/index.ts"
+    },
+    "./bun": {
+      "types": "./src/bun/index.ts",
+      "default": "./src/bun/index.ts"
+    },
+    "./package-manifest": "./src/package-manifest.ts",
+    "./package.json": "./package.json"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test ./src",
+    "typecheck": "tsc -p ./tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@reliverse/dcs-contract": "workspace:*",
+    "@reliverse/dcs-react": "workspace:*",
+    "@reliverse/rvs-private": "workspace:*"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  }
+}

@@ -1,0 +1,68 @@
+{
+  "$dcs": {
+    "contractVersion": 1,
+    "documentVersion": 1,
+    "fileStem": "playground",
+    "id": "org.reliverse.dcs-playground-demo",
+    "specVersion": "0.0.1"
+  },
+  "defaults": {
+    "editor": { "theme": "dark" },
+    "port": 4545,
+    "telemetry": false
+  },
+  "fields": {
+    "/editor": {
+      "merge": "deep",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "presentation": { "group": "Editor", "label": "Editor", "order": 10 }
+    },
+    "/editor/theme": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "presentation": { "control": "select", "group": "Editor", "label": "Theme", "order": 20 }
+    },
+    "/port": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["workspace", "local", "invocation"],
+      "presentation": {
+        "control": "number",
+        "description": "Local web-server port.",
+        "group": "Runtime",
+        "label": "Port",
+        "order": 30
+      }
+    },
+    "/telemetry": {
+      "merge": "replace",
+      "resettable": true,
+      "scopes": ["user", "workspace", "local", "invocation"],
+      "presentation": {
+        "control": "checkbox",
+        "description": "Send anonymous product telemetry.",
+        "group": "Privacy",
+        "label": "Telemetry",
+        "order": 40
+      }
+    }
+  },
+  "schema": {
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "editor": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": { "theme": { "type": "string", "enum": ["dark", "light"] } },
+        "required": ["theme"]
+      },
+      "port": { "type": "integer", "minimum": 1, "maximum": 65535 },
+      "telemetry": { "type": "boolean" }
+    },
+    "required": ["editor", "port", "telemetry"]
+  }
+}
