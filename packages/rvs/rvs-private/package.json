@@ -1,0 +1,36 @@
+{
+  "name": "@reliverse/rvs-private",
+  "version": "0.1.0",
+  "private": false,
+  "description": "RVS private-state topology, root resolution, and portable private namespace primitives.",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "test": "bun test ./src",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "devDependencies": {
+    "@repo/tsconfig": "workspace:*",
+    "@types/bun": "catalog:",
+    "typescript-7": "catalog:"
+  },
+  "engines": {
+    "bun": ">=1.4.2"
+  }
+}

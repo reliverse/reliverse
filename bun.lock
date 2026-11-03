@@ -222,6 +222,15 @@
         "typescript",
       ],
     },
+    "packages/home": {
+      "name": "@reliverse/home",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
+      },
+    },
     "packages/parser": {
       "name": "@reliverse/parser",
       "version": "0.1.0",
@@ -282,6 +291,27 @@
         "@repo/tsconfig": "workspace:*",
         "@types/bun": "catalog:",
         "@typescript/native-preview": "catalog:",
+      },
+    },
+    "packages/rvs/rvs-private": {
+      "name": "@reliverse/rvs-private",
+      "version": "0.1.0",
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
+      },
+    },
+    "packages/rvs/rvs-user": {
+      "name": "@reliverse/rvs-user",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reliverse/home": "workspace:*",
+      },
+      "devDependencies": {
+        "@repo/tsconfig": "workspace:*",
+        "@types/bun": "catalog:",
+        "typescript-7": "catalog:",
       },
     },
     "packages/tailwind": {
@@ -1100,6 +1130,8 @@
 
     "@reliverse/dler-rse-plugin": ["@reliverse/dler-rse-plugin@workspace:plugins/dler"],
 
+    "@reliverse/home": ["@reliverse/home@workspace:packages/home"],
+
     "@reliverse/os-rse-plugin": ["@reliverse/os-rse-plugin@workspace:plugins/os"],
 
     "@reliverse/parser": ["@reliverse/parser@workspace:packages/parser"],
@@ -1121,6 +1153,10 @@
     "@reliverse/rse": ["@reliverse/rse@workspace:apps/rse"],
 
     "@reliverse/rspace-rse-plugin": ["@reliverse/rspace-rse-plugin@workspace:plugins/rspace"],
+
+    "@reliverse/rvs-private": ["@reliverse/rvs-private@workspace:packages/rvs/rvs-private"],
+
+    "@reliverse/rvs-user": ["@reliverse/rvs-user@workspace:packages/rvs/rvs-user"],
 
     "@reliverse/toolkit-rse-plugin": ["@reliverse/toolkit-rse-plugin@workspace:plugins/toolkit"],
 
